@@ -1606,7 +1606,7 @@ export default function App() {
     const handleOpenCart = () => {
       setCheckoutStep("cart");
       setIsCartOpen(true);
-    };d
+    };
     window.addEventListener('openCart', handleOpenCart);
     return () => window.removeEventListener('openCart', handleOpenCart);
   }, []);
