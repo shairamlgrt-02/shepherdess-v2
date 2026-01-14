@@ -1685,7 +1685,8 @@ export default function App() {
       }
       return { ...prev, [p.id]: { ...p, qty: (prev[p.id]?.qty || 0) + 1 } };
     });
-    setIsCartOpen(true);
+    // setIsCartOpen(true); // <--- DELETE OR COMMENT OUT THIS LINE
+    showNotification("Added to cart! Click the bag to view."); // <--- Success Message
   };
   const updateCartQty = (id, delta) => {
     setCart((prev) => {
@@ -2066,16 +2067,19 @@ export default function App() {
             )}
             {viewMode === "shop" && (
               <button
-                onClick={() => setIsCartOpen(true)}
-                className="relative p-2 hover:text-purple-600 transition-colors"
-              >
-                <ShoppingBag size={24} />
-                {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
-                  <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                    {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
-                  </span>
-                )}
-              </button>
+              onClick={() => {
+                setCheckoutStep("cart"); // <--- This is the magic line!
+                setIsCartOpen(true);
+              }}
+              className="relative p-2 hover:text-purple-600 transition-colors"
+            >
+              <ShoppingBag size={24} />
+              {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
+                <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
+                  {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
+                </span>
+              )}
+            </button>
             )}
           </div>
         </div>
@@ -2358,97 +2362,78 @@ export default function App() {
             {/* Cart Body */}
             <div className="flex-1 overflow-y-auto p-6">
               {checkoutStep === "success" ? (
-                /* --- NEW SUCCESS SCREEN START --- */
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-6 animate-fade-in px-4">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 shadow-sm">
                     <Check size={40} />
                   </div>
-
                   <div>
-                    <h3 className="text-2xl font-serif font-bold text-gray-900 mb-1">
-                      Order Placed!
-                    </h3>
-                    <p className="text-xl font-mono font-bold text-purple-600 mb-2">
-                      {lastOrder?.orderId || "#ORDER"}
-                    </p>
-                    <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                      Your order has been received and is waiting for payment
-                      verification.
-                    </p>
+                    <h3 className="text-2xl font-serif font-bold text-gray-900 mb-1">Order Placed!</h3>
+                    <p className="text-xl font-mono font-bold text-purple-600 mb-2">{lastOrder?.orderId || "#ORDER"}</p>
+                    <p className="text-gray-500 text-sm max-w-xs mx-auto">Your order has been received and is waiting for payment verification.</p>
                   </div>
-
-                  {/* Download Receipt Button */}
-                  <button
-                    onClick={() => generateReceipt(lastOrder)}
-                    className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg"
-                  >
-                    <Download size={18} />
-                    Download Receipt (PDF)
+                  <button onClick={() => generateReceipt(lastOrder)} className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg">
+                    <Download size={18} /> Download Receipt (PDF)
                   </button>
-
-                  {/* WhatsApp Button */}
-                  <a
-                    href={`https://wa.me/97333027588?text=Hi, I just placed order ${
-                      lastOrder?.orderId || ""
-                    }. Please confirm!`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full"
-                  >
+                  <a href={`https://wa.me/97333027588?text=Hi, I just placed order ${lastOrder?.orderId || ""}. Please confirm!`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full">
                     <MessageSquare size={18} /> Chat on WhatsApp
                   </a>
-
-                  <button
-                    onClick={() => {
-                      setCheckoutStep("cart");
-                      setIsCartOpen(false);
-                      setLastOrder(null);
-                    }}
-                    className="text-gray-400 font-bold hover:text-gray-600 text-sm mt-4"
-                  >
+                  <button onClick={() => { setCheckoutStep("cart"); setIsCartOpen(false); setLastOrder(null); }} className="text-gray-400 font-bold hover:text-gray-600 text-sm mt-4">
                     Close & Continue Shopping
                   </button>
                 </div>
-              ) : /* --- NEW SUCCESS SCREEN END --- */
-              Object.keys(cart).length === 0 ? (
+              ) : Object.keys(cart).length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
                   <ShoppingBag size={48} className="text-purple-200" />
                   <p>Your bag is empty.</p>
-                  <button
-                    onClick={() => setIsCartOpen(false)}
-                    className="text-purple-600 font-semibold hover:underline"
-                  >
-                    Start Shopping
-                  </button>
+                  <button onClick={() => setIsCartOpen(false)} className="text-purple-600 font-semibold hover:underline">Start Shopping</button>
                 </div>
               ) : checkoutStep === "cart" ? (
-<div className="space-y-6 animate-fade-in p-1">
-                  
-                  {/* --- DELIVERY OPTIONS SECTION --- */}
+                /* --- STEP 1: SUMMARY VIEW --- */
+                <div className="space-y-6 animate-fade-in">
+                  {Object.values(cart).map((i) => (
+                    <div key={i.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 relative">
+                      <div className="w-20 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
+                        <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div className="pr-6">
+                          <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{i.name}</h4>
+                          <p className="text-[10px] text-purple-600 font-bold uppercase mt-1">{i.category}</p>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
+                          <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
+                            <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
+                            <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
+                            <button onClick={() => updateCartQty(i.id, 1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Plus size={14} /></button>
+                          </div>
+                        </div>
+                        <button onClick={() => updateCartQty(i.id, -i.qty)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-center text-gray-400 italic">Review your items before proceeding</p>
+                </div>
+              ) : (
+                /* --- STEP 2: DELIVERY & PAYMENT DETAILS --- */
+                <div className="space-y-6 animate-fade-in">
                   <div className="space-y-3">
                     <h3 className="font-bold text-gray-900 text-sm">Select Delivery Method</h3>
                     
                     {/* Option 1: Meet-Up */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
-                    }`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <input 
-                          type="radio" 
-                          name="delivery" 
-                          className="accent-purple-600 w-5 h-5"
-                          checked={deliveryMethod === 'meetup'} 
-                          onChange={() => setDeliveryMethod('meetup')}
-                        />
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900">Free Meet-Up</span>
-                          <span className="block text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-3 mb-1" onClick={() => setDeliveryMethod('meetup')}>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                          {deliveryMethod === 'meetup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
                         </div>
-                        <Store size={20} className="text-gray-400"/>
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900 block">Meet-Up</span>
+                          <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                        </div>
+                        <Store size={20} className="text-gray-400" />
                       </div>
-                      {/* Helper Text for Meetup */}
                       {deliveryMethod === 'meetup' && (
-                        <div className="ml-8 text-xs text-gray-600 space-y-1 bg-white/50 p-2 rounded border border-purple-100">
+                        <div className="ml-8 text-[11px] text-gray-600 space-y-1 mt-2 bg-white/50 p-2 rounded border border-purple-100 animate-fade-in">
                           <p><strong>Manama Centre:</strong> Sun-Thu (9AM - 3PM)</p>
                           <p><strong>Bahrain Tower:</strong> Mon/Tue/Thu (8PM-11PM) or Fri (11AM-2PM)</p>
                           <p className="italic text-purple-700 mt-1">"Or let's coordinate somewhere else!"</p>
@@ -2457,106 +2442,73 @@ export default function App() {
                     </label>
 
                     {/* Option 2: Pick-Up */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="radio" 
-                          name="delivery" 
-                          className="accent-purple-600 w-5 h-5"
-                          checked={deliveryMethod === 'pickup'} 
-                          onChange={() => setDeliveryMethod('pickup')}
-                        />
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900">Free Pick-Up (Sanabis)</span>
-                          <span className="block text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('pickup')}>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                          {deliveryMethod === 'pickup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
                         </div>
-                        <Store size={20} className="text-gray-400"/>
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900 block">Pick-Up (Sanabis)</span>
+                          <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                        </div>
+                        <Store size={20} className="text-gray-400" />
                       </div>
                       {deliveryMethod === 'pickup' && (
-                        <p className="ml-8 mt-2 text-xs text-gray-500">
+                        <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
                           I can leave it for you to pick up in Sanabis anytime!
                         </p>
                       )}
                     </label>
 
                     {/* Option 3: Delivery */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="radio" 
-                          name="delivery" 
-                          className="accent-purple-600 w-5 h-5"
-                          checked={deliveryMethod === 'delivery'} 
-                          onChange={() => setDeliveryMethod('delivery')}
-                        />
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900">Door-to-Door Delivery</span>
-                          <span className="block text-xs text-red-600 font-bold">+ 1.000 BHD</span>
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('delivery')}>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                          {deliveryMethod === 'delivery' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
                         </div>
-                        <Truck size={20} className="text-gray-400"/>
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900 block">Delivery</span>
+                          <span className="text-xs text-red-600 font-bold">+ 1.000 BHD</span>
+                        </div>
+                        <Truck size={20} className="text-gray-400" />
                       </div>
+                      {deliveryMethod === 'delivery' && (
+                         <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
+                           Same Day Delivery for orders until 2:30PM
+                         </p>
+                      )}
                     </label>
                   </div>
 
-                  {/* --- DYNAMIC INPUT FIELDS --- */}
-                  <div className="space-y-4 pt-2">
-                    {deliveryMethod === 'delivery' ? (
-                      <div className="animate-fade-in">
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Delivery Address</label>
-                        <textarea 
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
-                          placeholder="House, Road, Block, Area..."
-                          rows="2"
-                          value={deliveryAddress}
-                          onChange={(e) => setDeliveryAddress(e.target.value)}
-                        />
+                  {/* Dynamic Inputs */}
+                  <div className="space-y-4">
+                    <div className="animate-fade-in">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
+                        {deliveryMethod === 'delivery' ? "Delivery Address" : 
+                         deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
+                      </label>
+                      <textarea 
+                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
+                        placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." : 
+                                     deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
+                        rows="2"
+                        value={deliveryMethod === 'delivery' ? deliveryAddress : meetupNote}
+                        onChange={(e) => deliveryMethod === 'delivery' ? setDeliveryAddress(e.target.value) : setMeetupNote(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Contact Details</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Your Name" value={customerDetails.name} onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })} required />
+                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Phone Number" type="tel" value={customerDetails.phone} onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })} required />
                       </div>
-                    ) : (
-                      <div className="animate-fade-in">
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
-                          {deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
-                        </label>
-                        <textarea 
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
-                          placeholder={deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight around 8 PM"}
-                          rows="2"
-                          value={meetupNote}
-                          onChange={(e) => setMeetupNote(e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    {/* Standard Contact Info */}
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact Details</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <input
-                            className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                            placeholder="Your Name"
-                            value={customerDetails.name}
-                            onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
-                            required
-                            />
-                            <input
-                            className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                            placeholder="Phone Number"
-                            type="tel"
-                            value={customerDetails.phone}
-                            onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
-                            required
-                            />
-                        </div>
                     </div>
                   </div>
 
-                  {/* --- UPDATED PAYMENT SECTION --- */}
-                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 mt-4">
+                  {/* Summary Section matching Image 3 */}
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                     <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
-                    
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                       <span>Subtotal:</span>
                       <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
@@ -2566,151 +2518,34 @@ export default function App() {
                       <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
                     </div>
 
-                    <div className="flex justify-between items-end">
+                    <div className="flex justify-between items-end mb-4">
                         <span className="text-purple-700 font-bold text-lg">Total:</span>
                         <span className="font-mono text-2xl font-bold text-gray-900">
                           {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
                         </span>
                     </div>
 
-                    {/* Copy Number Box */}
-                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mt-4"
-                         onClick={() => navigator.clipboard.writeText("+97333027588")}>
-                      <p className="text-xs text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
-                      <p className="font-mono text-lg font-bold text-gray-900">+973 3302 7588</p>
+                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => {navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!");}}>
+                      <p className="text-[10px] text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
+                      <p className="font-mono text-lg font-bold text-gray-900 tracking-wider">+973 3302 7588</p>
                       <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">Name: <span className="font-bold">ILA Shai</span></p>
+                    <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
                   </div>
 
-                  {/* Proof Upload (Kept same) */}
-                  <div className="border-t border-gray-100 pt-4">
-                    <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                      proofFile ? "border-green-400 bg-green-50" : "border-gray-300 hover:border-purple-400"
-                    }`}>
+                  {/* Proof Upload */}
+                  <div className="pt-2">
+                    <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer bg-white transition-all ${proofFile ? "border-green-400" : "border-gray-200"}`}>
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => setProofFile(e.target.files[0])} />
-                      {proofFile ? (
-                        <div className="text-center text-green-700 flex items-center gap-2">
-                          <Check size={20} /> <span className="font-bold text-sm truncate">{proofFile.name}</span>
-                        </div>
-                      ) : (
-                        <div className="text-center text-gray-400 flex items-center gap-2">
-                          <Upload size={20} /> <span className="font-medium text-sm">Upload Payment Screenshot</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 text-gray-400">
+                        {proofFile ? <CheckCircle size={18} className="text-green-500" /> : <Upload size={18} />}
+                        <span className="text-xs font-bold">{proofFile ? proofFile.name : "Upload Payment Screenshot"}</span>
+                      </div>
                     </label>
-                  </div>
-
-                </div>
-              ) : (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                    <h3 className="font-bold text-purple-900 mb-3">
-                      BenefitPay Instructions
-                    </h3>
-                    <p className="text-sm text-purple-700 mb-4">
-                      Please transfer{" "}
-                      <span className="font-bold">
-                        {Object.values(cart)
-                          .reduce((s, i) => s + i.price * i.qty, 0)
-                          .toFixed(3)}{" "}
-                        BHD
-                      </span>
-                    </p>
-
-                    {/* Click to Copy Box */}
-                    <div
-                      className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer"
-                      onClick={() =>
-                        navigator.clipboard.writeText("+97333027588")
-                      }
-                    >
-                      <p className="text-xs text-purple-500 uppercase font-bold tracking-wider mb-1">
-                        Pay to Number
-                      </p>
-                      <p className="font-mono text-lg font-bold text-gray-900">
-                        +973 3302 7588
-                      </p>
-                      <Copy
-                        size={16}
-                        className="absolute right-3 top-4 text-purple-400"
-                      />
-                    </div>
-
-                    {/* NEW: Recipient Name Info */}
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Recipient/Account Name:{" "}
-                      <span className="font-bold text-gray-700">ILA Shai</span>
-                    </p>
-                  </div>
-                  <div className="border-t border-gray-100 pt-4">
-                    <h3 className="font-bold text-gray-800 mb-2 text-sm">
-                      Proof of Payment
-                    </h3>
-                    <label
-                      className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                        proofFile
-                          ? "border-green-400 bg-green-50"
-                          : "border-gray-300 hover:border-purple-400 hover:bg-purple-50"
-                      }`}
-                    >
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => setProofFile(e.target.files[0])}
-                      />
-                      {proofFile ? (
-                        <div className="text-center text-green-700">
-                          <Check size={24} className="mx-auto mb-1" />
-                          <p className="font-bold text-sm truncate max-w-[200px]">
-                            {proofFile.name}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-center text-gray-400">
-                          <Upload size={24} className="mx-auto mb-2" />
-                          <p className="font-medium text-sm text-gray-600">
-                            Upload Screenshot
-                          </p>
-                        </div>
-                      )}
-                    </label>
-                  </div>
-                  <div className="space-y-4 border-t border-gray-100 pt-4">
-                    <h3 className="font-bold text-gray-800 text-sm">
-                      Contact Info
-                    </h3>
-                    <input
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                      placeholder="Your Name"
-                      value={customerDetails.name}
-                      onChange={(e) =>
-                        setCustomerDetails({
-                          ...customerDetails,
-                          name: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                    <input
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                      placeholder="Phone Number"
-                      type="tel"
-                      value={customerDetails.phone}
-                      onChange={(e) =>
-                        setCustomerDetails({
-                          ...customerDetails,
-                          phone: e.target.value,
-                        })
-                      }
-                      required
-                    />
                   </div>
                 </div>
               )}
             </div>
-
             {/* Cart Footer (Sticky) */}
             {Object.keys(cart).length > 0 && checkoutStep !== "success" && (
               <div className="p-6 border-t border-gray-100 bg-gray-50">
