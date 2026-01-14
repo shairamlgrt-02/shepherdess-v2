@@ -2407,7 +2407,39 @@ export default function App() {
                   <button onClick={() => generateReceipt(lastOrder)} className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg">
                     <Download size={18} /> Download Receipt (PDF)
                   </button>
-                  <a href={`https://wa.me/97333027588?text=Hi, I just placed order ${lastOrder?.orderId || ""}. Please confirm!`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full">
+                  {/* WhatsApp Button: The Bestie Edition 🎀 */}
+                  <a
+                    href={(() => {
+                      // 1. Logic for the delivery/meet-up info
+                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery 📦' : 
+                                           lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up 🤝' : 'Pick-Up 🏠';
+                      
+                      const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery' 
+                        ? lastOrder.customer.deliveryAddress 
+                        : lastOrder.customer.meetupNote;
+
+                      // 2. Format the product list with emojis
+                      const itemList = Object.values(lastOrder?.items || {})
+                        .map(i => `✨ ${i.qty} x ${i.name}`)
+                        .join('%0A');
+
+                      // 3. Build the "Bestie" Message
+                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! 🐑✨%0A%0A` +
+                        `*ORDER SUMMARY* 💌%0A` +
+                        `🎀 *Name:* ${lastOrder?.customer?.name}%0A` +
+                        `🎀 *Order ID:* ${lastOrder?.orderId}%0A` +
+                        `🎀 *Method:* ${deliveryType}%0A` +
+                        `🎀 *The Stash Info:* ${deliveryDetail}%0A%0A` +
+                        `*THE GOODIES:* 🤫%0A${itemList}%0A%0A` +
+                        `*Total:* ${lastOrder?.total?.toFixed(3)} BHD%0A%0A` +
+                        `Let me know when you see this!`;
+
+                      return `https://wa.me/97333027588?text=${message}`;
+                    })()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full"
+                  >
                     <MessageSquare size={18} /> Chat on WhatsApp
                   </a>
                   <button onClick={() => { setCheckoutStep("cart"); setIsCartOpen(false); setLastOrder(null); }} className="text-gray-400 font-bold hover:text-gray-600 text-sm mt-4">
