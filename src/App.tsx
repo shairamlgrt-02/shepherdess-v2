@@ -1581,6 +1581,9 @@ export default function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [viewMode, setViewMode] = useState("shop");
   const [checkoutStep, setCheckoutStep] = useState("cart");
+  const [deliveryMethod, setDeliveryMethod] = useState("meetup"); 
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [meetupNote, setMeetupNote] = useState("");
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     phone: "",
@@ -1763,24 +1766,44 @@ export default function App() {
   const handleCheckout = async (e) => {
     e.preventDefault();
     if (!proofFile) return showNotification("Upload proof", "error");
+    
+    // Validation: Require Address for Delivery, Note for others
+    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
+      return showNotification("Please enter delivery address", "error");
+    }
+
     setIsSubmitting(true);
 
     try {
       const proof = await compressImage(proofFile);
-      const newOrderId = generateOrderId(); // Generate readable ID
+      const newOrderId = generateOrderId();
+      
+      // Calculate final total
+      const cartTotal = Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
+      const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
+      const finalTotal = cartTotal + deliveryFee;
 
       const orderData = {
-        orderId: newOrderId, // Save the ID
-        customer: { ...customerDetails, proof },
+        orderId: newOrderId,
+        customer: { 
+          ...customerDetails, 
+          proof,
+          // Save the delivery info clearly
+          deliveryMethod: deliveryMethod,
+          deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : "N/A",
+          meetupNote: deliveryMethod !== 'delivery' ? meetupNote : "N/A"
+        },
         items: cart,
-        total: Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0),
+        subtotal: cartTotal, // Keep track of pure product cost
+        deliveryFee: deliveryFee,
+        total: finalTotal,
         date: new Date().toISOString(),
         status: "pending",
       };
 
       await addDoc(collection(db, "orders"), orderData);
 
-      // Inventory update logic (kept the same)
+      // Inventory update logic (Same as before)
       for (const [id, item] of Object.entries(cart)) {
         const p = products.find((prod) => prod.id === id);
         if (p)
@@ -1790,9 +1813,12 @@ export default function App() {
           });
       }
 
-      setLastOrder(orderData); // Save data so we can print the receipt
+      setLastOrder(orderData);
       setCart({});
       setCheckoutStep("success");
+      // Reset forms
+      setDeliveryAddress("");
+      setMeetupNote("");
     } catch (e) {
       console.error(e);
       showNotification("Error processing order", "error");
@@ -2396,49 +2422,185 @@ export default function App() {
                   </button>
                 </div>
               ) : checkoutStep === "cart" ? (
-                <div className="space-y-6">
-                  {Object.values(cart).map((i) => (
-                    <div key={i.id} className="flex gap-4 relative">
-                      <div className="w-20 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                        <img
-                          src={i.image}
-                          className="w-full h-full object-cover"
+<div className="space-y-6 animate-fade-in p-1">
+                  
+                  {/* --- DELIVERY OPTIONS SECTION --- */}
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-gray-900 text-sm">Select Delivery Method</h3>
+                    
+                    {/* Option 1: Meet-Up */}
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
+                    }`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <input 
+                          type="radio" 
+                          name="delivery" 
+                          className="accent-purple-600 w-5 h-5"
+                          checked={deliveryMethod === 'meetup'} 
+                          onChange={() => setDeliveryMethod('meetup')}
+                        />
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900">Free Meet-Up</span>
+                          <span className="block text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                        </div>
+                        <Store size={20} className="text-gray-400"/>
+                      </div>
+                      {/* Helper Text for Meetup */}
+                      {deliveryMethod === 'meetup' && (
+                        <div className="ml-8 text-xs text-gray-600 space-y-1 bg-white/50 p-2 rounded border border-purple-100">
+                          <p><strong>Manama Centre:</strong> Sun-Thu (9AM - 3PM)</p>
+                          <p><strong>Bahrain Tower:</strong> Mon/Tue/Thu (8PM-11PM) or Fri (11AM-2PM)</p>
+                          <p className="italic text-purple-700 mt-1">"Or let's coordinate somewhere else!"</p>
+                        </div>
+                      )}
+                    </label>
+
+                    {/* Option 2: Pick-Up */}
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="delivery" 
+                          className="accent-purple-600 w-5 h-5"
+                          checked={deliveryMethod === 'pickup'} 
+                          onChange={() => setDeliveryMethod('pickup')}
+                        />
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900">Free Pick-Up (Sanabis)</span>
+                          <span className="block text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                        </div>
+                        <Store size={20} className="text-gray-400"/>
+                      </div>
+                      {deliveryMethod === 'pickup' && (
+                        <p className="ml-8 mt-2 text-xs text-gray-500">
+                          I can leave it for you to pick up in Sanabis anytime!
+                        </p>
+                      )}
+                    </label>
+
+                    {/* Option 3: Delivery */}
+                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="delivery" 
+                          className="accent-purple-600 w-5 h-5"
+                          checked={deliveryMethod === 'delivery'} 
+                          onChange={() => setDeliveryMethod('delivery')}
+                        />
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900">Door-to-Door Delivery</span>
+                          <span className="block text-xs text-red-600 font-bold">+ 1.000 BHD</span>
+                        </div>
+                        <Truck size={20} className="text-gray-400"/>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* --- DYNAMIC INPUT FIELDS --- */}
+                  <div className="space-y-4 pt-2">
+                    {deliveryMethod === 'delivery' ? (
+                      <div className="animate-fade-in">
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Delivery Address</label>
+                        <textarea 
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
+                          placeholder="House, Road, Block, Area..."
+                          rows="2"
+                          value={deliveryAddress}
+                          onChange={(e) => setDeliveryAddress(e.target.value)}
                         />
                       </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-sm line-clamp-1">
-                            {i.name}
-                          </h4>
-                          <p className="text-xs text-gray-500 mb-1">
-                            {i.category}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-purple-600">
-                            {i.price.toFixed(3)} BHD
-                          </span>
-                          <div className="flex items-center gap-3 bg-gray-50 rounded-full px-2 py-1 border border-gray-200">
-                            <button
-                              onClick={() => updateCartQty(i.id, -1)}
-                              className="p-1 hover:bg-white rounded-full"
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <span className="text-sm font-bold w-4 text-center">
-                              {i.qty}
-                            </span>
-                            <button
-                              onClick={() => updateCartQty(i.id, 1)}
-                              className="p-1 hover:bg-white rounded-full"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        </div>
+                    ) : (
+                      <div className="animate-fade-in">
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+                          {deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
+                        </label>
+                        <textarea 
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
+                          placeholder={deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight around 8 PM"}
+                          rows="2"
+                          value={meetupNote}
+                          onChange={(e) => setMeetupNote(e.target.value)}
+                        />
                       </div>
+                    )}
+
+                    {/* Standard Contact Info */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact Details</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <input
+                            className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                            placeholder="Your Name"
+                            value={customerDetails.name}
+                            onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
+                            required
+                            />
+                            <input
+                            className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                            placeholder="Phone Number"
+                            type="tel"
+                            value={customerDetails.phone}
+                            onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
+                            required
+                            />
+                        </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* --- UPDATED PAYMENT SECTION --- */}
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 mt-4">
+                    <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
+                    
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Subtotal:</span>
+                      <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-3 border-b border-purple-200 pb-2">
+                      <span>Delivery Fee:</span>
+                      <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
+                    </div>
+
+                    <div className="flex justify-between items-end">
+                        <span className="text-purple-700 font-bold text-lg">Total:</span>
+                        <span className="font-mono text-2xl font-bold text-gray-900">
+                          {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
+                        </span>
+                    </div>
+
+                    {/* Copy Number Box */}
+                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mt-4"
+                         onClick={() => navigator.clipboard.writeText("+97333027588")}>
+                      <p className="text-xs text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
+                      <p className="font-mono text-lg font-bold text-gray-900">+973 3302 7588</p>
+                      <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 text-center">Name: <span className="font-bold">ILA Shai</span></p>
+                  </div>
+
+                  {/* Proof Upload (Kept same) */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                      proofFile ? "border-green-400 bg-green-50" : "border-gray-300 hover:border-purple-400"
+                    }`}>
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => setProofFile(e.target.files[0])} />
+                      {proofFile ? (
+                        <div className="text-center text-green-700 flex items-center gap-2">
+                          <Check size={20} /> <span className="font-bold text-sm truncate">{proofFile.name}</span>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-400 flex items-center gap-2">
+                          <Upload size={20} /> <span className="font-medium text-sm">Upload Payment Screenshot</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
                 </div>
               ) : (
                 <div className="space-y-6 animate-fade-in">
