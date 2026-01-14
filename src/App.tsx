@@ -150,17 +150,16 @@ const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
   return (
     <div
-      className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-xl animate-bounce-in ${
-        type === "success"
+      className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-xl animate-bounce-in ${type === "success"
           ? "bg-green-100 text-green-800 border border-green-200"
           : "bg-red-100 text-red-800 border border-red-200"
-      }`}
+        }`}
       // This line allows the "View Bag" link to be clickable
       dangerouslySetInnerHTML={{ __html: message }}
       onClick={(e) => {
         // If they click the "View Bag" link specifically
         if (e.target.tagName === 'B') {
-           onClose(); 
+          onClose();
         }
       }}
     />
@@ -183,9 +182,8 @@ const ProductImage = ({ src, alt, stock, discount, isNew }) => {
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${
-          loaded ? "opacity-100" : "opacity-0"
-        }`}
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${loaded ? "opacity-100" : "opacity-0"
+          }`}
         onError={(e) => {
           e.currentTarget.src =
             "https://via.placeholder.com/400x500?text=Shepherdess+K-Beauty";
@@ -269,26 +267,23 @@ const AnalyticsSummary = ({ products, orders }) => {
 
       {/* Low Stock Card */}
       <div
-        className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${
-          lowStockItems.length > 0
+        className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${lowStockItems.length > 0
             ? "bg-amber-50 border-amber-200"
             : "bg-white border-gray-100"
-        }`}
+          }`}
       >
         <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center ${
-            lowStockItems.length > 0
+          className={`w-12 h-12 rounded-full flex items-center justify-center ${lowStockItems.length > 0
               ? "bg-amber-100 text-amber-600"
               : "bg-gray-100 text-gray-400"
-          }`}
+            }`}
         >
           <Package size={24} />
         </div>
         <div>
           <p
-            className={`text-sm font-bold uppercase ${
-              lowStockItems.length > 0 ? "text-amber-700" : "text-gray-500"
-            }`}
+            className={`text-sm font-bold uppercase ${lowStockItems.length > 0 ? "text-amber-700" : "text-gray-500"
+              }`}
           >
             Low Stock Alerts
           </p>
@@ -306,26 +301,23 @@ const AnalyticsSummary = ({ products, orders }) => {
 
       {/* Expiry Card */}
       <div
-        className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${
-          expiringItems.length > 0
+        className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${expiringItems.length > 0
             ? "bg-red-50 border-red-200"
             : "bg-white border-gray-100"
-        }`}
+          }`}
       >
         <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center ${
-            expiringItems.length > 0
+          className={`w-12 h-12 rounded-full flex items-center justify-center ${expiringItems.length > 0
               ? "bg-red-100 text-red-600"
               : "bg-gray-100 text-gray-400"
-          }`}
+            }`}
         >
           <Clock size={24} />
         </div>
         <div>
           <p
-            className={`text-sm font-bold uppercase ${
-              expiringItems.length > 0 ? "text-red-700" : "text-gray-500"
-            }`}
+            className={`text-sm font-bold uppercase ${expiringItems.length > 0 ? "text-red-700" : "text-gray-500"
+              }`}
           >
             Expiring Soon
           </p>
@@ -645,11 +637,10 @@ const AdminDashboard = ({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-              tab === t.id
+            className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${tab === t.id
                 ? "border-purple-600 text-purple-600"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             <t.icon size={18} /> {t.label}
           </button>
@@ -696,11 +687,10 @@ const AdminDashboard = ({
               <button
                 key={f.id}
                 onClick={() => setFilterStatus(f.id)}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
-                  filterStatus === f.id
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${filterStatus === f.id
                     ? "ring-2 ring-purple-500 ring-offset-1 border-transparent transform scale-105"
                     : "border-transparent opacity-70 hover:opacity-100"
-                } ${f.color}`}
+                  } ${f.color}`}
               >
                 {f.label} ({f.count})
               </button>
@@ -753,15 +743,14 @@ const AdminDashboard = ({
                 >
                   {/* Status Color Strip */}
                   <div
-                    className={`absolute top-0 left-0 right-0 h-1.5 ${
-                      status === "delivered"
+                    className={`absolute top-0 left-0 right-0 h-1.5 ${status === "delivered"
                         ? "bg-green-500"
                         : status === "confirmed"
-                        ? "bg-blue-500"
-                        : status === "canceled"
-                        ? "bg-red-500"
-                        : "bg-amber-500"
-                    }`}
+                          ? "bg-blue-500"
+                          : status === "canceled"
+                            ? "bg-red-500"
+                            : "bg-amber-500"
+                      }`}
                   />
 
                   <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-4">
@@ -784,15 +773,14 @@ const AdminDashboard = ({
                           onChange={(e) =>
                             updateOrderStatus(order.id, e.target.value)
                           }
-                          className={`appearance-none pl-8 pr-8 py-1.5 rounded-full text-xs font-bold uppercase cursor-pointer border focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                            status === "delivered"
+                          className={`appearance-none pl-8 pr-8 py-1.5 rounded-full text-xs font-bold uppercase cursor-pointer border focus:outline-none focus:ring-2 focus:ring-offset-1 ${status === "delivered"
                               ? "bg-green-50 text-green-700 border-green-200 focus:ring-green-500"
                               : status === "confirmed"
-                              ? "bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500"
-                              : status === "canceled"
-                              ? "bg-red-50 text-red-700 border-red-200 focus:ring-red-500"
-                              : "bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500"
-                          }`}
+                                ? "bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500"
+                                : status === "canceled"
+                                  ? "bg-red-50 text-red-700 border-red-200 focus:ring-red-500"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500"
+                            }`}
                         >
                           <option value="pending">Pending</option>
                           <option value="confirmed">Confirmed</option>
@@ -843,50 +831,70 @@ const AdminDashboard = ({
                   <div className="grid md:grid-cols-2 gap-4 text-sm border-t pt-4">
                     <div>
                       <h4 className="font-bold text-gray-400 text-xs uppercase mb-1">
-                        Customer
+                        Customer & Shipping
                       </h4>
-                      <p>
-                        <strong>Phone:</strong> {order.customer?.phone}
-                      </p>
+                      <p><strong>Name:</strong> {order.customer?.name}</p>
+                      <p><strong>Phone:</strong> {order.customer?.phone}</p>
+
+                      {/* --- NEW SHIPPING INFO BOX --- */}
+                      <div className="mt-3 p-3 bg-purple-50 rounded-xl border border-purple-100 animate-fade-in">
+                        <div className="flex items-center gap-2 mb-1">
+                          {order.customer?.deliveryMethod === 'delivery' ? <Truck size={14} className="text-purple-600" /> : <Store size={14} className="text-purple-600" />}
+                          <span className="font-bold text-purple-700 uppercase text-[10px] tracking-wider">
+                            {order.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
+                              order.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up'}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 text-xs italic">
+                          {order.customer?.deliveryMethod === 'delivery'
+                            ? order.customer?.deliveryAddress
+                            : order.customer?.meetupNote}
+                        </p>
+                      </div>
+
+                      {/* Payment Proof remains here */}
                       {order.customer?.proof && (
-                        <div
-                          className="mt-2 group relative w-24 h-24 bg-gray-100 rounded border overflow-hidden cursor-pointer"
+                        <div className="mt-3 group relative w-24 h-24 bg-gray-100 rounded border overflow-hidden cursor-pointer"
                           onClick={() => {
                             const w = window.open("");
-                            w.document.write(
-                              '<img src="' +
-                                order.customer.proof +
-                                '" style="max-width:100%"/>'
-                            );
-                          }}
-                        >
-                          <img
-                            src={order.customer.proof}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            w.document.write('<img src="' + order.customer.proof + '" style="max-width:100%"/>');
+                          }}>
+                          <img src={order.customer.proof} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <ExternalLink className="text-white" size={16} />
                           </div>
                         </div>
                       )}
                     </div>
+
                     <div>
                       <h4 className="font-bold text-gray-400 text-xs uppercase mb-1">
-                        Items
+                        Order Summary
                       </h4>
-                      <ul className="space-y-1">
-                        {order.items &&
-                          Object.values(order.items).map((i) => (
-                            <li key={i.id} className="flex justify-between">
-                              <span>
-                                {i.qty}x {i.name}
-                              </span>
-                              <span className="text-gray-500">
-                                {(i.price * i.qty).toFixed(3)}
-                              </span>
-                            </li>
-                          ))}
+                      <ul className="space-y-1 mb-3">
+                        {order.items && Object.values(order.items).map((i) => (
+                          <li key={i.id} className="flex justify-between text-xs">
+                            <span>{i.qty}x {i.name}</span>
+                            <span className="text-gray-500">{(i.price * i.qty).toFixed(3)}</span>
+                          </li>
+                        ))}
                       </ul>
+
+                      {/* --- NEW BREAKDOWN SECTION --- */}
+                      <div className="border-t border-dashed pt-2 space-y-1 text-xs">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Subtotal:</span>
+                          <span>{(order.subtotal || 0).toFixed(3)} BHD</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Delivery:</span>
+                          <span>{(order.deliveryFee || 0).toFixed(3)} BHD</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-purple-600 text-sm pt-1">
+                          <span>Grand Total:</span>
+                          <span>{(order.total || 0).toFixed(3)} BHD</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1158,9 +1166,8 @@ const AdminDashboard = ({
                   {filteredInventory.map((p) => (
                     <tr
                       key={p.id}
-                      className={`hover:bg-gray-50 transition-colors ${
-                        !p.active ? "opacity-60 bg-gray-50" : ""
-                      }`}
+                      className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""
+                        }`}
                     >
                       <td className="p-4">
                         <div className="font-bold text-gray-900">{p.name}</div>
@@ -1199,11 +1206,10 @@ const AdminDashboard = ({
                       <td className="p-4 text-center">
                         <input
                           type="number"
-                          className={`w-16 p-2 border rounded text-center font-bold ${
-                            p.stock < 3
+                          className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3
                               ? "text-red-600 border-red-200 bg-red-50"
                               : "border-gray-200"
-                          }`}
+                            }`}
                           value={p.stock}
                           onChange={(e) => onUpdateStock(p.id, e.target.value)}
                         />
@@ -1220,11 +1226,10 @@ const AdminDashboard = ({
                       <td className="p-4 text-center">
                         <button
                           onClick={() => onToggleStatus(p.id, p.active)}
-                          className={`p-2 rounded-full ${
-                            p.active
+                          className={`p-2 rounded-full ${p.active
                               ? "text-green-600 hover:bg-green-50"
                               : "text-gray-400 hover:bg-gray-100"
-                          }`}
+                            }`}
                         >
                           {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
                         </button>
@@ -1408,11 +1413,10 @@ const AdminDashboard = ({
               {filteredPromoProducts.map((p) => (
                 <label
                   key={p.id}
-                  className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${
-                    newPromo.productIds.includes(p.id)
+                  className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.productIds.includes(p.id)
                       ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
                       : "border-gray-200 hover:border-purple-300"
-                  }`}
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -1587,7 +1591,7 @@ export default function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [viewMode, setViewMode] = useState("shop");
   const [checkoutStep, setCheckoutStep] = useState("cart");
-  const [deliveryMethod, setDeliveryMethod] = useState("meetup"); 
+  const [deliveryMethod, setDeliveryMethod] = useState("meetup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [meetupNote, setMeetupNote] = useState("");
   const [customerDetails, setCustomerDetails] = useState({
@@ -1704,7 +1708,7 @@ export default function App() {
 
     // Custom success message with clickable "View Bag"
     const successMsg = `Added to cart! <b onclick="window.dispatchEvent(new CustomEvent('openCart'))" style="text-decoration: underline; font-style: italic; cursor: pointer; margin-left: 8px;">View Bag</b>`;
-    showNotification(successMsg); 
+    showNotification(successMsg);
   };
   const updateCartQty = (id, delta) => {
     setCart((prev) => {
@@ -1720,78 +1724,78 @@ export default function App() {
       return { ...prev, [id]: { ...item, qty: newQty } };
     });
   };
-// --- Helper: Generate PDF Receipt ---
-const generateReceipt = (orderData) => {
-  const doc = new jsPDF();
+  // --- Helper: Generate PDF Receipt ---
+  const generateReceipt = (orderData) => {
+    const doc = new jsPDF();
 
-  // Header
-  doc.setFontSize(20);
-  doc.text("Shepherdess K-Beauty", 14, 22);
-  doc.setFontSize(10);
-  doc.text("Authentic Korean Skincare", 14, 28);
+    // Header
+    doc.setFontSize(20);
+    doc.text("Shepherdess K-Beauty", 14, 22);
+    doc.setFontSize(10);
+    doc.text("Authentic Korean Skincare", 14, 28);
 
-  // Order Details
-  doc.setFontSize(12);
-  doc.text(`Order Receipt: ${orderData.orderId}`, 14, 40);
-  doc.setFontSize(10);
-  doc.text(`Date: ${new Date(orderData.date).toLocaleDateString()}`, 14, 46);
-  doc.text(`Customer: ${orderData.customer.name}`, 14, 52);
-  doc.text(`Phone: ${orderData.customer.phone}`, 14, 58);
+    // Order Details
+    doc.setFontSize(12);
+    doc.text(`Order Receipt: ${orderData.orderId}`, 14, 40);
+    doc.setFontSize(10);
+    doc.text(`Date: ${new Date(orderData.date).toLocaleDateString()}`, 14, 46);
+    doc.text(`Customer: ${orderData.customer.name}`, 14, 52);
+    doc.text(`Phone: ${orderData.customer.phone}`, 14, 58);
 
-  // --- ADDED: DELIVERY/MEETUP INFO ---
-  doc.setFont("helvetica", "bold");
-  const methodTitle = orderData.customer.deliveryMethod === 'delivery' ? 'Delivery' : 
-                      orderData.customer.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
-  doc.text(`Method: ${methodTitle}`, 14, 64);
-  doc.setFont("helvetica", "normal");
-  
-  const deliveryInfo = orderData.customer.deliveryMethod === 'delivery' 
-    ? orderData.customer.deliveryAddress 
-    : orderData.customer.meetupNote;
-  doc.text(`${deliveryInfo}`, 14, 70);
+    // --- ADDED: DELIVERY/MEETUP INFO ---
+    doc.setFont("helvetica", "bold");
+    const methodTitle = orderData.customer.deliveryMethod === 'delivery' ? 'Delivery' :
+      orderData.customer.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
+    doc.text(`Method: ${methodTitle}`, 14, 64);
+    doc.setFont("helvetica", "normal");
 
-  // Table (startY moved to 78 to make room for delivery info)
-  const tableColumn = ["Item", "Qty", "Price", "Total"];
-  const tableRows = [];
+    const deliveryInfo = orderData.customer.deliveryMethod === 'delivery'
+      ? orderData.customer.deliveryAddress
+      : orderData.customer.meetupNote;
+    doc.text(`${deliveryInfo}`, 14, 70);
 
-  Object.values(orderData.items).forEach((item) => {
-    const itemData = [
-      item.name,
-      item.qty,
-      `${item.price.toFixed(3)} BHD`,
-      `${(item.price * item.qty).toFixed(3)} BHD`,
-    ];
-    tableRows.push(itemData);
-  });
+    // Table (startY moved to 78 to make room for delivery info)
+    const tableColumn = ["Item", "Qty", "Price", "Total"];
+    const tableRows = [];
 
-  autoTable(doc, {
-    head: [tableColumn],
-    body: tableRows,
-    startY: 78, 
-    theme: "grid",
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [147, 51, 234] }, // Purple color
-  });
+    Object.values(orderData.items).forEach((item) => {
+      const itemData = [
+        item.name,
+        item.qty,
+        `${item.price.toFixed(3)} BHD`,
+        `${(item.price * item.qty).toFixed(3)} BHD`,
+      ];
+      tableRows.push(itemData);
+    });
 
-  // Total Section
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Subtotal: ${orderData.subtotal.toFixed(3)} BHD`, 14, finalY);
-  doc.text(`Delivery Fee: ${orderData.deliveryFee.toFixed(3)} BHD`, 14, finalY + 6);
-  
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(`Total Amount: ${orderData.total.toFixed(3)} BHD`, 14, finalY + 14);
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 78,
+      theme: "grid",
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [147, 51, 234] }, // Purple color
+    });
 
-  // Footer Note
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Status: Payment Under Verification", 14, finalY + 24);
-  doc.text("Thank you for shopping with Shepherdess!", 14, finalY + 30);
+    // Total Section
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Subtotal: ${orderData.subtotal.toFixed(3)} BHD`, 14, finalY);
+    doc.text(`Delivery Fee: ${orderData.deliveryFee.toFixed(3)} BHD`, 14, finalY + 6);
 
-  doc.save(`Shepherdess-Receipt-${orderData.orderId}.pdf`);
-};
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total Amount: ${orderData.total.toFixed(3)} BHD`, 14, finalY + 14);
+
+    // Footer Note
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Status: Payment Under Verification", 14, finalY + 24);
+    doc.text("Thank you for shopping with Shepherdess!", 14, finalY + 30);
+
+    doc.save(`Shepherdess-Receipt-${orderData.orderId}.pdf`);
+  };
   // Helper to generate short ID
   const generateOrderId = () => {
     return "#" + Math.floor(100000 + Math.random() * 900000).toString();
@@ -1802,7 +1806,7 @@ const generateReceipt = (orderData) => {
   const handleCheckout = async (e) => {
     e.preventDefault();
     if (!proofFile) return showNotification("Upload proof", "error");
-    
+
     // Validation: Require Address for Delivery, Note for others
     if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
       return showNotification("Please enter delivery address", "error");
@@ -1813,7 +1817,7 @@ const generateReceipt = (orderData) => {
     try {
       const proof = await compressImage(proofFile);
       const newOrderId = generateOrderId();
-      
+
       // Calculate final total
       const cartTotal = Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
@@ -1821,8 +1825,8 @@ const generateReceipt = (orderData) => {
 
       const orderData = {
         orderId: newOrderId,
-        customer: { 
-          ...customerDetails, 
+        customer: {
+          ...customerDetails,
           proof,
           // Save the delivery info clearly
           deliveryMethod: deliveryMethod,
@@ -2102,19 +2106,19 @@ const generateReceipt = (orderData) => {
             )}
             {viewMode === "shop" && (
               <button
-              onClick={() => {
-                setCheckoutStep("cart"); // <--- This is the magic line!
-                setIsCartOpen(true);
-              }}
-              className="relative p-2 hover:text-purple-600 transition-colors"
-            >
-              <ShoppingBag size={24} />
-              {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
-                <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                  {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
-                </span>
-              )}
-            </button>
+                onClick={() => {
+                  setCheckoutStep("cart"); // <--- This is the magic line!
+                  setIsCartOpen(true);
+                }}
+                className="relative p-2 hover:text-purple-600 transition-colors"
+              >
+                <ShoppingBag size={24} />
+                {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
+                  <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
+                    {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
+                  </span>
+                )}
+              </button>
             )}
           </div>
         </div>
@@ -2171,11 +2175,10 @@ const generateReceipt = (orderData) => {
                     setSelectedCategory("All");
                     setVisibleCount(12);
                   }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                    selectedCategory === "All"
+                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === "All"
                       ? "bg-purple-600 text-white shadow-md transform scale-105"
                       : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   All
                 </button>
@@ -2186,11 +2189,10 @@ const generateReceipt = (orderData) => {
                       setSelectedCategory(p.title);
                       setVisibleCount(12);
                     }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${
-                      selectedCategory === p.title
+                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title
                         ? "bg-red-500 text-white shadow-md"
                         : "bg-red-50 text-red-600 hover:bg-red-100"
-                    }`}
+                      }`}
                   >
                     <Tag size={12} /> {p.title}
                   </button>
@@ -2202,11 +2204,10 @@ const generateReceipt = (orderData) => {
                       setSelectedCategory(c);
                       setVisibleCount(12);
                     }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                      selectedCategory === c || currentMainCategory === c
+                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c
                         ? "bg-purple-600 text-white shadow-md transform scale-105"
                         : "bg-gray-100 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     {c}
                   </button>
@@ -2260,11 +2261,10 @@ const generateReceipt = (orderData) => {
                     setSelectedCategory(currentMainCategory);
                     setVisibleCount(12);
                   }}
-                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                    selectedCategory === currentMainCategory
+                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === currentMainCategory
                       ? "bg-purple-100 text-purple-700 border-purple-200"
                       : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   All {currentMainCategory}
                 </button>
@@ -2275,11 +2275,10 @@ const generateReceipt = (orderData) => {
                       setSelectedCategory(sub);
                       setVisibleCount(12);
                     }}
-                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                      selectedCategory === sub
+                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === sub
                         ? "bg-purple-100 text-purple-700 border-purple-200"
                         : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {sub}
                   </button>
@@ -2303,8 +2302,8 @@ const generateReceipt = (orderData) => {
                   discount={
                     p.originalPrice
                       ? Math.round(
-                          ((p.originalPrice - p.price) / p.originalPrice) * 100
-                        )
+                        ((p.originalPrice - p.price) / p.originalPrice) * 100
+                      )
                       : 0
                   }
                 />
@@ -2347,11 +2346,10 @@ const generateReceipt = (orderData) => {
                     <button
                       onClick={() => addToCart(p)}
                       disabled={p.stock === 0}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${
-                        p.stock === 0
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                           : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
-                      }`}
+                        }`}
                     >
                       <Plus size={20} />
                     </button>
@@ -2454,7 +2452,7 @@ const generateReceipt = (orderData) => {
                 <div className="space-y-6 animate-fade-in">
                   <div className="space-y-3">
                     <h3 className="font-bold text-gray-900 text-sm">Select Delivery Method</h3>
-                    
+
                     {/* Option 1: Meet-Up */}
                     <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
                       <div className="flex items-center gap-3 mb-1" onClick={() => setDeliveryMethod('meetup')}>
@@ -2508,9 +2506,9 @@ const generateReceipt = (orderData) => {
                         <Truck size={20} className="text-gray-400" />
                       </div>
                       {deliveryMethod === 'delivery' && (
-                         <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
-                           Same Day Delivery for orders until 2:30PM
-                         </p>
+                        <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
+                          Same Day Delivery for orders until 2:30PM
+                        </p>
                       )}
                     </label>
                   </div>
@@ -2519,19 +2517,19 @@ const generateReceipt = (orderData) => {
                   <div className="space-y-4">
                     <div className="animate-fade-in">
                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
-                        {deliveryMethod === 'delivery' ? "Delivery Address" : 
-                         deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
+                        {deliveryMethod === 'delivery' ? "Delivery Address" :
+                          deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
                       </label>
-                      <textarea 
+                      <textarea
                         className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
-                        placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." : 
-                                     deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
+                        placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." :
+                          deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
                         rows="2"
                         value={deliveryMethod === 'delivery' ? deliveryAddress : meetupNote}
                         onChange={(e) => deliveryMethod === 'delivery' ? setDeliveryAddress(e.target.value) : setMeetupNote(e.target.value)}
                       />
                     </div>
-                    
+
                     <div className="space-y-4">
                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Contact Details</label>
                       <div className="grid grid-cols-2 gap-2">
@@ -2554,13 +2552,13 @@ const generateReceipt = (orderData) => {
                     </div>
 
                     <div className="flex justify-between items-end mb-4">
-                        <span className="text-purple-700 font-bold text-lg">Total:</span>
-                        <span className="font-mono text-2xl font-bold text-gray-900">
-                          {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
-                        </span>
+                      <span className="text-purple-700 font-bold text-lg">Total:</span>
+                      <span className="font-mono text-2xl font-bold text-gray-900">
+                        {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
+                      </span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => {navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!");}}>
+                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => { navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!"); }}>
                       <p className="text-[10px] text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
                       <p className="font-mono text-lg font-bold text-gray-900 tracking-wider">+973 3302 7588</p>
                       <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
@@ -2611,11 +2609,10 @@ const generateReceipt = (orderData) => {
                     <button
                       onClick={handleCheckout}
                       disabled={isSubmitting || !proofFile}
-                      className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${
-                        isSubmitting || !proofFile
+                      className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting || !proofFile
                           ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
                           : "bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200"
-                      }`}
+                        }`}
                     >
                       {isSubmitting ? "Uploading..." : "Confirm Order"}
                     </button>
