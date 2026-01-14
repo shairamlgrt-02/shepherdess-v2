@@ -155,9 +155,15 @@ const Notification = ({ message, type, onClose }) => {
           ? "bg-green-100 text-green-800 border border-green-200"
           : "bg-red-100 text-red-800 border border-red-200"
       }`}
-    >
-      {message}
-    </div>
+      // This line allows the "View Bag" link to be clickable
+      dangerouslySetInnerHTML={{ __html: message }}
+      onClick={(e) => {
+        // If they click the "View Bag" link specifically
+        if (e.target.tagName === 'B') {
+           onClose(); 
+        }
+      }}
+    />
   );
 };
 
@@ -1595,6 +1601,16 @@ export default function App() {
   const [visibleCount, setVisibleCount] = useState(12);
   const [sortOption, setSortOption] = useState("default");
 
+  // Listener to open cart from the notification link
+  useEffect(() => {
+    const handleOpenCart = () => {
+      setCheckoutStep("cart");
+      setIsCartOpen(true);
+    };d
+    window.addEventListener('openCart', handleOpenCart);
+    return () => window.removeEventListener('openCart', handleOpenCart);
+  }, []);
+
   // --- Auth & Sync ---
   useEffect(() => {
     signInAnonymously(auth);
@@ -1685,8 +1701,10 @@ export default function App() {
       }
       return { ...prev, [p.id]: { ...p, qty: (prev[p.id]?.qty || 0) + 1 } };
     });
-    // setIsCartOpen(true); // <--- DELETE OR COMMENT OUT THIS LINE
-    showNotification("Added to cart! Click the bag to view."); // <--- Success Message
+
+    // Custom success message with clickable "View Bag"
+    const successMsg = `Added to cart! <b onclick="window.dispatchEvent(new CustomEvent('openCart'))" style="text-decoration: underline; font-style: italic; cursor: pointer; margin-left: 8px;">View Bag</b>`;
+    showNotification(successMsg); 
   };
   const updateCartQty = (id, delta) => {
     setCart((prev) => {
