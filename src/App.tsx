@@ -2407,44 +2407,36 @@ export default function App() {
                   <button onClick={() => generateReceipt(lastOrder)} className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg">
                     <Download size={18} /> Download Receipt (PDF)
                   </button>
-                  {/* WhatsApp Button: Guaranteed Emoji Safe 🎀 */}
+                  {/* WhatsApp Button: Aesthetic Unicode Edition ♡ */}
                   <a
                     href={(() => {
-                      // Using the most basic, stable emoji characters
-                      const iconSparkle = "✨";
-                      const iconSheep = "🐑";
-                      const iconLove = "💌";
-                      const iconRibbon = "🎀";
-                      const iconShh = "🤫";
-                      const iconPackage = "📦";
-                      const iconHandshake = "🤝";
-                      const iconHouse = "🏠";
+                      // These symbols are 100% safe and will NOT turn into question marks
+                      const symHeart = "\u2661"; // ♡
+                      const symStar = "\u22C6";  // ⋆
+                      const symSparkle = "\u2727"; // ✧
+                      const symArrow = "\u279C"; // ➜
 
-                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? `Delivery ${iconPackage}` :
-                        lastOrder?.customer?.deliveryMethod === 'meetup' ? `Meet-Up ${iconHandshake}` : `Pick-Up ${iconHouse}`;
+                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
+                        lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
 
                       const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery'
                         ? lastOrder.customer.deliveryAddress
                         : lastOrder.customer.meetupNote;
 
                       const itemList = Object.values(lastOrder?.items || {})
-                        .map(i => `* ${i.qty} x ${i.name}`) // Switched ✨ to * for maximum safety
+                        .map(i => `${symStar} ${i.qty} x ${i.name}`)
                         .join('\n');
 
-                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! ${iconSheep}${iconSparkle}\n\n` +
-                        `*ORDER SUMMARY* ${iconLove}\n` +
-                        `${iconRibbon} *Name:* ${lastOrder?.customer?.name}\n` +
-                        `${iconRibbon} *Order ID:* ${lastOrder?.orderId}\n` +
-                        `${iconRibbon} *Method:* ${deliveryType}\n` +
-                        `${iconRibbon} *Details:* ${deliveryDetail}\n\n` +
-                        `*THE GOODIES:* ${iconShh}\n${itemList}\n\n` +
+                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! ${symSparkle}\n\n` +
+                        `*ORDER SUMMARY* ${symHeart}\n` +
+                        `${symArrow} *Name:* ${lastOrder?.customer?.name}\n` +
+                        `${symArrow} *Order ID:* ${lastOrder?.orderId}\n` +
+                        `${symArrow} *Method:* ${deliveryType}\n` +
+                        `${symArrow} *Details:* ${deliveryDetail}\n\n` +
+                        `*THE GOODIES:* ${symSparkle}\n${itemList}\n\n` +
                         `*Total:* ${lastOrder?.total?.toFixed(3)} BHD`;
 
-                      // THE CRITICAL FIX: We are using a different encoding method here
-                      const encodedMessage = encodeURIComponent(message)
-                        .replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16));
-
-                      return `https://wa.me/97333027588?text=${encodedMessage}`;
+                      return `https://wa.me/97333027588?text=${encodeURIComponent(message)}`;
                     })()}
                     target="_blank"
                     rel="noreferrer"
