@@ -1720,61 +1720,78 @@ export default function App() {
       return { ...prev, [id]: { ...item, qty: newQty } };
     });
   };
-  // --- Helper: Generate PDF Receipt ---
-  const generateReceipt = (orderData) => {
-    const doc = new jsPDF();
+// --- Helper: Generate PDF Receipt ---
+const generateReceipt = (orderData) => {
+  const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(20);
-    doc.text("Shepherdess K-Beauty", 14, 22);
-    doc.setFontSize(10);
-    doc.text("Authentic Korean Skincare", 14, 28);
+  // Header
+  doc.setFontSize(20);
+  doc.text("Shepherdess K-Beauty", 14, 22);
+  doc.setFontSize(10);
+  doc.text("Authentic Korean Skincare", 14, 28);
 
-    // Order Details
-    doc.setFontSize(12);
-    doc.text(`Order Receipt: ${orderData.orderId}`, 14, 40);
-    doc.setFontSize(10);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 46);
-    doc.text(`Customer: ${orderData.customer.name}`, 14, 52);
-    doc.text(`Phone: ${orderData.customer.phone}`, 14, 58);
+  // Order Details
+  doc.setFontSize(12);
+  doc.text(`Order Receipt: ${orderData.orderId}`, 14, 40);
+  doc.setFontSize(10);
+  doc.text(`Date: ${new Date(orderData.date).toLocaleDateString()}`, 14, 46);
+  doc.text(`Customer: ${orderData.customer.name}`, 14, 52);
+  doc.text(`Phone: ${orderData.customer.phone}`, 14, 58);
 
-    // Table
-    const tableColumn = ["Item", "Qty", "Price", "Total"];
-    const tableRows = [];
+  // --- ADDED: DELIVERY/MEETUP INFO ---
+  doc.setFont("helvetica", "bold");
+  const methodTitle = orderData.customer.deliveryMethod === 'delivery' ? 'Delivery' : 
+                      orderData.customer.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
+  doc.text(`Method: ${methodTitle}`, 14, 64);
+  doc.setFont("helvetica", "normal");
+  
+  const deliveryInfo = orderData.customer.deliveryMethod === 'delivery' 
+    ? orderData.customer.deliveryAddress 
+    : orderData.customer.meetupNote;
+  doc.text(`${deliveryInfo}`, 14, 70);
 
-    Object.values(orderData.items).forEach((item) => {
-      const itemData = [
-        item.name,
-        item.qty,
-        `${item.price.toFixed(3)} BHD`,
-        `${(item.price * item.qty).toFixed(3)} BHD`,
-      ];
-      tableRows.push(itemData);
-    });
+  // Table (startY moved to 78 to make room for delivery info)
+  const tableColumn = ["Item", "Qty", "Price", "Total"];
+  const tableRows = [];
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 65,
-      theme: "grid",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [147, 51, 234] }, // Purple color
-    });
+  Object.values(orderData.items).forEach((item) => {
+    const itemData = [
+      item.name,
+      item.qty,
+      `${item.price.toFixed(3)} BHD`,
+      `${(item.price * item.qty).toFixed(3)} BHD`,
+    ];
+    tableRows.push(itemData);
+  });
 
-    // Total
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total Amount: ${orderData.total.toFixed(3)} BHD`, 14, finalY);
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 78, 
+    theme: "grid",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [147, 51, 234] }, // Purple color
+  });
 
-    // Footer Note
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Status: Payment Under Verification", 14, finalY + 10);
-    doc.text("Thank you for shopping with Shepherdess!", 14, finalY + 16);
+  // Total Section
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Subtotal: ${orderData.subtotal.toFixed(3)} BHD`, 14, finalY);
+  doc.text(`Delivery Fee: ${orderData.deliveryFee.toFixed(3)} BHD`, 14, finalY + 6);
+  
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Total Amount: ${orderData.total.toFixed(3)} BHD`, 14, finalY + 14);
 
-    doc.save(`Shepherdess-Receipt-${orderData.orderId}.pdf`);
-  };
+  // Footer Note
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("Status: Payment Under Verification", 14, finalY + 24);
+  doc.text("Thank you for shopping with Shepherdess!", 14, finalY + 30);
+
+  doc.save(`Shepherdess-Receipt-${orderData.orderId}.pdf`);
+};
   // Helper to generate short ID
   const generateOrderId = () => {
     return "#" + Math.floor(100000 + Math.random() * 900000).toString();
