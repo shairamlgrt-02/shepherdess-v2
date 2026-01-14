@@ -151,8 +151,8 @@ const Notification = ({ message, type, onClose }) => {
   return (
     <div
       className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-xl animate-bounce-in ${type === "success"
-          ? "bg-green-100 text-green-800 border border-green-200"
-          : "bg-red-100 text-red-800 border border-red-200"
+        ? "bg-green-100 text-green-800 border border-green-200"
+        : "bg-red-100 text-red-800 border border-red-200"
         }`}
       // This line allows the "View Bag" link to be clickable
       dangerouslySetInnerHTML={{ __html: message }}
@@ -268,14 +268,14 @@ const AnalyticsSummary = ({ products, orders }) => {
       {/* Low Stock Card */}
       <div
         className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${lowStockItems.length > 0
-            ? "bg-amber-50 border-amber-200"
-            : "bg-white border-gray-100"
+          ? "bg-amber-50 border-amber-200"
+          : "bg-white border-gray-100"
           }`}
       >
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center ${lowStockItems.length > 0
-              ? "bg-amber-100 text-amber-600"
-              : "bg-gray-100 text-gray-400"
+            ? "bg-amber-100 text-amber-600"
+            : "bg-gray-100 text-gray-400"
             }`}
         >
           <Package size={24} />
@@ -302,14 +302,14 @@ const AnalyticsSummary = ({ products, orders }) => {
       {/* Expiry Card */}
       <div
         className={`p-6 rounded-xl border shadow-sm flex items-center gap-4 transition-all ${expiringItems.length > 0
-            ? "bg-red-50 border-red-200"
-            : "bg-white border-gray-100"
+          ? "bg-red-50 border-red-200"
+          : "bg-white border-gray-100"
           }`}
       >
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center ${expiringItems.length > 0
-              ? "bg-red-100 text-red-600"
-              : "bg-gray-100 text-gray-400"
+            ? "bg-red-100 text-red-600"
+            : "bg-gray-100 text-gray-400"
             }`}
         >
           <Clock size={24} />
@@ -638,8 +638,8 @@ const AdminDashboard = ({
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${tab === t.id
-                ? "border-purple-600 text-purple-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+              ? "border-purple-600 text-purple-600"
+              : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
           >
             <t.icon size={18} /> {t.label}
@@ -688,8 +688,8 @@ const AdminDashboard = ({
                 key={f.id}
                 onClick={() => setFilterStatus(f.id)}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${filterStatus === f.id
-                    ? "ring-2 ring-purple-500 ring-offset-1 border-transparent transform scale-105"
-                    : "border-transparent opacity-70 hover:opacity-100"
+                  ? "ring-2 ring-purple-500 ring-offset-1 border-transparent transform scale-105"
+                  : "border-transparent opacity-70 hover:opacity-100"
                   } ${f.color}`}
               >
                 {f.label} ({f.count})
@@ -744,12 +744,12 @@ const AdminDashboard = ({
                   {/* Status Color Strip */}
                   <div
                     className={`absolute top-0 left-0 right-0 h-1.5 ${status === "delivered"
-                        ? "bg-green-500"
-                        : status === "confirmed"
-                          ? "bg-blue-500"
-                          : status === "canceled"
-                            ? "bg-red-500"
-                            : "bg-amber-500"
+                      ? "bg-green-500"
+                      : status === "confirmed"
+                        ? "bg-blue-500"
+                        : status === "canceled"
+                          ? "bg-red-500"
+                          : "bg-amber-500"
                       }`}
                   />
 
@@ -774,12 +774,12 @@ const AdminDashboard = ({
                             updateOrderStatus(order.id, e.target.value)
                           }
                           className={`appearance-none pl-8 pr-8 py-1.5 rounded-full text-xs font-bold uppercase cursor-pointer border focus:outline-none focus:ring-2 focus:ring-offset-1 ${status === "delivered"
-                              ? "bg-green-50 text-green-700 border-green-200 focus:ring-green-500"
-                              : status === "confirmed"
-                                ? "bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500"
-                                : status === "canceled"
-                                  ? "bg-red-50 text-red-700 border-red-200 focus:ring-red-500"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500"
+                            ? "bg-green-50 text-green-700 border-green-200 focus:ring-green-500"
+                            : status === "confirmed"
+                              ? "bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500"
+                              : status === "canceled"
+                                ? "bg-red-50 text-red-700 border-red-200 focus:ring-red-500"
+                                : "bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500"
                             }`}
                         >
                           <option value="pending">Pending</option>
@@ -1207,8 +1207,8 @@ const AdminDashboard = ({
                         <input
                           type="number"
                           className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3
-                              ? "text-red-600 border-red-200 bg-red-50"
-                              : "border-gray-200"
+                            ? "text-red-600 border-red-200 bg-red-50"
+                            : "border-gray-200"
                             }`}
                           value={p.stock}
                           onChange={(e) => onUpdateStock(p.id, e.target.value)}
@@ -1227,8 +1227,8 @@ const AdminDashboard = ({
                         <button
                           onClick={() => onToggleStatus(p.id, p.active)}
                           className={`p-2 rounded-full ${p.active
-                              ? "text-green-600 hover:bg-green-50"
-                              : "text-gray-400 hover:bg-gray-100"
+                            ? "text-green-600 hover:bg-green-50"
+                            : "text-gray-400 hover:bg-gray-100"
                             }`}
                         >
                           {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -1414,8 +1414,8 @@ const AdminDashboard = ({
                 <label
                   key={p.id}
                   className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.productIds.includes(p.id)
-                      ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
-                      : "border-gray-200 hover:border-purple-300"
+                    ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
+                    : "border-gray-200 hover:border-purple-300"
                     }`}
                 >
                   <input
@@ -2176,8 +2176,8 @@ export default function App() {
                     setVisibleCount(12);
                   }}
                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === "All"
-                      ? "bg-purple-600 text-white shadow-md transform scale-105"
-                      : "bg-gray-100 hover:bg-gray-200"
+                    ? "bg-purple-600 text-white shadow-md transform scale-105"
+                    : "bg-gray-100 hover:bg-gray-200"
                     }`}
                 >
                   All
@@ -2190,8 +2190,8 @@ export default function App() {
                       setVisibleCount(12);
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title
-                        ? "bg-red-500 text-white shadow-md"
-                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                      ? "bg-red-500 text-white shadow-md"
+                      : "bg-red-50 text-red-600 hover:bg-red-100"
                       }`}
                   >
                     <Tag size={12} /> {p.title}
@@ -2205,8 +2205,8 @@ export default function App() {
                       setVisibleCount(12);
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c
-                        ? "bg-purple-600 text-white shadow-md transform scale-105"
-                        : "bg-gray-100 hover:bg-gray-200"
+                      ? "bg-purple-600 text-white shadow-md transform scale-105"
+                      : "bg-gray-100 hover:bg-gray-200"
                       }`}
                   >
                     {c}
@@ -2262,8 +2262,8 @@ export default function App() {
                     setVisibleCount(12);
                   }}
                   className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === currentMainCategory
-                      ? "bg-purple-100 text-purple-700 border-purple-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                    ? "bg-purple-100 text-purple-700 border-purple-200"
+                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                     }`}
                 >
                   All {currentMainCategory}
@@ -2276,8 +2276,8 @@ export default function App() {
                       setVisibleCount(12);
                     }}
                     className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === sub
-                        ? "bg-purple-100 text-purple-700 border-purple-200"
-                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                      ? "bg-purple-100 text-purple-700 border-purple-200"
+                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     {sub}
@@ -2347,8 +2347,8 @@ export default function App() {
                       onClick={() => addToCart(p)}
                       disabled={p.stock === 0}
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
                         }`}
                     >
                       <Plus size={20} />
@@ -2407,34 +2407,44 @@ export default function App() {
                   <button onClick={() => generateReceipt(lastOrder)} className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg">
                     <Download size={18} /> Download Receipt (PDF)
                   </button>
-                  {/* WhatsApp Button: The Bestie Edition 🎀 */}
+                  {/* WhatsApp Button: Guaranteed Emoji Safe 🎀 */}
                   <a
                     href={(() => {
-                      // 1. Logic for the delivery/meet-up info
-                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery 📦' : 
-                                           lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up 🤝' : 'Pick-Up 🏠';
-                      
-                      const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery' 
-                        ? lastOrder.customer.deliveryAddress 
+                      // Using the most basic, stable emoji characters
+                      const iconSparkle = "✨";
+                      const iconSheep = "🐑";
+                      const iconLove = "💌";
+                      const iconRibbon = "🎀";
+                      const iconShh = "🤫";
+                      const iconPackage = "📦";
+                      const iconHandshake = "🤝";
+                      const iconHouse = "🏠";
+
+                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? `Delivery ${iconPackage}` :
+                        lastOrder?.customer?.deliveryMethod === 'meetup' ? `Meet-Up ${iconHandshake}` : `Pick-Up ${iconHouse}`;
+
+                      const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery'
+                        ? lastOrder.customer.deliveryAddress
                         : lastOrder.customer.meetupNote;
 
-                      // 2. Format the product list with emojis
                       const itemList = Object.values(lastOrder?.items || {})
-                        .map(i => `✨ ${i.qty} x ${i.name}`)
-                        .join('%0A');
+                        .map(i => `* ${i.qty} x ${i.name}`) // Switched ✨ to * for maximum safety
+                        .join('\n');
 
-                      // 3. Build the "Bestie" Message
-                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! 🐑✨%0A%0A` +
-                        `*ORDER SUMMARY* 💌%0A` +
-                        `🎀 *Name:* ${lastOrder?.customer?.name}%0A` +
-                        `🎀 *Order ID:* ${lastOrder?.orderId}%0A` +
-                        `🎀 *Method:* ${deliveryType}%0A` +
-                        `🎀 *The Stash Info:* ${deliveryDetail}%0A%0A` +
-                        `*THE GOODIES:* 🤫%0A${itemList}%0A%0A` +
-                        `*Total:* ${lastOrder?.total?.toFixed(3)} BHD%0A%0A` +
-                        `Let me know when you see this!`;
+                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! ${iconSheep}${iconSparkle}\n\n` +
+                        `*ORDER SUMMARY* ${iconLove}\n` +
+                        `${iconRibbon} *Name:* ${lastOrder?.customer?.name}\n` +
+                        `${iconRibbon} *Order ID:* ${lastOrder?.orderId}\n` +
+                        `${iconRibbon} *Method:* ${deliveryType}\n` +
+                        `${iconRibbon} *Details:* ${deliveryDetail}\n\n` +
+                        `*THE GOODIES:* ${iconShh}\n${itemList}\n\n` +
+                        `*Total:* ${lastOrder?.total?.toFixed(3)} BHD`;
 
-                      return `https://wa.me/97333027588?text=${message}`;
+                      // THE CRITICAL FIX: We are using a different encoding method here
+                      const encodedMessage = encodeURIComponent(message)
+                        .replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16));
+
+                      return `https://wa.me/97333027588?text=${encodedMessage}`;
                     })()}
                     target="_blank"
                     rel="noreferrer"
@@ -2642,8 +2652,8 @@ export default function App() {
                       onClick={handleCheckout}
                       disabled={isSubmitting || !proofFile}
                       className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting || !proofFile
-                          ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
-                          : "bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200"
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                        : "bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200"
                         }`}
                     >
                       {isSubmitting ? "Uploading..." : "Confirm Order"}
