@@ -570,9 +570,31 @@ const AdminDashboard = ({
   const updateOrderStatus = async (orderId, newStatus) => {
     await updateDoc(doc(db, "orders", orderId), { status: newStatus });
   };
+
+  const updateOrderNote = async (orderId, note) => {
+    await updateDoc(doc(db, "orders", orderId), { adminNote: note });
+  };
+
+  const updateOrderTotal = async (orderId, newTotal) => {
+    await updateDoc(doc(db, "orders", orderId), { total: parseFloat(newTotal) });
+  };
+
   const deleteOrder = async (orderId) => {
     if (window.confirm("Delete order?"))
       await deleteDoc(doc(db, "orders", orderId));
+  };
+
+  // --- ADD THIS NEW ONE HERE ---
+  const addItemToOrder = async (orderId, currentItems, product) => {
+    const newItem = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      qty: 1,
+      image: product.image
+    };
+    const updatedItems = { ...currentItems, [product.id]: newItem };
+    await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
   };
 
   // --- FILTERED INVENTORY (SAFE VERSION) ---
@@ -829,6 +851,7 @@ const AdminDashboard = ({
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4 text-sm border-t pt-4">
+                    {/* LEFT COLUMN: Customer & Shipping */}
                     <div>
                       <h4 className="font-bold text-gray-400 text-xs uppercase mb-1">
                         Customer & Shipping
@@ -836,7 +859,6 @@ const AdminDashboard = ({
                       <p><strong>Name:</strong> {order.customer?.name}</p>
                       <p><strong>Phone:</strong> {order.customer?.phone}</p>
 
-                      {/* --- NEW SHIPPING INFO BOX --- */}
                       <div className="mt-3 p-3 bg-purple-50 rounded-xl border border-purple-100 animate-fade-in">
                         <div className="flex items-center gap-2 mb-1">
                           {order.customer?.deliveryMethod === 'delivery' ? <Truck size={14} className="text-purple-600" /> : <Store size={14} className="text-purple-600" />}
@@ -852,7 +874,6 @@ const AdminDashboard = ({
                         </p>
                       </div>
 
-                      {/* Payment Proof remains here */}
                       {order.customer?.proof && (
                         <div className="mt-3 group relative w-24 h-24 bg-gray-100 rounded border overflow-hidden cursor-pointer"
                           onClick={() => {
@@ -862,78 +883,135 @@ const AdminDashboard = ({
                           <img src={order.customer.proof} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <ExternalLink className="text-white" size={16} />
-                          </div>
+                          </div>  
                         </div>
                       )}
                     </div>
 
+                    {/* RIGHT COLUMN: Order Items + Replacement Tool */}
                     <div>
-                      <h4 className="font-bold text-gray-400 text-xs uppercase mb-1">
-                        Order Summary
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase mb-2 flex justify-between items-center">
+                        Order Items <span className="text-purple-500 font-normal lowercase italic">(click X to remove)</span>
                       </h4>
-                      <ul className="space-y-1 mb-3">
+                      
+                      {/* 1. The List of Current Items */}
+                      <ul className="space-y-2 mb-4">
                         {order.items && Object.values(order.items).map((i) => (
-                          <li key={i.id} className="flex justify-between text-xs">
-                            <span>{i.qty}x {i.name}</span>
-                            <span className="text-gray-500">{(i.price * i.qty).toFixed(3)}</span>
+                          <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-purple-600">{i.qty}x</span>
+                              <span className="truncate max-w-[140px]">{i.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-gray-500">{(i.price * i.qty).toFixed(3)}</span>
+                              <button 
+                                onClick={async () => {
+                                  if(window.confirm(`Remove ${i.name}?`)) {
+                                    const newItems = { ...order.items };
+                                    delete newItems[i.id];
+                                    await updateDoc(doc(db, "orders", order.id), { items: newItems });
+                                  }
+                                }}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
 
-                      {/* --- NEW BREAKDOWN SECTION --- */}
-                      <div className="border-t border-dashed pt-2 space-y-1 text-xs">
-                        <div className="flex justify-between text-gray-500">
-                          <span>Subtotal:</span>
-                          <span>{(order.subtotal || 0).toFixed(3)} BHD</span>
-                        </div>
-                        <div className="flex justify-between text-gray-500">
-                          <span>Delivery:</span>
-                          <span>{(order.deliveryFee || 0).toFixed(3)} BHD</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-purple-600 text-sm pt-1">
-                          <span>Grand Total:</span>
-                          <span>{(order.total || 0).toFixed(3)} BHD</span>
-                        </div>
+                      {/* 2. THE REPLACEMENT DROPDOWN ✨ */}
+                      <div className="mt-4 p-3 border-2 border-dashed border-purple-200 rounded-xl bg-purple-50/50 animate-pulse-subtle">
+                        <p className="text-[9px] font-bold text-purple-500 uppercase mb-2 tracking-widest">✨ Add Replacement Item</p>
+                        <select 
+                          className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-300 transition-all cursor-pointer"
+                          onChange={(e) => {
+                            const prod = products.find(p => p.id === e.target.value);
+                            if (prod) {
+                              addItemToOrder(order.id, order.items, prod);
+                              // This resets the dropdown so it says "Select a product" again
+                              e.target.value = ""; 
+                            }
+                          }}
+                        >
+                          <option value="">Select a product to add...</option>
+                          {products
+                            .filter(p => p.active && p.stock > 0)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} — {p.price.toFixed(3)} BHD
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[8px] text-purple-400 mt-2 italic">Tip: Removing an item doesn't change the total automatically. Use the box below to adjust! 👇</p>
                       </div>
+
+                      {/* 3. Pricing & Notes */}
+                      <div className="border-t border-dashed pt-3 mt-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Adjusted Grand Total:</span>
+                          <div className="flex items-center gap-1">
+                            <input 
+                              type="number" 
+                              step="0.001"
+                              defaultValue={order.total}
+                              onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
+                              className="w-24 p-1 border border-purple-200 rounded text-right font-bold text-purple-600 focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
+                            <span className="text-[10px] font-bold text-purple-600">BHD</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
+                          <textarea 
+                            className="w-full p-2 text-xs border border-amber-200 rounded-lg bg-amber-50/50 focus:bg-white focus:ring-2 focus:ring-amber-300 outline-none transition-all"
+                              placeholder="e.g. Swapped out toner for serum as per WA chat..."
+                            defaultValue={order.adminNote || ""}
+                            rows="2"
+                            onBlur={(e) => updateOrderNote(order.id, e.target.value)}
+                          />
+                      </div>
+                    </div> {/* Closes Pricing & Notes */}
+                  </div> {/* Closes Right Column */}
+                </div> {/* Closes the Grid (This was likely the missing one!) */}
+
+                <div className="mt-4 pt-4 border-t flex justify-end gap-2">
+                      {status === "pending" && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, "confirmed")}
+                          className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm"
+                        >
+                          <Check size={14} /> Quick Confirm
+                        </button>
+                      )}
+                      {(status === "pending" || status === "confirmed") && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, "delivered")}
+                          className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm"
+                        >
+                          <Truck size={14} /> Quick Deliver
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteOrder(order.id)}
+                        className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
+                        title="Delete Record"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
+                );
+              })
+            )}
+          </div>
+        )}
 
-                  <div className="mt-4 pt-4 border-t flex justify-end gap-2">
-                    {/* Shortcut Buttons (Optional now, since you have the dropdown) */}
-                    {status === "pending" && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, "confirmed")}
-                        className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm"
-                      >
-                        <Check size={14} /> Quick Confirm
-                      </button>
-                    )}
-                    {(status === "pending" || status === "confirmed") && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, "delivered")}
-                        className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm"
-                      >
-                        <Truck size={14} /> Quick Deliver
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => deleteOrder(order.id)}
-                      className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
-                      title="Delete Record"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* INVENTORY TAB */}
-      {tab === "inventory" && (
+        {/* INVENTORY TAB */}
+        {tab === "inventory" && (
         <div className="space-y-6">
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex flex-col md:flex-row gap-2 flex-1 w-full">
