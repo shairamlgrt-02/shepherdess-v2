@@ -1567,7 +1567,8 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [promotions, setPromotions] = useState([]);
-  // --- LOAD CART FROM STORAGE ---
+
+  // --- LOAD/SAVE CART ---
   const [cart, setCart] = useState(() => {
     try {
       const savedCart = localStorage.getItem("shepherdess_cart");
@@ -1578,10 +1579,11 @@ export default function App() {
     }
   });
 
-  // --- SAVE CART TO STORAGE ---
   useEffect(() => {
     localStorage.setItem("shepherdess_cart", JSON.stringify(cart));
   }, [cart]);
+
+  // --- UI & FILTER STATES ---
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1594,18 +1596,22 @@ export default function App() {
   const [deliveryMethod, setDeliveryMethod] = useState("meetup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [meetupNote, setMeetupNote] = useState("");
+
+  // --- RESTORING MISSING VARIABLES ---
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [sortOption, setSortOption] = useState("default");
+  const [hideOutOfStock, setHideOutOfStock] = useState(false);
+  const [notification, setNotification] = useState(null); // 👈 THIS WAS THE CRASH CAUSE!
+  const [proofFile, setProofFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     phone: "",
     proof: "",
   });
-  const [proofFile, setProofFile] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notification, setNotification] = useState(null);
-  const [visibleCount, setVisibleCount] = useState(12);
-  const [sortOption, setSortOption] = useState("default");
 
-  // Listener to open cart from the notification link
+  // Listener to open cart
   useEffect(() => {
     const handleOpenCart = () => {
       setCheckoutStep("cart");
@@ -1613,12 +1619,6 @@ export default function App() {
     };
     window.addEventListener('openCart', handleOpenCart);
     return () => window.removeEventListener('openCart', handleOpenCart);
-  }, []);
-
-  // --- Auth & Sync ---
-  useEffect(() => {
-    signInAnonymously(auth);
-    return onAuthStateChanged(auth, setUser);
   }, []);
 
   // Sync Data
@@ -1918,19 +1918,22 @@ export default function App() {
     return diffDays <= 30; // 30 Day Limit
   };
 
-  // --- FILTERED PRODUCTS LOGIC (SAFE VERSION) ---
+  // --- FILTERED PRODUCTS LOGIC ---
   const filteredProducts = useMemo(() => {
+    // 1. Start with the initial filter
     let result = products.filter((p) => {
-      // 1. Basic Active Check
+      // Basic Active Check
       if (!p.active && !isAdmin) return false;
 
-      // 2. Search Filter
-      // FIX 1: Added (p.name || "") to prevent crash
+      // Hide Out of Stock Check
+      if (hideOutOfStock && p.stock === 0) return false;
+
+      // Search Filter
       const matchesSearch = (p.name || "")
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
 
-      // 3. Category Filter
+      // Category Filter
       let matchesCategory = false;
       if (selectedCategory === "All") matchesCategory = true;
       else if (categories[selectedCategory])
@@ -1944,32 +1947,22 @@ export default function App() {
       return matchesCategory && matchesSearch;
     });
 
-    // --- SORTING & FILTERING OPTIONS ---
-    if (sortOption === "price-asc") {
-      result.sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (sortOption === "price-desc") {
-      result.sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (sortOption === "alpha-asc") {
-      // FIX 2: Added safeguards here too
-      result.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    } else if (sortOption === "bestseller") {
-      result.sort((a, b) => (b.sold || 0) - (a.sold || 0));
-    } else if (sortOption === "available") {
-      result = result.filter((p) => p.stock > 0);
-    } else if (sortOption === "newest") {
-      result = result.filter((p) => isNewArrival(p.createdAt));
-      result.sort((a, b) => {
-        const dateA = a.createdAt
-          ? new Date(a.createdAt.seconds * 1000)
-          : new Date(0);
-        const dateB = b.createdAt
-          ? new Date(b.createdAt.seconds * 1000)
-          : new Date(0);
+    // 2. Apply Sorting
+    result.sort((a, b) => {
+      if (sortOption === "price-asc") return a.price - b.price;
+      if (sortOption === "price-desc") return b.price - a.price;
+      if (sortOption === "alpha-asc") return (a.name || "").localeCompare(b.name || "");
+      if (sortOption === "newest") {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0);
         return dateB - dateA;
-      });
-    }
+      }
+      if (sortOption === "bestseller") return (b.sold || 0) - (a.sold || 0);
+      if (sortOption === "available") return (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0);
+      return 0; // Default
+    });
 
-    return result;
+    return result; // 👈 THIS IS THE CRITICAL RETURN!
   }, [
     products,
     selectedCategory,
@@ -1978,6 +1971,7 @@ export default function App() {
     categories,
     promotions,
     sortOption,
+    hideOutOfStock
   ]);
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
@@ -2165,34 +2159,33 @@ export default function App() {
             </div>
           </div>
 
-          {/* FILTERS & SORT */}
-          <div className="flex flex-col gap-4 mb-10 bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative z-20">
-            {/* TOP ROW: All, Promos, Main Categories, Search, Sort */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="flex flex-wrap gap-2 justify-center md:justify-start flex-1">
+{/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
+<div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+             {/* Search Bar */}
+             <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Search for product, or a keyword..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
+                />
+                <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
+              </div>
+
+              {/* Category Buttons */}
+              <div className="flex flex-wrap gap-2 justify-center">
                 <button
-                  onClick={() => {
-                    setSelectedCategory("All");
-                    setVisibleCount(12);
-                  }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === "All"
-                    ? "bg-purple-600 text-white shadow-md transform scale-105"
-                    : "bg-gray-100 hover:bg-gray-200"
-                    }`}
+                  onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
                   All
                 </button>
                 {promotions.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => {
-                      setSelectedCategory(p.title);
-                      setVisibleCount(12);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title
-                      ? "bg-red-500 text-white shadow-md"
-                      : "bg-red-50 text-red-600 hover:bg-red-100"
-                      }`}
+                    onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
+                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                   >
                     <Tag size={12} /> {p.title}
                   </button>
@@ -2200,91 +2193,48 @@ export default function App() {
                 {availableCategories.map((c) => (
                   <button
                     key={c}
-                    onClick={() => {
-                      setSelectedCategory(c);
-                      setVisibleCount(12);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c
-                      ? "bg-purple-600 text-white shadow-md transform scale-105"
-                      : "bg-gray-100 hover:bg-gray-200"
-                      }`}
+                    onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
+                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
                   >
                     {c}
                   </button>
                 ))}
               </div>
+          </div>
 
-              <div className="flex gap-2 w-full md:w-auto">
-                <div className="relative">
-                  <select
-                    value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value)}
-                    className="appearance-none bg-gray-100 pl-8 pr-8 py-2 rounded-full text-sm font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-gray-200 transition-colors"
-                  >
-                    <option value="default">Sort: Default</option>
-                    <option value="bestseller">Best Sellers</option>
-                    <option value="newest">New Arrivals</option>
-                    <option value="available">In Stock</option>
-                    <option value="price-asc">Price: Low to High</option>
-                    <option value="price-desc">Price: High to Low</option>
-                    <option value="alpha-asc">Name: A to Z</option>
-                  </select>
-                  <ArrowUpDown
-                    size={14}
-                    className="absolute left-3 top-3 text-gray-500"
-                  />
-                </div>
-                <div className="relative flex-1 md:w-48">
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                  />
-                  <Search
-                    size={16}
-                    className="absolute left-3 top-2.5 text-gray-400"
-                  />
-                </div>
+          {/* 2. THE STICKY CONTROL BAR (Only Sort & Toggle - Stays at top) */}
+          <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              
+              {/* Sort Option */}
+              <div className="relative flex-1 max-w-[180px]">
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  className="appearance-none bg-gray-50 pl-9 pr-4 py-2 rounded-xl text-xs font-bold cursor-pointer focus:outline-none border border-gray-200 w-full"
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="price-asc">Price: Low</option>
+                  <option value="price-desc">Price: High</option>
+                  <option value="newest">New Arrivals</option>
+                </select>
+                <ArrowUpDown size={14} className="absolute left-3 top-2.5 text-gray-400" />
               </div>
-            </div>
 
-            {/* BOTTOM ROW: Subcategories (Dynamic) - NEW! */}
-            {currentMainCategory && displaySubcategories.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 animate-fade-in">
-                <span className="text-xs font-bold text-gray-400 uppercase self-center mr-2">
-                  {currentMainCategory}:
+              {/* Toggle Switch */}
+              <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+                <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
+                  Hide Sold
                 </span>
                 <button
-                  onClick={() => {
-                    setSelectedCategory(currentMainCategory);
-                    setVisibleCount(12);
-                  }}
-                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === currentMainCategory
-                    ? "bg-purple-100 text-purple-700 border-purple-200"
-                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                    }`}
+                  type="button"
+                  onClick={() => setHideOutOfStock(!hideOutOfStock)}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}
                 >
-                  All {currentMainCategory}
+                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hideOutOfStock ? 'translate-x-5' : 'translate-x-1'}`} />
                 </button>
-                {displaySubcategories.map((sub) => (
-                  <button
-                    key={sub}
-                    onClick={() => {
-                      setSelectedCategory(sub);
-                      setVisibleCount(12);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${selectedCategory === sub
-                      ? "bg-purple-100 text-purple-700 border-purple-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                      }`}
-                  >
-                    {sub}
-                  </button>
-                ))}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -2361,7 +2311,7 @@ export default function App() {
           {displayedProducts.length < filteredProducts.length && (
             <div className="text-center mt-12 pb-12">
               <button
-                onClick={() => setVisibleCount((c) => c + 12)}
+                onClick={() => setVisiƒbleCount((c) => c + 12)}
                 className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
               >
                 <ChevronDown size={20} /> Show More Products
