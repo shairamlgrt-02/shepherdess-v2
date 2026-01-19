@@ -1107,14 +1107,17 @@ const AdminDashboard = ({
             {/* --- TOOLBAR GROUP --- */}
             <div className="flex items-center gap-4">
 
-              {/* 1. TOGGLE SWITCH (Hide 0 Stock) */}
+              {/* 1. TOGGLE SWITCH (Polished Version) ✨ */}
               <div
                 onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                className="flex items-center gap-2 cursor-pointer group select-none"
+                className="flex items-center gap-3 cursor-pointer group select-none"
               >
-                <div className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-300 ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
-                  <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
+                {/* TRACK: Made wider (w-11) and taller (h-6) for better spacing */}
+                <div className={`relative w-11 h-6 rounded-full transition-colors duration-300 ease-in-out ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  {/* THUMB: Adjusted size and translation to fit perfectly */}
+                  <div className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ease-in-out ${hideOutOfStock ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
+
                 <span className="text-[10px] font-bold text-gray-500 group-hover:text-gray-700 uppercase tracking-wide">
                   {hideOutOfStock ? "Hidden" : "Show 0"}
                 </span>
@@ -1124,8 +1127,8 @@ const AdminDashboard = ({
               <button
                 onClick={() => setShowArchived(!showArchived)}
                 className={`p-2 rounded-lg transition-all border ${showArchived
-                    ? "bg-amber-100 text-amber-800 border-amber-200"
-                    : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
+                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                  : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
                   }`}
                 title={showArchived ? "Back to Inventory" : "View Archived Items"}
               >
@@ -2228,7 +2231,7 @@ export default function App() {
               {/* Toggle Switch */}
               <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
                 <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
-                  Hide Sold
+                  Hide Sold Out
                 </span>
                 <button
                   type="button"
