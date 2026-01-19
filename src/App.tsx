@@ -59,6 +59,8 @@ import {
   Instagram,
   Facebook,
   MessageCircle,
+  Archive,
+  RefreshCw,
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -361,7 +363,22 @@ const AdminDashboard = ({
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("orders");
   const [editableContent, setEditableContent] = useState(content);
+  // --- PASTE THIS HERE ---
+  const toggleArchiveStatus = async (product) => {
+    const newStatus = !product.archived;
+    const confirmMsg = newStatus
+      ? `Archive "${product.name}"? It will be hidden from the main list.`
+      : `Unarchive "${product.name}"? It will return to the active inventory.`;
 
+    if (window.confirm(confirmMsg)) {
+      try {
+        await updateDoc(doc(db, "products", product.id), { archived: newStatus });
+      } catch (error) {
+        console.error("Error updating status:", error);
+        alert("Error: Could not update product. Check console.");
+      }
+    }
+  };
   // ORDERS STATE
   const [orderSearch, setOrderSearch] = useState("");
   const [orderSort, setOrderSort] = useState("date-desc");
@@ -380,6 +397,8 @@ const AdminDashboard = ({
   const [invSort, setInvSort] = useState("name");
   const [editingId, setEditingId] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [hideOutOfStock, setHideOutOfStock] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Product Form State
   const [productForm, setProductForm] = useState({
@@ -597,24 +616,38 @@ const AdminDashboard = ({
     await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
   };
 
-  // --- FILTERED INVENTORY (SAFE VERSION) ---
+  // --- FILTERED INVENTORY (With Archive & Stock Toggle) ---
   const filteredInventory = useMemo(() => {
     let data = [...products];
 
-    // 1. Search (Safeguard added: || "")
+    // 1. ARCHIVE FILTER (The Gatekeeper) 🔒
+    if (showArchived) {
+      // If viewing archives, ONLY show items marked as archived
+      data = data.filter((p) => p.archived === true);
+    } else {
+      // If viewing normal inventory, HIDE items that are archived
+      data = data.filter((p) => !p.archived);
+    }
+
+    // 2. Search
     if (invSearch) {
       data = data.filter((p) =>
         (p.name || "").toLowerCase().includes(invSearch.toLowerCase())
       );
     }
 
-    // 2. Category Filters
+    // 3. Category Filters
     if (invCategory !== "All")
       data = data.filter((p) => p.category === invCategory);
     if (invCategory !== "All" && invSubCategory !== "All")
       data = data.filter((p) => p.subcategory === invSubCategory);
 
-    // 3. Sorting (Safeguard added: || "")
+    // 4. Hide Out of Stock Logic (Works in both views)
+    if (hideOutOfStock) {
+      data = data.filter((p) => (p.stock || 0) > 0);
+    }
+
+    // 5. Sorting
     if (invSort === "name") {
       data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     } else if (invSort === "stock-asc") {
@@ -633,7 +666,8 @@ const AdminDashboard = ({
       });
     }
     return data;
-  }, [products, invSearch, invCategory, invSubCategory, invSort]);
+  }, [products, invSearch, invCategory, invSubCategory, invSort, hideOutOfStock, showArchived]); // <--- Added showArchived
+
 
   // Counts for Filter Badges
   const getCount = (status) =>
@@ -883,7 +917,7 @@ const AdminDashboard = ({
                           <img src={order.customer.proof} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <ExternalLink className="text-white" size={16} />
-                          </div>  
+                          </div>
                         </div>
                       )}
                     </div>
@@ -893,7 +927,7 @@ const AdminDashboard = ({
                       <h4 className="font-bold text-gray-400 text-[10px] uppercase mb-2 flex justify-between items-center">
                         Order Items <span className="text-purple-500 font-normal lowercase italic">(click X to remove)</span>
                       </h4>
-                      
+
                       {/* 1. The List of Current Items */}
                       <ul className="space-y-2 mb-4">
                         {order.items && Object.values(order.items).map((i) => (
@@ -904,9 +938,9 @@ const AdminDashboard = ({
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="text-gray-500">{(i.price * i.qty).toFixed(3)}</span>
-                              <button 
+                              <button
                                 onClick={async () => {
-                                  if(window.confirm(`Remove ${i.name}?`)) {
+                                  if (window.confirm(`Remove ${i.name}?`)) {
                                     const newItems = { ...order.items };
                                     delete newItems[i.id];
                                     await updateDoc(doc(db, "orders", order.id), { items: newItems });
@@ -924,14 +958,14 @@ const AdminDashboard = ({
                       {/* 2. THE REPLACEMENT DROPDOWN ✨ */}
                       <div className="mt-4 p-3 border-2 border-dashed border-purple-200 rounded-xl bg-purple-50/50 animate-pulse-subtle">
                         <p className="text-[9px] font-bold text-purple-500 uppercase mb-2 tracking-widest">✨ Add Replacement Item</p>
-                        <select 
+                        <select
                           className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-300 transition-all cursor-pointer"
                           onChange={(e) => {
                             const prod = products.find(p => p.id === e.target.value);
                             if (prod) {
                               addItemToOrder(order.id, order.items, prod);
                               // This resets the dropdown so it says "Select a product" again
-                              e.target.value = ""; 
+                              e.target.value = "";
                             }
                           }}
                         >
@@ -940,10 +974,10 @@ const AdminDashboard = ({
                             .filter(p => p.active && p.stock > 0)
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map(p => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} — {p.price.toFixed(3)} BHD
-                            </option>
-                          ))}
+                              <option key={p.id} value={p.id}>
+                                {p.name} — {p.price.toFixed(3)} BHD
+                              </option>
+                            ))}
                         </select>
                         <p className="text-[8px] text-purple-400 mt-2 italic">Tip: Removing an item doesn't change the total automatically. Use the box below to adjust! 👇</p>
                       </div>
@@ -953,8 +987,8 @@ const AdminDashboard = ({
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Adjusted Grand Total:</span>
                           <div className="flex items-center gap-1">
-                            <input 
-                              type="number" 
+                            <input
+                              type="number"
                               step="0.001"
                               defaultValue={order.total}
                               onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
@@ -966,60 +1000,57 @@ const AdminDashboard = ({
 
                         <div className="mt-4">
                           <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
-                          <textarea 
+                          <textarea
                             className="w-full p-2 text-xs border border-amber-200 rounded-lg bg-amber-50/50 focus:bg-white focus:ring-2 focus:ring-amber-300 outline-none transition-all"
-                              placeholder="e.g. Swapped out toner for serum as per WA chat..."
+                            placeholder="e.g. Swapped out toner for serum as per WA chat..."
                             defaultValue={order.adminNote || ""}
                             rows="2"
                             onBlur={(e) => updateOrderNote(order.id, e.target.value)}
                           />
-                      </div>
-                    </div> {/* Closes Pricing & Notes */}
-                  </div> {/* Closes Right Column */}
-                </div> {/* Closes the Grid (This was likely the missing one!) */}
+                        </div>
+                      </div> {/* Closes Pricing & Notes */}
+                    </div> {/* Closes Right Column */}
+                  </div> {/* Closes the Grid (This was likely the missing one!) */}
 
-                <div className="mt-4 pt-4 border-t flex justify-end gap-2">
-                      {status === "pending" && (
-                        <button
-                          onClick={() => updateOrderStatus(order.id, "confirmed")}
-                          className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm"
-                        >
-                          <Check size={14} /> Quick Confirm
-                        </button>
-                      )}
-                      {(status === "pending" || status === "confirmed") && (
-                        <button
-                          onClick={() => updateOrderStatus(order.id, "delivered")}
-                          className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm"
-                        >
-                          <Truck size={14} /> Quick Deliver
-                        </button>
-                      )}
+                  <div className="mt-4 pt-4 border-t flex justify-end gap-2">
+                    {status === "pending" && (
                       <button
-                        onClick={() => deleteOrder(order.id)}
-                        className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
-                        title="Delete Record"
+                        onClick={() => updateOrderStatus(order.id, "confirmed")}
+                        className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm"
                       >
-                        <Trash2 size={16} />
+                        <Check size={14} /> Quick Confirm
                       </button>
-                    </div>
+                    )}
+                    {(status === "pending" || status === "confirmed") && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, "delivered")}
+                        className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm"
+                      >
+                        <Truck size={14} /> Quick Deliver
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteOrder(order.id)}
+                      className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
+                      title="Delete Record"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                );
-              })
-            )}
-          </div>
-        )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
-        {/* INVENTORY TAB */}
-        {tab === "inventory" && (
+      {/* INVENTORY TAB */}
+      {tab === "inventory" && (
         <div className="space-y-6">
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex flex-col md:flex-row gap-2 flex-1 w-full">
               <div className="relative flex-1">
-                <Search
-                  className="absolute left-3 top-2.5 text-gray-400"
-                  size={16}
-                />
+                <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
                 <input
                   className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm bg-gray-50 focus:bg-white transition-colors"
                   placeholder="Search product name..."
@@ -1057,10 +1088,7 @@ const AdminDashboard = ({
                 </select>
               )}
               <div className="relative">
-                <Filter
-                  className="absolute left-3 top-2.5 text-gray-400"
-                  size={16}
-                />
+                <Filter className="absolute left-3 top-2.5 text-gray-400" size={16} />
                 <select
                   className="pl-9 pr-4 py-2 border rounded-lg text-sm bg-white appearance-none cursor-pointer hover:bg-gray-50"
                   value={invSort}
@@ -1075,27 +1103,52 @@ const AdminDashboard = ({
                 </select>
               </div>
             </div>
-            <button
-              onClick={() => {
-                setEditingId(null);
-                setProductForm({
-                  name: "",
-                  category: Object.keys(categories)[0] || "",
-                  subcategory: "",
-                  price: "",
-                  originalPrice: "",
-                  stock: "",
-                  expiryDate: "",
-                  description: "",
-                  image: "",
-                });
-                setShowProductForm(!showProductForm);
-              }}
-              className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
-            >
-              {showProductForm ? <X size={16} /> : <Plus size={16} />}{" "}
-              {showProductForm ? "Cancel" : "Add Product"}
-            </button>
+
+            {/* --- TOOLBAR GROUP --- */}
+            <div className="flex items-center gap-4">
+
+              {/* 1. TOGGLE SWITCH (Hide 0 Stock) */}
+              <div
+                onClick={() => setHideOutOfStock(!hideOutOfStock)}
+                className="flex items-center gap-2 cursor-pointer group select-none"
+              >
+                <div className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-300 ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-500 group-hover:text-gray-700 uppercase tracking-wide">
+                  {hideOutOfStock ? "Hidden" : "Show 0"}
+                </span>
+              </div>
+
+              {/* 2. ARCHIVE BUTTON */}
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`p-2 rounded-lg transition-all border ${showArchived
+                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                    : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
+                  }`}
+                title={showArchived ? "Back to Inventory" : "View Archived Items"}
+              >
+                {showArchived ? <RefreshCw size={20} /> : <Archive size={20} />}
+              </button>
+
+              {/* 3. ADD PRODUCT BUTTON */}
+              {!showArchived && (
+                <button
+                  onClick={() => {
+                    setEditingId(null);
+                    setProductForm({
+                      name: "", category: Object.keys(categories)[0] || "", subcategory: "", price: "", originalPrice: "", stock: "", expiryDate: "", description: "", image: "",
+                    });
+                    setShowProductForm(!showProductForm);
+                  }}
+                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
+                >
+                  {showProductForm ? <X size={16} /> : <Plus size={16} />}{" "}
+                  {showProductForm ? "Cancel" : "Add Product"}
+                </button>
+              )}
+            </div>
           </div>
 
           {showProductForm && (
@@ -1107,122 +1160,25 @@ const AdminDashboard = ({
                 {editingId ? "Edit Product" : "Add New Product"}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  required
-                  placeholder="Name"
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.name}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, name: e.target.value })
-                  }
-                />
-                <select
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.category}
-                  onChange={(e) =>
-                    setProductForm({
-                      ...productForm,
-                      category: e.target.value,
-                      subcategory: "",
-                    })
-                  }
-                >
+                <input required placeholder="Name" className="p-3 border rounded-lg text-sm" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+                <select className="p-3 border rounded-lg text-sm" value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value, subcategory: "" })}>
                   <option value="">Select Category</option>
-                  {Object.keys(categories).map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {Object.keys(categories).map((c) => (<option key={c} value={c}>{c}</option>))}
                 </select>
-                <select
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.subcategory}
-                  onChange={(e) =>
-                    setProductForm({
-                      ...productForm,
-                      subcategory: e.target.value,
-                    })
-                  }
-                >
+                <select className="p-3 border rounded-lg text-sm" value={productForm.subcategory} onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value })}>
                   <option value="">Select Subcategory</option>
-                  {(categories[productForm.category] || []).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
+                  {(categories[productForm.category] || []).map((s) => (<option key={s} value={s}>{s}</option>))}
                 </select>
                 <div className="flex gap-2">
-                  <input
-                    required
-                    type="number"
-                    step="0.001"
-                    placeholder="Price"
-                    className="p-3 border rounded-lg text-sm w-1/2"
-                    value={productForm.price}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, price: e.target.value })
-                    }
-                  />
-                  <input
-                    type="number"
-                    step="0.001"
-                    placeholder="Old Price"
-                    className="p-3 border rounded-lg text-sm w-1/2"
-                    value={productForm.originalPrice}
-                    onChange={(e) =>
-                      setProductForm({
-                        ...productForm,
-                        originalPrice: e.target.value,
-                      })
-                    }
-                  />
+                  <input required type="number" step="0.001" placeholder="Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+                  <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
                 </div>
-                <input
-                  required
-                  type="number"
-                  placeholder="Stock"
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.stock}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, stock: e.target.value })
-                  }
-                />
-                <input
-                  placeholder="Expiry (YYYY-MM-DD)"
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.expiryDate}
-                  onChange={(e) =>
-                    setProductForm({
-                      ...productForm,
-                      expiryDate: e.target.value,
-                    })
-                  }
-                />
-                <input
-                  placeholder="Image URL"
-                  className="p-3 border rounded-lg text-sm"
-                  value={productForm.image}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, image: e.target.value })
-                  }
-                />
-                <textarea
-                  placeholder="Description"
-                  className="p-3 border rounded-lg text-sm md:col-span-2"
-                  rows="2"
-                  value={productForm.description}
-                  onChange={(e) =>
-                    setProductForm({
-                      ...productForm,
-                      description: e.target.value,
-                    })
-                  }
-                />
+                <input required type="number" placeholder="Stock" className="p-3 border rounded-lg text-sm" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
+                <input placeholder="Expiry (YYYY-MM-DD)" className="p-3 border rounded-lg text-sm" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
+                <input placeholder="Image URL" className="p-3 border rounded-lg text-sm" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} />
+                <textarea placeholder="Description" className="p-3 border rounded-lg text-sm md:col-span-2" rows="2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black"
-              >
+              <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black">
                 {editingId ? "Update Product" : "Save Product"}
               </button>
             </form>
@@ -1242,87 +1198,46 @@ const AdminDashboard = ({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredInventory.map((p) => (
-                    <tr
-                      key={p.id}
-                      className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""
-                        }`}
-                    >
+                    <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""}`}>
                       <td className="p-4">
                         <div className="font-bold text-gray-900">{p.name}</div>
-                        {p.expiryDate &&
-                          (() => {
-                            const today = new Date();
-                            const exp = new Date(p.expiryDate);
-                            const diff = Math.ceil(
-                              (exp - today) / (1000 * 60 * 60 * 24)
-                            );
-                            if (diff < 0)
-                              return (
-                                <span className="inline-block mt-1 text-[10px] font-bold text-white bg-red-800 px-2 py-0.5 rounded animate-pulse">
-                                  ⚠️ EXPIRED ({p.expiryDate})
-                                </span>
-                              );
-                            if (diff <= 90)
-                              return (
-                                <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                                  ⏳ Expiring in {diff} days ({p.expiryDate})
-                                </span>
-                              );
-                            return null;
-                          })()}
+                        {p.expiryDate && (() => {
+                          const diff = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+                          if (diff < 0) return <span className="inline-block mt-1 text-[10px] font-bold text-white bg-red-800 px-2 py-0.5 rounded animate-pulse">⚠️ EXPIRED</span>;
+                          if (diff <= 90) return <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">⏳ Expiring in {diff} days</span>;
+                          return null;
+                        })()}
                         <div className="flex gap-2 mt-1">
-                          <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 font-bold">
-                            {p.category}
-                          </span>
-                          {p.subcategory && (
-                            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                              {p.subcategory}
-                            </span>
-                          )}
+                          <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 font-bold">{p.category}</span>
+                          {p.subcategory && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{p.subcategory}</span>}
                         </div>
                       </td>
                       <td className="p-4 text-center">
-                        <input
-                          type="number"
-                          className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3
-                            ? "text-red-600 border-red-200 bg-red-50"
-                            : "border-gray-200"
-                            }`}
-                          value={p.stock}
-                          onChange={(e) => onUpdateStock(p.id, e.target.value)}
-                        />
+                        <input type="number" className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3 ? "text-red-600 border-red-200 bg-red-50" : "border-gray-200"}`} value={p.stock} onChange={(e) => onUpdateStock(p.id, e.target.value)} />
                       </td>
                       <td className="p-4 text-center">
-                        <input
-                          type="number"
-                          step="0.001"
-                          className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold"
-                          value={p.price}
-                          onChange={(e) => onUpdatePrice(p.id, e.target.value)}
-                        />
+                        <input type="number" step="0.001" className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
                       </td>
                       <td className="p-4 text-center">
-                        <button
-                          onClick={() => onToggleStatus(p.id, p.active)}
-                          className={`p-2 rounded-full ${p.active
-                            ? "text-green-600 hover:bg-green-50"
-                            : "text-gray-400 hover:bg-gray-100"
-                            }`}
-                        >
+                        <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-2 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
                           {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
                         </button>
                       </td>
                       <td className="p-4 text-center flex justify-center gap-2">
-                        <button
-                          onClick={() => startEditProduct(p)}
-                          className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
-                        >
+                        <button onClick={() => startEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full" title="Edit">
                           <Edit size={18} />
                         </button>
+
+                        {/* ARCHIVE BUTTON */}
                         <button
-                          onClick={() => onDeleteProduct(p.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                          onClick={() => toggleArchiveStatus(p)}
+                          className={`p-2 rounded-full transition-colors ${p.archived ? "text-green-500 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
+                          title={p.archived ? "Restore" : "Archive"}
                         >
+                          {p.archived ? <RefreshCw size={18} /> : <Archive size={18} />}
+                        </button>
+
+                        <button onClick={() => onDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full" title="Delete">
                           <Trash2 size={18} />
                         </button>
                       </td>
@@ -1747,6 +1662,17 @@ export default function App() {
     updateDoc(doc(db, "products", id), { active: !val });
   const handleDeleteProduct = async (id) => {
     if (window.confirm("Delete?")) await deleteDoc(doc(db, "products", id));
+  };
+  // --- ARCHIVE / UNARCHIVE FUNCTION ---
+  const toggleArchiveStatus = async (product) => {
+    const newStatus = !product.archived; // Flip the status
+    const confirmMsg = newStatus
+      ? `Archive "${product.name}"? It will be hidden from the main list.`
+      : `Unarchive "${product.name}"? It will return to the active inventory.`;
+
+    if (window.confirm(confirmMsg)) {
+      await updateDoc(doc(db, "products", product.id), { archived: newStatus });
+    }
   };
   const handleAddProduct = async (data) => {
     await addDoc(collection(db, "products"), {
@@ -2237,53 +2163,53 @@ export default function App() {
             </div>
           </div>
 
-{/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
-<div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-             {/* Search Bar */}
-             <div className="relative w-full">
-                <input
-                  type="text"
-                  placeholder="Search for product, or a keyword..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
-                />
-                <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-              </div>
+          {/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
+          <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            {/* Search Bar */}
+            <div className="relative w-full">
+              <input
+                type="text"
+                placeholder="Search for product, or a keyword..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
+              />
+              <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
+            </div>
 
-              {/* Category Buttons */}
-              <div className="flex flex-wrap gap-2 justify-center">
+            {/* Category Buttons */}
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+              >
+                All
+              </button>
+              {promotions.map((p) => (
                 <button
-                  onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                  key={p.id}
+                  onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
+                  className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                 >
-                  All
+                  <Tag size={12} /> {p.title}
                 </button>
-                {promotions.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
-                  >
-                    <Tag size={12} /> {p.title}
-                  </button>
-                ))}
-                {availableCategories.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
+              ))}
+              {availableCategories.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
+                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* 2. THE STICKY CONTROL BAR (Only Sort & Toggle - Stays at top) */}
           <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-              
+
               {/* Sort Option */}
               <div className="relative flex-1 max-w-[180px]">
                 <select
