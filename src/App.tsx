@@ -61,6 +61,7 @@ import {
   MessageCircle,
   Archive,
   RefreshCw,
+  ChevronUp,
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -379,28 +380,34 @@ const AdminDashboard = ({
       }
     }
   };
-  // ORDERS STATE
+  // --- 1. ORDERS STATE ---
   const [orderSearch, setOrderSearch] = useState("");
   const [orderSort, setOrderSort] = useState("date-desc");
-  const [filterStatus, setFilterStatus] = useState("all"); // NEW: Filter State
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  // INVENTORY/OTHER STATE
+  // --- 2. CATEGORIES & PROMOS STATE ---
   const [localCategories, setLocalCategories] = useState(categories);
   const [newMainCat, setNewMainCat] = useState("");
   const [newSubCat, setNewSubCat] = useState({ main: "", sub: "" });
   const [newPromo, setNewPromo] = useState({ title: "", productIds: [] });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
   const [promoSearchQuery, setPromoSearchQuery] = useState("");
+
+  // --- 3. INVENTORY & MULTI-SORT STATE ---
   const [invSearch, setInvSearch] = useState("");
   const [invCategory, setInvCategory] = useState("All");
   const [invSubCategory, setInvSubCategory] = useState("All");
-  const [invSort, setInvSort] = useState("name");
+
+  const initialSort = [{ key: "name", direction: "asc" }];
+  const [sortConfig, setSortConfig] = useState(initialSort);
+  const [visFilter, setVisFilter] = useState("all");
+
   const [editingId, setEditingId] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [hideOutOfStock, setHideOutOfStock] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
-  // Product Form State
+  // --- 4. PRODUCT FORM STATE ---
   const [productForm, setProductForm] = useState({
     name: "",
     category: "",
@@ -412,6 +419,36 @@ const AdminDashboard = ({
     description: "",
     image: "",
   });
+
+  // --- 5. POWER MULTI-SORT LOGIC ---
+  const clearAllFilters = () => {
+    setSortConfig(initialSort);
+    setVisFilter("all");
+    setInvSearch("");
+    setInvCategory("All");
+    setInvSubCategory("All");
+    setHideOutOfStock(false);
+  };
+
+  const handleHeaderSort = (key) => {
+    setSortConfig((currentSorts) => {
+      const existingIndex = currentSorts.findIndex((s) => s.key === key);
+      let newDirection = "asc";
+
+      if (existingIndex !== -1) {
+        newDirection = currentSorts[existingIndex].direction === "asc" ? "desc" : "asc";
+      }
+
+      const others = currentSorts.filter(s => s.key !== key);
+      return [{ key, direction: newDirection }, ...others];
+    });
+  };
+
+  const cycleVisFilter = () => {
+    if (visFilter === "all") setVisFilter("visible");
+    else if (visFilter === "visible") setVisFilter("hidden");
+    else setVisFilter("all");
+  };
 
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("date", "desc"));
@@ -616,57 +653,54 @@ const AdminDashboard = ({
     await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
   };
 
-  // --- FILTERED INVENTORY (With Archive & Stock Toggle) ---
+  // --- FILTERED INVENTORY (Smart Stack Sort) ---
   const filteredInventory = useMemo(() => {
     let data = [...products];
 
-    // 1. ARCHIVE FILTER (The Gatekeeper) 🔒
-    if (showArchived) {
-      // If viewing archives, ONLY show items marked as archived
-      data = data.filter((p) => p.archived === true);
-    } else {
-      // If viewing normal inventory, HIDE items that are archived
-      data = data.filter((p) => !p.archived);
-    }
+    // 1. ARCHIVE & SEARCH & CATEGORY FILTERS (Standard)
+    if (showArchived) data = data.filter((p) => p.archived === true);
+    else data = data.filter((p) => !p.archived);
 
-    // 2. Search
-    if (invSearch) {
-      data = data.filter((p) =>
-        (p.name || "").toLowerCase().includes(invSearch.toLowerCase())
-      );
-    }
+    if (invSearch) data = data.filter((p) => (p.name || "").toLowerCase().includes(invSearch.toLowerCase()));
 
-    // 3. Category Filters
-    if (invCategory !== "All")
-      data = data.filter((p) => p.category === invCategory);
-    if (invCategory !== "All" && invSubCategory !== "All")
-      data = data.filter((p) => p.subcategory === invSubCategory);
+    if (invCategory !== "All") data = data.filter((p) => p.category === invCategory);
+    if (invCategory !== "All" && invSubCategory !== "All") data = data.filter((p) => p.subcategory === invSubCategory);
 
-    // 4. Hide Out of Stock Logic (Works in both views)
-    if (hideOutOfStock) {
-      data = data.filter((p) => (p.stock || 0) > 0);
-    }
+    if (hideOutOfStock) data = data.filter((p) => (p.stock || 0) > 0);
 
-    // 5. Sorting
-    if (invSort === "name") {
-      data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    } else if (invSort === "stock-asc") {
-      data.sort((a, b) => (a.stock || 0) - (b.stock || 0));
-    } else if (invSort === "stock-desc") {
-      data.sort((a, b) => (b.stock || 0) - (a.stock || 0));
-    } else if (invSort === "price-desc") {
-      data.sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (invSort === "price-asc") {
-      data.sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (invSort === "expiry-asc") {
-      data.sort((a, b) => {
-        if (!a.expiryDate) return 1;
-        if (!b.expiryDate) return -1;
-        return new Date(a.expiryDate) - new Date(b.expiryDate);
-      });
-    }
+    // 2. NEW: VISIBILITY FILTER 👁️
+    if (visFilter === "visible") data = data.filter(p => p.active);
+    if (visFilter === "hidden") data = data.filter(p => !p.active);
+
+    // 3. ✨ POWER MULTI-COLUMN SORTING (With Chronological Expiry)
+    data.sort((a, b) => {
+      for (const sort of sortConfig) {
+        let aVal = a[sort.key] ?? 0;
+        let bVal = b[sort.key] ?? 0;
+
+        if (sort.key === "name") {
+          aVal = (a.name || "").toLowerCase();
+          bVal = (b.name || "").toLowerCase();
+        } else if (sort.key === "expiryDate") {
+          // 💡 This turns "2025-01-01" into a number. 
+          // Missing dates are set to a huge number so they always stay at the bottom.
+          aVal = a.expiryDate ? new Date(a.expiryDate).getTime() : 9999999999999;
+          bVal = b.expiryDate ? new Date(b.expiryDate).getTime() : 9999999999999;
+        } else {
+          aVal = Number(aVal);
+          bVal = Number(bVal);
+        }
+
+        if (aVal !== bVal) {
+          if (aVal < bVal) return sort.direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return sort.direction === "asc" ? 1 : -1;
+        }
+      }
+      return 0;
+    });
+
     return data;
-  }, [products, invSearch, invCategory, invSubCategory, invSort, hideOutOfStock, showArchived]); // <--- Added showArchived
+  }, [products, invSearch, invCategory, invSubCategory, sortConfig, hideOutOfStock, showArchived, visFilter]);
 
 
   // Counts for Filter Badges
@@ -1087,40 +1121,28 @@ const AdminDashboard = ({
                   ))}
                 </select>
               )}
-              <div className="relative">
-                <Filter className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                <select
-                  className="pl-9 pr-4 py-2 border rounded-lg text-sm bg-white appearance-none cursor-pointer hover:bg-gray-50"
-                  value={invSort}
-                  onChange={(e) => setInvSort(e.target.value)}
-                >
-                  <option value="name">Sort: Name (A-Z)</option>
-                  <option value="stock-asc">Stock: Low to High</option>
-                  <option value="stock-desc">Stock: High to Low</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="expiry-asc">Expiry: Sooner to Later</option>
-                </select>
-              </div>
             </div>
 
             {/* --- TOOLBAR GROUP --- */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto mt-3 md:mt-0">
 
-              {/* 1. TOGGLE SWITCH (Polished Version) ✨ */}
+              {/* CLEAR ALL BUTTON */}
+              <button
+                onClick={clearAllFilters}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-bold border border-gray-200 uppercase tracking-tighter hover:bg-red-50 hover:text-red-600 transition-colors"
+              >
+                <RefreshCw size={14} /> Clear All
+              </button>
+
+              {/* TOGGLE SWITCH */}
               <div
                 onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                className="flex items-center gap-3 cursor-pointer group select-none"
+                className="flex items-center gap-2 cursor-pointer group select-none bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100"
               >
-                {/* TRACK: Made wider (w-11) and taller (h-6) for better spacing */}
-                <div className={`relative w-11 h-6 rounded-full transition-colors duration-300 ease-in-out ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
-                  {/* THUMB: Adjusted size and translation to fit perfectly */}
-                  <div className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ease-in-out ${hideOutOfStock ? 'translate-x-5' : 'translate-x-0'}`} />
+                <div className={`relative w-9 h-5 rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow transform transition-transform ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
                 </div>
-
-                <span className="text-[10px] font-bold text-gray-500 group-hover:text-gray-700 uppercase tracking-wide">
-                  {hideOutOfStock ? "Hidden" : "Show 0"}
-                </span>
+                <span className="text-[9px] font-bold text-gray-500 uppercase">Hide 0</span>
               </div>
 
               {/* 2. ARCHIVE BUTTON */}
@@ -1192,13 +1214,87 @@ const AdminDashboard = ({
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
                   <tr>
-                    <th className="p-4">Product</th>
-                    <th className="p-4 text-center">Stock</th>
-                    <th className="p-4 text-center">Price</th>
-                    <th className="p-4 text-center">Visible</th>
+                    {/* PRODUCT HEADER */}
+                    <th className="p-4 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("name")}>
+                      <div className="flex items-center gap-1">
+                        Product
+                        {sortConfig.map((s, index) => s.key === "name" && (
+                          <span key="name-sort" className="text-purple-600 flex items-center">
+                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </th>
+
+                    {/* STOCK HEADER */}
+                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("stock")}>
+                      <div className="flex items-center justify-center gap-1">
+                        Stock
+                        {sortConfig.map((s, index) => s.key === "stock" && (
+                          <span key="stock-sort" className="text-purple-600 flex items-center">
+                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </th>
+
+                    {/* PRICE HEADER */}
+                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("price")}>
+                      <div className="flex items-center justify-center gap-1">
+                        Price
+                        {sortConfig.map((s, index) => s.key === "price" && (
+                          <span key="price-sort" className="text-purple-600 flex items-center">
+                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </th>
+
+                    {/* --- EXPIRY HEADER --- */}
+                    <th
+                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleHeaderSort("expiryDate")}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Expiry
+                        {sortConfig.map((s, index) => s.key === "expiryDate" && (
+                          <span key="expiry-sort" className="text-purple-600 flex items-center">
+                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {sortConfig.length > 1 && (
+                              <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px] font-bold">
+                                {index + 1}
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </th>
+
+                    {/* --- VISIBLE HEADER (FILTER) --- */}
+                    <th
+                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={cycleVisFilter}
+                      title="Click to toggle: All -> Visible -> Hidden"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        {visFilter === "all" && <span>Visible</span>}
+                        {visFilter === "visible" && <span className="text-green-600 flex items-center gap-1"><Eye size={14} /> Only</span>}
+                        {visFilter === "hidden" && <span className="text-gray-400 flex items-center gap-1"><EyeOff size={14} /> Only</span>}
+
+                        {/* The Filter Icon you requested */}
+                        <div className="text-gray-300">
+                          {visFilter === "all" ? <Filter size={12} /> : <Filter size={12} className="text-purple-500" />}
+                        </div>
+                      </div>
+                    </th>
+
                     <th className="p-4 text-center">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-gray-100">
                   {filteredInventory.map((p) => (
                     <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""}`}>
@@ -1220,6 +1316,9 @@ const AdminDashboard = ({
                       </td>
                       <td className="p-4 text-center">
                         <input type="number" step="0.001" className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
+                      </td>
+                      <td className="p-4 text-center text-[11px] font-mono text-gray-500">
+                        {p.expiryDate ? p.expiryDate : "—"}
                       </td>
                       <td className="p-4 text-center">
                         <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-2 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
