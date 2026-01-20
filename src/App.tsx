@@ -240,147 +240,157 @@ const OrderReceiptModal = ({ order, onClose }) => {
   const subtotal = order.items
     ? Object.values(order.items).reduce((sum, item) => sum + (item.price * item.qty), 0)
     : 0;
-  const deliveryFee = order.deliveryFee !== undefined
-    ? order.deliveryFee
-    : (order.customer?.deliveryMethod === 'delivery' ? 1.000 : 0);
+  const deliveryFee = order.deliveryFee || 0;
   const total = subtotal + deliveryFee;
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4">
       <div className="relative w-full max-w-[360px] my-8">
+        <div className="bg-white shadow-2xl rounded-sm p-6 flex flex-col items-center text-gray-800 font-sans relative">
 
-        {/* RECEIPT CARD */}
-        <div id="receipt-card" className="bg-white shadow-2xl overflow-hidden rounded-sm relative">
-
-          <button onClick={onClose} className="absolute top-3 right-3 z-10 text-gray-400 hover:text-red-500 bg-white/50 rounded-full p-1 print:hidden">
+          <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500">
             <X size={24} />
           </button>
 
-          <div className="p-6 flex flex-col items-center text-gray-800 font-sans">
-
-            {/* LOGO AREA */}
-            <div className="flex flex-col items-center mb-6 mt-2">
-              <div className="bg-[#8B5CF6] text-white w-12 h-12 rounded-full flex items-center justify-center mb-2 shadow-sm print-color-exact">
-                <span className="font-serif text-2xl italic">S</span>
-              </div>
-              <h1 className="text-2xl font-serif font-bold text-gray-900 tracking-tight leading-none">Shepherdess</h1>
-              <p className="text-[10px] font-bold text-[#8B5CF6] tracking-[0.25em] uppercase mt-1 print-color-exact">K-BEAUTY</p>
+          {/* Aesthetic Header */}
+          <div className="flex flex-col items-center mb-6 mt-2">
+            <div className="bg-[#8B5CF6] text-white w-12 h-12 rounded-full flex items-center justify-center mb-2 shadow-sm">
+              <span className="font-serif text-2xl italic">S</span>
             </div>
+            <h1 className="text-2xl font-serif font-bold text-gray-900 tracking-tight">Shepherdess</h1>
+            <p className="text-[10px] font-bold text-[#8B5CF6] tracking-[0.25em] uppercase mt-1">K-BEAUTY</p>
+          </div>
 
-            {/* ORDER INFO */}
-            <div className="w-full text-center mb-5">
-              <h2 className="text-lg font-bold text-[#7C3AED] uppercase tracking-wide print-color-exact">
-                ORDER ID: {order.orderId || "000000"}
-              </h2>
+          <div className="w-full text-center mb-4">
+            <h2 className="text-lg font-bold text-[#7C3AED] uppercase tracking-wide">
+              ORDER ID: {order.orderId}
+            </h2>
+            <p className="text-[10px] text-gray-400">{new Date(order.date).toLocaleDateString()}</p>
+          </div>
+
+          <div className="w-full border-t-2 border-[#7C3AED] border-dashed mb-5"></div>
+
+          {/* Customer Details */}
+          <div className="w-full text-sm space-y-2 mb-6 font-medium text-gray-700">
+            <div className="flex justify-between">
+              <span className="font-bold">Customer:</span>
+              <span>{order.customer?.name}</span>
             </div>
-
-            <div className="w-full border-t-2 border-[#7C3AED] border-dashed mb-5 print-color-exact"></div>
-
-            {/* CUSTOMER DETAILS */}
-            <div className="w-full text-sm space-y-2 mb-6 font-medium text-gray-700">
-              <div className="flex justify-between">
-                <span className="font-bold">Customer:</span>
-                <span className="text-right">{order.customer?.name || "Guest"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-bold">Phone:</span>
-                <span className="text-right">{order.customer?.phone || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-bold">Method:</span>
-                <span className="uppercase text-right">{order.customer?.deliveryMethod || order.method || "Pickup"}</span>
-              </div>
+            <div className="flex justify-between">
+              <span className="font-bold">Phone:</span>
+              <span>{order.customer?.phone}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="font-bold">Method:</span>
+              <span className="uppercase">{order.customer?.deliveryMethod}</span>
+            </div>
+          </div>
 
-            <div className="w-full border-t border-gray-200 mb-5"></div>
+          <div className="w-full border-t border-gray-100 mb-5"></div>
 
-            {/* ITEMS */}
-            <div className="w-full space-y-3 mb-6">
-              {order.items && Object.values(order.items).map((item, i) => (
-                <div key={i} className="flex justify-between items-start text-sm">
-                  <div className="flex gap-2">
-                    <span className="font-bold text-gray-900">{item.qty}x</span>
-                    <span className="text-gray-700 leading-tight max-w-[160px]">{item.name}</span>
-                  </div>
-                  <span className="font-mono text-gray-900">{(item.price * item.qty).toFixed(3)}</span>
+          {/* Items */}
+          <div className="w-full space-y-3 mb-6">
+            {Object.values(order.items || {}).map((item, i) => (
+              <div key={i} className="flex justify-between items-start text-sm">
+                <div className="flex gap-2">
+                  <span className="font-bold text-gray-900">{item.qty}x</span>
+                  <span className="text-gray-700 max-w-[160px]">{item.name}</span>
                 </div>
-              ))}
+                <span className="font-mono">{(item.price * item.qty).toFixed(3)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="w-full border-t-2 border-gray-800 mb-6"></div>
+
+          {/* Totals */}
+          <div className="w-full space-y-2 mb-8">
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Subtotal</span>
+              <span>{subtotal.toFixed(3)} BHD</span>
             </div>
-
-            <div className="w-full border-t-2 border-gray-800 mb-6"></div>
-
-            {/* TOTALS */}
-            <div className="w-full space-y-2 mb-8">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Subtotal</span>
-                <span className="font-mono">{subtotal.toFixed(3)} BHD</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Delivery</span>
-                <span className="font-mono">{deliveryFee.toFixed(3)} BHD</span>
-              </div>
-              <div className="flex justify-between items-center text-xl font-bold text-[#7C3AED] mt-4 pt-4 border-t border-dashed border-gray-300 print-color-exact">
-                <span className="uppercase">Total</span>
-                <span>{total.toFixed(3)} BHD</span>
-              </div>
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Delivery</span>
+              <span>{deliveryFee.toFixed(3)} BHD</span>
             </div>
-
-            {/* BARCODE */}
-            <div className="w-full flex flex-col items-center mt-auto pt-4">
-              <div
-                className="h-10 w-full mb-2 opacity-80 print-color-exact"
-                style={{
-                  background: `repeating-linear-gradient(90deg, #333 0px, #333 2px, transparent 2px, transparent 4px, #333 4px, #333 6px, transparent 6px, transparent 9px)`
-                }}
-              ></div>
-              <div className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.2em] text-gray-600 uppercase">
-                Thank you for shopping!
-              </div>
+            <div className="flex justify-between items-center text-xl font-bold text-[#7C3AED] mt-4 pt-4 border-t border-dashed border-gray-200">
+              <span>TOTAL</span>
+              <span>{total.toFixed(3)} BHD</span>
             </div>
+          </div>
 
+          {/* Aesthetic Barcode */}
+          <div className="w-full flex flex-col items-center pt-4">
+            <div
+              className="h-10 w-full mb-2 opacity-80"
+              style={{ background: `repeating-linear-gradient(90deg, #333 0px, #333 2px, transparent 2px, transparent 4px)` }}
+            ></div>
+            <p className="font-mono text-[10px] font-bold tracking-[0.2em] text-gray-400 uppercase">
+              Thank you for shopping!
+            </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+// --- 💬 SMART WHATSAPP HUB ---
+const WhatsAppModal = ({ order, templates, onClose }) => {
+  if (!order) return null;
+  const [message, setMessage] = useState("");
 
-        {/* PRINT BUTTON */}
-        <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50 print:hidden">
+  const getCleanPhone = (phone) => {
+    if (!phone) return "";
+    let clean = phone.replace(/[^0-9]/g, "");
+    if (clean.length === 8) clean = "973" + clean;
+    return clean;
+  };
+
+  const applyTemplate = (templateText) => {
+    const processed = templateText
+      .replace(/{name}/g, order.customer?.name || "there")
+      .replace(/{orderId}/g, order.orderId || "")
+      .replace(/{total}/g, (order.total || 0).toFixed(3))
+      .replace(/{method}/g, (order.customer?.deliveryMethod || "pickup").toUpperCase());
+    setMessage(processed);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-[#25D366] p-4 flex justify-between items-center text-white">
+          <div className="flex items-center gap-2 font-bold">
+            <MessageCircle size={20} /> WhatsApp Hub
+          </div>
+          <button onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Template</p>
+          <div className="grid grid-cols-2 gap-2">
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => applyTemplate(t.text)}
+                className="text-[10px] font-bold p-2 border rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors text-left"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="w-full h-40 p-3 border rounded-xl text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-400 transition-all"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Select a template above..."
+          />
           <button
-            onClick={() => window.print()}
-            className="pointer-events-auto shadow-2xl flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-full font-bold text-sm hover:bg-purple-600 transition-colors border-2 border-white/20"
+            onClick={() => window.open(`https://wa.me/${getCleanPhone(order.customer?.phone)}?text=${encodeURIComponent(message)}`, "_blank")}
+            className="w-full py-3 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#128C7E] shadow-lg transition-transform active:scale-95"
           >
-            <Printer size={20} /> PRINT RECEIPT
+            Send WhatsApp Message
           </button>
         </div>
-
       </div>
-
-      {/* PRINT STYLES */}
-      <style>{`
-        @media print {
-          body > * { display: none !important; }
-          .fixed.inset-0.z-\\[9999\\] {
-            display: block !important;
-            position: absolute !important;
-            top: 0 !important; left: 0 !important;
-            width: 100% !important; height: 100% !important;
-            background: white !important;
-            padding: 0 !important;
-          }
-          #receipt-card {
-            display: block !important;
-            position: absolute !important;
-            top: 0 !important; left: 0 !important;
-            width: 100% !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-          #receipt-card * { visibility: visible !important; }
-          /* FORCE COLORS TO PRINT */
-          .print-color-exact {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };
@@ -500,6 +510,7 @@ const AdminDashboard = ({
   content,
   categories,
   promotions,
+  whatsappTemplates,
   onUpdateStock,
   onUpdateExpiry,
   onUpdatePrice,
@@ -517,13 +528,12 @@ const AdminDashboard = ({
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("orders");
   const [editableContent, setEditableContent] = useState(content);
-  // --- NEW STATES & LOGIC ---
   const [receiptOrder, setReceiptOrder] = useState(null);
+  const [whatsappOrder, setWhatsappOrder] = useState(null);
 
   const updateOrderJourney = async (orderId, newJourney) => {
     await updateDoc(doc(db, "orders", orderId), { journeyStatus: newJourney });
   };
-  // --- PASTE THIS HERE ---
   const toggleArchiveStatus = async (product) => {
     const newStatus = !product.archived;
     const confirmMsg = newStatus
@@ -902,6 +912,7 @@ const AdminDashboard = ({
           { id: "categories", icon: ListFilter, label: "Categories" },
           { id: "promos", icon: Tag, label: "Promotions" },
           { id: "content", icon: Settings, label: "Content" },
+          { id: "wa-templates", icon: MessageCircle, label: "WA Templates" },
         ].map((t) => (
           <button
             key={t.id}
@@ -998,288 +1009,201 @@ const AdminDashboard = ({
 
           {/* 3. ORDER LIST */}
           {filteredOrders.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 bg-white rounded-xl border">
+            <div className="text-center py-20 text-gray-500 bg-white rounded-xl border border-dashed">
               No orders found in this view.
             </div>
           ) : (
-            filteredOrders.map((order) => {
-              const status = order.status || "pending"; // Default for old data
+            <div className="space-y-4">
+              {filteredOrders.map((order) => {
+                const status = order.status || "pending";
+                const statusColors = {
+                  delivered: "border-green-500 bg-green-50/30 text-green-700",
+                  confirmed: "border-blue-500 bg-blue-50/30 text-blue-700",
+                  canceled: "border-red-500 bg-red-50/30 text-red-700",
+                  pending: "border-amber-500 bg-amber-50/30 text-amber-700"
+                };
 
-              return (
-                <div
-                  key={order.id}
-                  className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative overflow-hidden transition-all hover:shadow-md"
-                >
-                  {/* Status Color Strip */}
-                  <div
-                    className={`absolute top-0 left-0 right-0 h-1.5 ${status === "delivered"
-                      ? "bg-green-500"
-                      : status === "confirmed"
-                        ? "bg-blue-500"
-                        : status === "canceled"
-                          ? "bg-red-500"
-                          : "bg-amber-500"
-                      }`}
-                  />
+                return (
+                  <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-4 md:p-6 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+                    {/* Status Indicator Line */}
+                    <div className={`absolute top-0 left-0 right-0 h-1 ${statusColors[status].split(' ')[0]}`} />
 
-                  <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold text-lg">
-                          {order.customer?.name}
-                        </h3>
-                        {order.orderId && (
-                          <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-900">{order.customer?.name}</h3>
+                          <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">
                             {order.orderId}
                           </span>
-                        )}
-                      </div>
-
-                      {/* --- MASTER STATUS DROPDOWN (Fixes the "Mistake" problem) --- */}
-                      <div className="relative inline-block">
-                        <select
-                          value={status}
-                          onChange={(e) =>
-                            updateOrderStatus(order.id, e.target.value)
-                          }
-                          className={`appearance-none pl-8 pr-8 py-1.5 rounded-full text-xs font-bold uppercase cursor-pointer border focus:outline-none focus:ring-2 focus:ring-offset-1 ${status === "delivered"
-                            ? "bg-green-50 text-green-700 border-green-200 focus:ring-green-500"
-                            : status === "confirmed"
-                              ? "bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500"
-                              : status === "canceled"
-                                ? "bg-red-50 text-red-700 border-red-200 focus:ring-red-500"
-                                : "bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500"
-                            }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="canceled">Canceled</option>
-                        </select>
-
-                        {/* Icon overlay for the select */}
-                        <div className="absolute left-2.5 top-1.5 pointer-events-none">
-                          {status === "delivered" && (
-                            <CheckCircle size={12} className="text-green-700" />
-                          )}
-                          {status === "confirmed" && (
-                            <Check size={12} className="text-blue-700" />
-                          )}
-                          {status === "pending" && (
-                            <Clock size={12} className="text-amber-700" />
-                          )}
-                          {status === "canceled" && (
-                            <Ban size={12} className="text-red-700" />
-                          )}
                         </div>
-                        <ChevronDown
-                          size={12}
-                          className="absolute right-2.5 top-1.5 pointer-events-none opacity-50"
-                        />
+
+                        {/* Minimal Status Control */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <select
+                            value={status}
+                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                            className={`text-[10px] font-bold uppercase py-1 px-3 rounded-full border cursor-pointer focus:outline-none transition-colors ${statusColors[status]}`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="canceled">Canceled</option>
+                          </select>
+                          <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                            <Calendar size={10} /> {new Date(order.date).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
 
-                      <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
-                        <Calendar size={12} />{" "}
-                        {new Date(order.date).toLocaleString()}
-                      </p>
-                      {/* ✨ NEW: ORDER JOURNEY DROPDOWN */}
-                      <div className="relative mt-2">
-                        <select
-                          value={order.journeyStatus || "Payment Under Verification"}
-                          onChange={(e) => updateOrderJourney(order.id, e.target.value)}
-                          onClick={(e) => e.stopPropagation()} // Prevents clicking the card
-                          className="appearance-none pl-2 pr-6 py-1.5 rounded-lg text-[10px] font-bold uppercase cursor-pointer border border-purple-100 bg-purple-50 text-purple-700 focus:outline-none focus:ring-1 focus:ring-purple-500 w-full tracking-wide transition-colors hover:bg-purple-100"
-                        >
-                          <option value="Payment Under Verification">Payment Under Verification</option>
-                          <option value="Payment Verified">Payment Verified</option>
-                          <option value="Processing Order">Processing Order</option>
-                          <option value="Ready for Pickup">Ready for Pickup</option>
-                          <option value="Out for Delivery">Out for Delivery</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
-                        <ChevronDown
-                          size={10}
-                          className="absolute right-2 top-2 pointer-events-none text-purple-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="text-right w-full md:w-auto flex flex-row md:flex-col justify-between items-center md:items-end">
-                      <p className="text-xl font-bold text-purple-600">
-                        {order.total?.toFixed(3)} BHD
-                      </p>
-                      {/* 💎 DOWNLOAD PDF BUTTON (No more Print) */}
-                      <div className="flex gap-2 mt-2 justify-end">
+                      <div className="flex flex-col items-end gap-1">
+                        <p className="text-xl font-bold text-purple-600 leading-none">
+                          {order.total?.toFixed(3)} <span className="text-xs">BHD</span>
+                        </p>
+                        {/* Aesthetic Minimal Receipt Link */}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            generateReceipt(order); // Calls the new generator
-                          }}
-                          className="text-xs flex items-center gap-1 text-white font-bold bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded border border-purple-600 shadow-sm transition-all"
-                          title="Download Official Receipt"
+                          onClick={() => generateReceipt(order)}
+                          className="text-[10px] text-gray-400 hover:text-purple-600 flex items-center gap-1 justify-end mt-1 group"
                         >
-                          <Download size={14} /> Download Receipt
+                          <Download size={12} className="group-hover:scale-110 transition-transform" />
+                          <span>Receipt</span>
                         </button>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid md:grid-cols-2 gap-4 text-sm border-t pt-4">
-                    {/* LEFT COLUMN: Customer & Shipping */}
-                    <div>
-                      <h4 className="font-bold text-gray-400 text-xs uppercase mb-1">
-                        Customer & Shipping
-                      </h4>
-                      <p><strong>Name:</strong> {order.customer?.name}</p>
-                      <p><strong>Phone:</strong> {order.customer?.phone}</p>
-
-                      <div className="mt-3 p-3 bg-purple-50 rounded-xl border border-purple-100 animate-fade-in">
-                        <div className="flex items-center gap-2 mb-1">
-                          {order.customer?.deliveryMethod === 'delivery' ? <Truck size={14} className="text-purple-600" /> : <Store size={14} className="text-purple-600" />}
-                          <span className="font-bold text-purple-700 uppercase text-[10px] tracking-wider">
-                            {order.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
-                              order.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up'}
-                          </span>
-                        </div>
-                        <p className="text-gray-700 text-xs italic">
-                          {order.customer?.deliveryMethod === 'delivery'
-                            ? order.customer?.deliveryAddress
-                            : order.customer?.meetupNote}
-                        </p>
-                      </div>
-
-                      {order.customer?.proof && (
-                        <div className="mt-3 group relative w-24 h-24 bg-gray-100 rounded border overflow-hidden cursor-pointer"
-                          onClick={() => {
-                            const w = window.open("");
-                            w.document.write('<img src="' + order.customer.proof + '" style="max-width:100%"/>');
-                          }}>
-                          <img src={order.customer.proof} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ExternalLink className="text-white" size={16} />
+                    <div className="grid md:grid-cols-2 gap-8 text-sm border-t border-gray-50 pt-4">
+                      {/* LEFT: Shipping */}
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Customer & Shipping</h4>
+                          <div className="flex items-center gap-3 text-gray-700">
+                            <div className="bg-purple-50 p-2 rounded-lg text-purple-600">
+                              {order.customer?.deliveryMethod === 'delivery' ? <Truck size={16} /> : <Store size={16} />}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900">{order.customer?.phone}</p>
+                              <p className="text-xs italic text-gray-500">
+                                {order.customer?.deliveryMethod === 'delivery' ? order.customer?.deliveryAddress : order.customer?.meetupNote}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
 
-                    {/* RIGHT COLUMN: Order Items + Replacement Tool */}
-                    <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase mb-2 flex justify-between items-center">
-                        Order Items <span className="text-purple-500 font-normal lowercase italic">(click X to remove)</span>
-                      </h4>
-
-                      {/* 1. The List of Current Items */}
-                      <ul className="space-y-2 mb-4">
-                        {order.items && Object.values(order.items).map((i) => (
-                          <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded-lg border border-gray-100">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-purple-600">{i.qty}x</span>
-                              <span className="truncate max-w-[140px]">{i.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-gray-500">{(i.price * i.qty).toFixed(3)}</span>
-                              <button
-                                onClick={async () => {
-                                  if (window.confirm(`Remove ${i.name}?`)) {
-                                    const newItems = { ...order.items };
-                                    delete newItems[i.id];
-                                    await updateDoc(doc(db, "orders", order.id), { items: newItems });
-                                  }
-                                }}
-                                className="text-red-400 hover:text-red-600 transition-colors"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* 2. THE REPLACEMENT DROPDOWN ✨ */}
-                      <div className="mt-4 p-3 border-2 border-dashed border-purple-200 rounded-xl bg-purple-50/50 animate-pulse-subtle">
-                        <p className="text-[9px] font-bold text-purple-500 uppercase mb-2 tracking-widest">✨ Add Replacement Item</p>
-                        <select
-                          className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none focus:ring-2 focus:ring-purple-300 transition-all cursor-pointer"
-                          onChange={(e) => {
-                            const prod = products.find(p => p.id === e.target.value);
-                            if (prod) {
-                              addItemToOrder(order.id, order.items, prod);
-                              // This resets the dropdown so it says "Select a product" again
-                              e.target.value = "";
-                            }
-                          }}
-                        >
-                          <option value="">Select a product to add...</option>
-                          {products
-                            .filter(p => p.active && p.stock > 0)
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} — {p.price.toFixed(3)} BHD
-                              </option>
-                            ))}
-                        </select>
-                        <p className="text-[8px] text-purple-400 mt-2 italic">Tip: Removing an item doesn't change the total automatically. Use the box below to adjust! 👇</p>
+                        {order.customer?.proof && (
+                          <img
+                            src={order.customer.proof}
+                            className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(order.customer.proof)}
+                          />
+                        )}
                       </div>
 
-                      {/* 3. Pricing & Notes */}
-                      <div className="border-t border-dashed pt-3 mt-4 space-y-2">
+                      {/* RIGHT: Items & Tools */}
+                      <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Adjusted Grand Total:</span>
-                          <div className="flex items-center gap-1">
+                          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Items</h4>
+                          <span className="text-[10px] italic text-purple-400">(click x to remove)</span>
+                        </div>
+
+                        <ul className="space-y-2">
+                          {order.items && Object.values(order.items).map((i: any) => (
+                            <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50/50 p-2 rounded-xl border border-gray-100 group">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-purple-600">{i.qty}x</span>
+                                <span className="text-gray-700">{i.name}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono text-gray-400">{i.price.toFixed(3)}</span>
+                                <button
+                                  onClick={async () => { if (window.confirm("Remove?")) { const n = { ...order.items }; delete n[i.id]; await updateDoc(doc(db, "orders", order.id), { items: n }); } }}
+                                  className="text-gray-300 hover:text-red-500 transition-colors"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {/* Aesthetic Replacement Tool */}
+                        <div className="p-4 border-2 border-dashed border-purple-100 rounded-2xl bg-purple-50/30">
+                          <p className="text-[10px] font-bold text-purple-700 mb-2">✨ ADD REPLACEMENT ITEM</p>
+                          <select
+                            className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none focus:ring-1 focus:ring-purple-300"
+                            onChange={(e) => { const prod = products.find(p => p.id === e.target.value); if (prod) { addItemToOrder(order.id, order.items, prod); e.target.value = ""; } }}
+                          >
+                            <option value="">Select a product to add...</option>
+                            {products.filter(p => p.active && p.stock > 0).map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                          </select>
+                          <p className="text-[9px] text-purple-400 mt-2 italic flex items-center gap-1">
+                            Tip: Removing an item doesn't change the total automatically. Use the box below to adjust! 👇
+                          </p>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">Adjusted Grand Total:</span>
+                          <div className="flex items-center gap-2">
                             <input
                               type="number"
                               step="0.001"
                               defaultValue={order.total}
                               onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
-                              className="w-24 p-1 border border-purple-200 rounded text-right font-bold text-purple-600 focus:ring-2 focus:ring-purple-500 outline-none"
+                              className="w-20 p-1 border border-gray-200 rounded text-right font-bold text-purple-600 outline-none focus:border-purple-300"
                             />
-                            <span className="text-[10px] font-bold text-purple-600">BHD</span>
+                            <span className="text-[10px] font-bold text-gray-400">BHD</span>
                           </div>
                         </div>
 
-                        <div className="mt-4">
+                        <div>
                           <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
                           <textarea
-                            className="w-full p-2 text-xs border border-amber-200 rounded-lg bg-amber-50/50 focus:bg-white focus:ring-2 focus:ring-amber-300 outline-none transition-all"
+                            className="w-full p-3 text-xs border border-gray-100 rounded-xl bg-gray-50/50 outline-none focus:bg-white focus:border-purple-200 transition-all"
                             placeholder="e.g. Swapped out toner for serum as per WA chat..."
                             defaultValue={order.adminNote || ""}
-                            rows="2"
+                            rows={2}
                             onBlur={(e) => updateOrderNote(order.id, e.target.value)}
                           />
                         </div>
-                      </div> {/* Closes Pricing & Notes */}
-                    </div> {/* Closes Right Column */}
-                  </div> {/* Closes the Grid (This was likely the missing one!) */}
+                      </div>
+                    </div>
 
-                  <div className="mt-4 pt-4 border-t flex justify-end gap-2">
-                    {status === "pending" && (
+                    {/* Refined Action Hub */}
+                    <div className="mt-6 pt-4 border-t border-gray-50 flex flex-wrap justify-end gap-2">
                       <button
-                        onClick={() => updateOrderStatus(order.id, "confirmed")}
-                        className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm"
+                        onClick={() => setWhatsappOrder(order)}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-lg text-[10px] font-bold hover:shadow-md transition-all"
                       >
-                        <Check size={14} /> Quick Confirm
+                        <MessageCircle size={14} /> WhatsApp Hub
                       </button>
-                    )}
-                    {(status === "pending" || status === "confirmed") && (
+
+                      <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                      {order.status === "pending" && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, "confirmed")}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg text-[10px] font-bold"
+                        >
+                          Quick Confirm
+                        </button>
+                      )}
+
                       <button
                         onClick={() => updateOrderStatus(order.id, "delivered")}
-                        className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm"
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg text-[10px] font-bold"
                       >
-                        <Truck size={14} /> Quick Deliver
+                        Quick Deliver
                       </button>
-                    )}
-                    <button
-                      onClick={() => deleteOrder(order.id)}
-                      className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
-                      title="Delete Record"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+
+                      <button
+                        onClick={() => deleteOrder(order.id)}
+                        className="p-2 text-gray-300 hover:text-red-500"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -1847,7 +1771,55 @@ const AdminDashboard = ({
           </div>
         </form>
       )}
-      {/* ✨ RENDER RECEIPT MODAL */}
+      {tab === "wa-templates" && (
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 animate-fade-in">
+          <div className="flex justify-between items-center border-b pb-4">
+            <h3 className="font-bold text-lg">Edit WhatsApp Templates</h3>
+            <button
+              onClick={() => {
+                setDoc(doc(db, "settings", "whatsapp_templates"), { templates: whatsappTemplates });
+                showNotification("Templates Saved to Database! 🚀");
+              }}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700"
+            >
+              <Save size={16} /> Save All Templates
+            </button>
+          </div>
+
+          <div className="grid gap-4">
+            {whatsappTemplates.map((temp) => (
+              <div key={temp.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <input
+                  className="w-full font-bold bg-transparent border-b border-gray-300 mb-2 outline-none focus:border-green-500"
+                  value={temp.label}
+                  onChange={(e) => {
+                    const updated = whatsappTemplates.map(t => t.id === temp.id ? { ...t, label: e.target.value } : t);
+                    setWhatsappTemplates(updated);
+                  }}
+                />
+                <textarea
+                  className="w-full h-24 p-3 text-sm border rounded-lg mt-2 resize-none focus:ring-2 focus:ring-green-400"
+                  value={temp.text}
+                  onChange={(e) => {
+                    const updated = whatsappTemplates.map(t => t.id === temp.id ? { ...t, text: e.target.value } : t);
+                    setWhatsappTemplates(updated);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* ✨ WHATSAPP HUB POPUP */}
+      {whatsappOrder && (
+        <WhatsAppModal
+          order={whatsappOrder}
+          templates={whatsappTemplates}
+          onClose={() => setWhatsappOrder(null)}
+        />
+      )}
+
+      {/* ✨ RECEIPT MODAL */}
       {receiptOrder && (
         <OrderReceiptModal
           order={receiptOrder}
@@ -1870,204 +1842,205 @@ export default function App() {
     }
     link.href = LOGO_URL;
   }, []);
-// --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
-const generateReceipt = async (order) => {
-  // 1. CALCULATE HEIGHT BEFORE CREATING PDF
-  const items = Object.values(order.items || {});
-  const itemCount = items.length;
-  
-  // Check for notes/address to add extra space
-  const methodRaw = order.customer?.deliveryMethod || order.method || "Pickup";
-  let noteText = "";
-  if (methodRaw.toLowerCase() === 'delivery') noteText = order.customer?.deliveryAddress || "";
-  else noteText = order.customer?.meetupNote || "";
-  
-  const hasNote = noteText && noteText !== "N/A" && noteText.trim() !== "";
+  // --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
+  const generateReceipt = async (order) => {
+    // 1. CALCULATE HEIGHT BEFORE CREATING PDF
+    const items = Object.values(order.items || {});
+    const itemCount = items.length;
 
-  // Math: Base Header/Footer (130mm) + Items (7mm each) + Note Buffer (20mm)
-  const dynamicHeight = 130 + (itemCount * 7) + (hasNote ? 20 : 0);
+    // Check for notes/address to add extra space
+    const methodRaw = order.customer?.deliveryMethod || order.method || "Pickup";
+    let noteText = "";
+    if (methodRaw.toLowerCase() === 'delivery') noteText = order.customer?.deliveryAddress || "";
+    else noteText = order.customer?.meetupNote || "";
 
-  // 2. SETUP PDF WITH CALCULATED HEIGHT
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: [80, dynamicHeight] // <--- THIS CUTS THE PAPER TO FIT!
-  });
-  
-  const centerX = 40; 
-  let y = 10; 
+    const hasNote = noteText && noteText !== "N/A" && noteText.trim() !== "";
 
-  // --- HELPER: Circular Image ---
-  const loadCircularImage = (url) => {
-    return new Promise((resolve) => {
-      if (!url) return resolve(null);
-      const img = new Image();
-      img.src = url;
-      img.crossOrigin = "Anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const size = Math.min(img.width, img.height);
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        ctx.beginPath();
-        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/png"));
-      };
-      img.onerror = () => resolve(null);
+    // --- FIX: Increased Base (150) and per-item (10) for safe dynamic growth ---
+    const dynamicHeight = 150 + (itemCount * 10) + (hasNote ? 25 : 0);
+
+    // 2. SETUP PDF WITH CALCULATED HEIGHT
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [80, dynamicHeight]
     });
-  };
 
-  // 3. 🌸 LOGO & HEADER
-  const logoData = await loadCircularImage(LOGO_URL);
-  if (logoData) {
-    doc.addImage(logoData, "PNG", centerX - 9, y, 18, 18);
-    y += 24; 
-  }
-  
-  doc.setFont("times", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(0, 0, 0);
-  doc.text("Shepherdess", centerX, y, null, "center");
-  y += 5;
+    const centerX = 40;
+    let y = 10;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(124, 58, 237); 
-  doc.text("K-BEAUTY STORE", centerX, y, null, "center");
-  y += 8;
+    // --- HELPER: Circular Image (Restored exactly from your old code) ---
+    const loadCircularImage = (url) => {
+      return new Promise((resolve) => {
+        if (!url) return resolve(null);
+        const img = new Image();
+        img.src = url;
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          ctx.beginPath();
+          ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, size, size);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => resolve(null);
+      });
+    };
 
-  // 4. 🆔 ORDER INFO
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  const cleanId = order.orderId.replace('#', '');
-  doc.text(`ORDER #${cleanId}`, centerX, y, null, "center");
-  y += 5;
+    // 3. 🌸 LOGO & HEADER
+    const logoData = await loadCircularImage(LOGO_URL);
+    if (logoData) {
+      doc.addImage(logoData, "PNG", centerX - 9, y, 18, 18);
+      y += 24;
+    }
 
-  doc.setFontSize(8);
-  doc.setTextColor(100, 100, 100);
-  doc.setFont("helvetica", "normal");
-  doc.text(new Date(order.date).toLocaleDateString(), centerX, y, null, "center");
-  y += 6;
-
-  // --- DASHED DIVIDER ---
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineDash([1, 1], 0);
-  doc.line(6, y, 74, y);
-  y += 6;
-
-  // 5. 👤 CUSTOMER DETAILS
-  doc.setFontSize(8);
-  doc.setTextColor(0, 0, 0);
-  
-  const drawRow = (label, value) => {
-    doc.setFont("helvetica", "bold");
-    doc.text(label, 6, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(value, 74, y, null, "right");
+    doc.setFont("times", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Shepherdess", centerX, y, null, "center");
     y += 5;
-  };
 
-  drawRow("Customer:", order.customer?.name || "Guest");
-  drawRow("Phone:", order.customer?.phone || "N/A");
-  drawRow("Method:", methodRaw.toUpperCase());
-  
-  // --- NOTE / ADDRESS ---
-  if (hasNote) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(124, 58, 237);
+    doc.text("K-BEAUTY STORE", centerX, y, null, "center");
+    y += 8;
+
+    // 4. 🆔 ORDER INFO
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    const cleanId = order.orderId.replace('#', '');
+    doc.text(`ORDER #${cleanId}`, centerX, y, null, "center");
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date(order.date).toLocaleDateString(), centerX, y, null, "center");
+    y += 6;
+
+    // --- DASHED DIVIDER ---
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineDash([1, 1], 0);
+    doc.line(6, y, 74, y);
+    y += 6;
+
+    // 5. 👤 CUSTOMER DETAILS
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+
+    const drawRow = (label, value) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, 6, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, 74, y, null, "right");
+      y += 5;
+    };
+
+    drawRow("Customer:", order.customer?.name || "Guest");
+    drawRow("Phone:", order.customer?.phone || "N/A");
+    drawRow("Method:", methodRaw.toUpperCase());
+
+    // --- NOTE / ADDRESS ---
+    if (hasNote) {
       y += 1;
       doc.setFont("helvetica", "italic");
       doc.setTextColor(80, 80, 80);
       doc.setFontSize(7);
       const splitNote = doc.splitTextToSize(noteText, 65);
       doc.text(splitNote, centerX, y, null, "center");
-      y += (splitNote.length * 3.5) + 2; 
+      y += (splitNote.length * 3.5) + 2;
       doc.setTextColor(0, 0, 0);
-  } else {
+    } else {
       y += 2;
-  }
+    }
 
-  // --- DASHED DIVIDER ---
-  doc.setLineDash([1, 1], 0);
-  doc.setDrawColor(200, 200, 200);
-  doc.line(6, y, 74, y);
-  y += 6;
+    // --- DASHED DIVIDER ---
+    doc.setLineDash([1, 1], 0);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(6, y, 74, y);
+    y += 6;
 
-  // 6. 🛒 ITEMS LIST
-  items.forEach(item => {
+    // 6. 🛒 ITEMS LIST
+    items.forEach(item => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+
+      let name = item.name;
+      if (name.length > 22) name = name.substring(0, 20) + "...";
+
+      doc.text(`${item.qty}x ${name}`, 6, y);
+
+      doc.setFont("courier", "bold");
+      doc.text(`${(item.price * item.qty).toFixed(3)}`, 74, y, null, "right");
+      y += 5;
+    });
+
+    y += 2;
+    // --- SOLID TOTALS LINE ---
+    doc.setLineDash([], 0);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(6, y, 74, y);
+    y += 6;
+
+    // 7. 💰 TOTALS
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    
-    let name = item.name;
-    if (name.length > 22) name = name.substring(0, 20) + "...";
 
-    doc.text(`${item.qty}x ${name}`, 6, y);
-    
-    doc.setFont("courier", "bold");
-    doc.text(`${(item.price * item.qty).toFixed(3)}`, 74, y, null, "right");
+    const subtotal = order.items ? Object.values(order.items).reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
+    const deliveryFee = order.deliveryFee || 0;
+    const total = subtotal + deliveryFee;
+
+    doc.text("Subtotal", 6, y);
+    doc.text(`${subtotal.toFixed(3)} BHD`, 74, y, null, "right");
     y += 5;
-  });
 
-  y += 2;
-  // --- SOLID TOTALS LINE ---
-  doc.setLineDash([], 0);
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.line(6, y, 74, y);
-  y += 6;
+    doc.text("Delivery", 6, y);
+    doc.text(`${deliveryFee.toFixed(3)} BHD`, 74, y, null, "right");
+    y += 8;
 
-  // 7. 💰 TOTALS
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  
-  const subtotal = order.items ? Object.values(order.items).reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
-  const deliveryFee = order.deliveryFee || 0;
-  const total = subtotal + deliveryFee;
+    // GRAND TOTAL
+    doc.setTextColor(124, 58, 237);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("TOTAL", 6, y);
+    doc.text(`${total.toFixed(3)} BHD`, 74, y, null, "right");
+    y += 12;
 
-  doc.text("Subtotal", 6, y);
-  doc.text(`${subtotal.toFixed(3)} BHD`, 74, y, null, "right");
-  y += 5;
+    // 8. ║█║ BARCODE (Bottom Anchor)
+    doc.setFillColor(0, 0, 0);
+    const barcodeH = 12;
+    const barcodeW = 60;
+    const startX = (80 - barcodeW) / 2;
+    const endX = startX + barcodeW;
 
-  doc.text("Delivery", 6, y);
-  doc.text(`${deliveryFee.toFixed(3)} BHD`, 74, y, null, "right");
-  y += 8;
-
-  // GRAND TOTAL
-  doc.setTextColor(124, 58, 237); 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("TOTAL", 6, y);
-  doc.text(`${total.toFixed(3)} BHD`, 74, y, null, "right");
-  y += 12;
-
-  // 8. ║█║ BARCODE (Bottom Anchor)
-  doc.setFillColor(0, 0, 0);
-  const barcodeH = 12; 
-  const barcodeW = 60;
-  const startX = (80 - barcodeW) / 2; 
-  const endX = startX + barcodeW;    
-  
-  let currentBarX = startX;
-  while(currentBarX < endX) {
-      const w = Math.random() > 0.5 ? 1.5 : 0.6; 
+    let currentBarX = startX;
+    while (currentBarX < endX) {
+      const w = Math.random() > 0.5 ? 1.5 : 0.6;
       if (currentBarX + w > endX) break;
       doc.rect(currentBarX, y, w, barcodeH, "F");
       const gap = Math.random() > 0.5 ? 0.5 : 0.8;
       currentBarX += w + gap;
-  }
-  
-  y += barcodeH + 4;
+    }
 
-  doc.setTextColor(0, 0, 0);
-  doc.setFont("courier", "normal");
-  doc.setFontSize(9);
-  doc.text("THANK YOU FOR SHOPPING!", centerX, y, null, "center");
+    y += barcodeH + 4;
 
-  doc.save(`Receipt-${cleanId}.pdf`);
-};
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("courier", "normal");
+    doc.setFontSize(9);
+    doc.text("THANK YOU FOR SHOPPING!", centerX, y, null, "center");
+
+    doc.save(`Receipt-${cleanId}.pdf`);
+  };
   const [user, setUser] = useState(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [promotions, setPromotions] = useState([]);
@@ -2144,11 +2117,27 @@ const generateReceipt = async (order) => {
     const unsubPr = onSnapshot(collection(db, "promotions"), (s) =>
       setPromotions(s.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubW = onSnapshot(doc(db, "settings", "whatsapp_templates"), (s) => {
+      if (s.exists()) {
+        setWhatsappTemplates(s.data().templates || []);
+      } else {
+        // These are your starting templates if none exist in the DB
+        const defaults = [
+          { id: '1', label: "✅ Confirmation", text: "Hi {name}! 🌸 Your Order {orderId} is confirmed. Total: {total} BHD." },
+          { id: '2', label: "💸 Payment Reminder", text: "Hi {name}! 🎀 Just a reminder for Order {orderId}. Please send payment proof! ✨" },
+          { id: '3', label: "🚚 Delivery/Ready", text: "Hi {name}! 🚚 Your order {orderId} is ready! Method: {method}. See you soon! 💖" },
+          { id: '4', label: "🎉 Completed", text: "Hi {name}! ✨ Your order is complete. Hope you love your K-Beauty goodies! 🎀" }
+        ];
+        setDoc(doc(db, "settings", "whatsapp_templates"), { templates: defaults });
+      }
+    });
+    // Add unsubW(); to the return cleanup function below it
     return () => {
       unsubP();
       unsubC();
       unsubI();
       unsubPr();
+      unsubW();
     };
   }, []);
 
@@ -2572,6 +2561,7 @@ const generateReceipt = async (order) => {
           content={shopContent}
           categories={categories}
           promotions={promotions}
+          whatsappTemplates={whatsappTemplates}
           onUpdateStock={handleUpdateStock}
           onUpdateExpiry={handleUpdateExpiry}
           onUpdatePrice={handleUpdatePrice}
@@ -2757,7 +2747,7 @@ const generateReceipt = async (order) => {
           {displayedProducts.length < filteredProducts.length && (
             <div className="text-center mt-12 pb-12">
               <button
-                onClick={() => setVisiƒbleCount((c) => c + 12)}
+                onClick={() => setVisibleCount((c) => c + 12)}
                 className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
               >
                 <ChevronDown size={20} /> Show More Products
