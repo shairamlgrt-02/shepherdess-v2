@@ -6,6 +6,7 @@ import {
   getFirestore,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   updateDoc,
   addDoc,
@@ -347,11 +348,41 @@ const WhatsAppModal = ({ order, templates, onClose }) => {
   };
 
   const applyTemplate = (templateText) => {
+    // 1. Build the Goods list summary
+    const itemList = Object.values(order.items || {})
+      .map(i => `⋆ ${i.qty} x ${i.name}`)
+      .join('\n');
+
+    // 2. Identify Delivery Method & Details
+    const isDelivery = order.customer?.deliveryMethod === 'delivery';
+    const deliveryType = isDelivery ? 'Delivery' : (order.customer?.deliveryMethod === 'pickup' ? 'Pick-Up' : 'Meet-Up');
+
+    const deliveryDetail = isDelivery
+      ? order.customer?.deliveryAddress
+      : (order.customer?.meetupNote || "Direct Sell");
+
+    // 3. YOUR EXACT JOURNEY MAPPING
+    const journeyLabels = {
+      pending: "PAYMENT UNDER VERIFICATION",
+      confirmed: "PAYMENT VERIFIED",
+      packing: "PREPARING ORDER",
+      out_for_delivery: "OUT FOR DELIVERY",
+      ready_for_pickup: "READY FOR PICKUP",
+      delivered: "ORDER COMPLETED",
+      canceled: "ORDER CANCELED"
+    };
+    const currentStatus = journeyLabels[order.journeyStatus] || "PAYMENT UNDER VERIFICATION";
+
+    // 4. Run the replacements
     const processed = templateText
-      .replace(/{name}/g, order.customer?.name || "there")
+      .replace(/{name}/g, order.customer?.name || "Bestie")
       .replace(/{orderId}/g, order.orderId || "")
       .replace(/{total}/g, (order.total || 0).toFixed(3))
-      .replace(/{method}/g, (order.customer?.deliveryMethod || "pickup").toUpperCase());
+      .replace(/{method}/g, deliveryType.toUpperCase())
+      .replace(/{details}/g, deliveryDetail)
+      .replace(/{summary}/g, itemList)
+      .replace(/{status}/g, currentStatus);
+
     setMessage(processed);
   };
 
@@ -511,6 +542,7 @@ const AdminDashboard = ({
   categories,
   promotions,
   whatsappTemplates,
+  setWhatsappTemplates,
   onUpdateStock,
   onUpdateExpiry,
   onUpdatePrice,
@@ -1072,6 +1104,7 @@ const AdminDashboard = ({
                             <option value="out_for_delivery">🚚 Out for Delivery</option>
                             <option value="ready_for_pickup">🏪 Ready for Pickup</option>
                             <option value="delivered">✅ Order Completed</option>
+                            <option value="canceled"> ❌ Order Canceled</option>
                           </select>
                         </div>
                       </div>
@@ -1774,39 +1807,82 @@ const AdminDashboard = ({
       {tab === "wa-templates" && (
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 animate-fade-in">
           <div className="flex justify-between items-center border-b pb-4">
-            <h3 className="font-bold text-lg">Edit WhatsApp Templates</h3>
-            <button
-              onClick={() => {
-                setDoc(doc(db, "settings", "whatsapp_templates"), { templates: whatsappTemplates });
-                showNotification("Templates Saved to Database! 🚀");
-              }}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700"
-            >
-              <Save size={16} /> Save All Templates
-            </button>
+            <div>
+              <h3 className="font-bold text-lg text-gray-900">Edit WhatsApp Templates</h3>
+              <p className="text-xs text-gray-500">Manage your message automation.</p>
+            </div>
+            <div className="flex gap-3">
+              {/* ➕ NEW ADD BUTTON */}
+              <button
+                onClick={() => {
+                  const newTemp = {
+                    id: Date.now().toString(), // Generates a unique ID
+                    label: "New Template Name",
+                    text: "Type your message here... ✧"
+                  };
+                  setWhatsappTemplates([...whatsappTemplates, newTemp]);
+                }}
+                className="bg-purple-50 text-purple-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-purple-100 transition-all"
+              >
+                <Plus size={16} /> Add Template
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await setDoc(doc(db, "settings", "whatsapp_templates"), { templates: whatsappTemplates });
+                    alert("All changes saved! 🚀");
+                  } catch (e) { console.error(e); }
+                }}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm"
+              >
+                <Save size={16} /> Save All
+              </button>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {whatsappTemplates.map((temp) => (
-              <div key={temp.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  className="w-full font-bold bg-transparent border-b border-gray-300 mb-2 outline-none focus:border-green-500"
-                  value={temp.label}
-                  onChange={(e) => {
-                    const updated = whatsappTemplates.map(t => t.id === temp.id ? { ...t, label: e.target.value } : t);
-                    setWhatsappTemplates(updated);
-                  }}
-                />
-                <textarea
-                  className="w-full h-24 p-3 text-sm border rounded-lg mt-2 resize-none focus:ring-2 focus:ring-green-400"
-                  value={temp.text}
-                  onChange={(e) => {
-                    const updated = whatsappTemplates.map(t => t.id === temp.id ? { ...t, text: e.target.value } : t);
-                    setWhatsappTemplates(updated);
-                  }}
-                />
+          {/* This section generates the actual text boxes */}
+          <div className="grid gap-6">
+            {whatsappTemplates && whatsappTemplates.length > 0 ? (
+              whatsappTemplates.map((temp, index) => (
+                <div key={temp.id || index} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-purple-400">#0{index + 1}</span>
+                    <input
+                      className="w-full font-bold bg-transparent border-b border-transparent hover:border-gray-200 focus:border-purple-400 mb-1 outline-none transition-all text-gray-800"
+                      value={temp.label}
+                      onChange={(e) => {
+                        const updated = [...whatsappTemplates];
+                        updated[index] = { ...updated[index], label: e.target.value };
+                        setWhatsappTemplates(updated);
+                      }}
+                    />
+                  </div>
+
+                  <textarea
+                    className="w-full h-40 p-4 text-sm border border-gray-100 rounded-xl bg-white resize-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 outline-none transition-all shadow-inner text-gray-700 font-medium"
+                    value={temp.text}
+                    onChange={(e) => {
+                      const updated = [...whatsappTemplates];
+                      updated[index] = { ...updated[index], text: e.target.value };
+                      setWhatsappTemplates(updated);
+                    }}
+                  />
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {['{name}', '{orderId}', '{total}', '{method}', '{summary}', '{status}'].map(tag => (
+                      <span key={tag} className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-purple-500">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400">
+                <p>No templates found. Try refreshing or check Firebase.</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -2096,17 +2172,7 @@ export default function App() {
     proof: "",
   });
 
-  // Listener to open cart
-  useEffect(() => {
-    const handleOpenCart = () => {
-      setCheckoutStep("cart");
-      setIsCartOpen(true);
-    };
-    window.addEventListener('openCart', handleOpenCart);
-    return () => window.removeEventListener('openCart', handleOpenCart);
-  }, []);
-
-  // Sync Data
+  // Sync Data (Live Listeners)
   useEffect(() => {
     const unsubP = onSnapshot(collection(db, "products"), (s) =>
       setProducts(s.docs.map((d) => ({ ...d.data(), id: d.id })))
@@ -2123,28 +2189,25 @@ export default function App() {
     const unsubPr = onSnapshot(collection(db, "promotions"), (s) =>
       setPromotions(s.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
-    const unsubW = onSnapshot(doc(db, "settings", "whatsapp_templates"), (s) => {
-      if (s.exists()) {
-        setWhatsappTemplates(s.data().templates || []);
-      } else {
-        // These are your starting templates if none exist in the DB
-        const defaults = [
-          { id: '1', label: "✅ Confirmation", text: "Hi {name}! 🌸 Your Order {orderId} is confirmed. Total: {total} BHD." },
-          { id: '2', label: "💸 Payment Reminder", text: "Hi {name}! 🎀 Just a reminder for Order {orderId}. Please send payment proof! ✨" },
-          { id: '3', label: "🚚 Delivery/Ready", text: "Hi {name}! 🚚 Your order {orderId} is ready! Method: {method}. See you soon! 💖" },
-          { id: '4', label: "🎉 Completed", text: "Hi {name}! ✨ Your order is complete. Hope you love your K-Beauty goodies! 🎀" }
-        ];
-        setDoc(doc(db, "settings", "whatsapp_templates"), { templates: defaults });
-      }
-    });
-    // Add unsubW(); to the return cleanup function below it
+
     return () => {
       unsubP();
       unsubC();
       unsubI();
       unsubPr();
-      unsubW();
     };
+  }, []);
+
+  // --- NEW: Load WhatsApp Templates ONCE (Fixes the typing lock) ---
+  useEffect(() => {
+    const loadTemplates = async () => {
+      const docRef = doc(db, "settings", "whatsapp_templates");
+      const s = await getDoc(docRef); // 👈 Use getDoc, NOT onSnapshot
+      if (s.exists()) {
+        setWhatsappTemplates(s.data().templates);
+      }
+    };
+    loadTemplates();
   }, []);
 
   // --- Actions ---
@@ -2246,9 +2309,9 @@ export default function App() {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (!proofFile) return showNotification("Upload proof", "error");
 
-    // Validation: Require Address for Delivery, Note for others
+    // 1. Initial Validations
+    if (!proofFile) return showNotification("Please upload payment proof", "error");
     if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
       return showNotification("Please enter delivery address", "error");
     }
@@ -2256,232 +2319,248 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
-      const proof = await compressImage(proofFile);
-      const newOrderId = generateOrderId();
+      const orderId = generateOrderId();
+      let proofUrl = "";
 
-      // Calculate final total
-      const cartTotal = Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
-      const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
-      const finalTotal = cartTotal + deliveryFee;
+      // (Your existing image upload logic would go here)
+      // proofUrl = await uploadImage(proofFile);
 
-      const orderData = {
-        orderId: newOrderId,
-        customer: {
-          ...customerDetails,
-          proof,
-          // Save the delivery info clearly
-          deliveryMethod: deliveryMethod,
-          deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : "N/A",
-          meetupNote: deliveryMethod !== 'delivery' ? meetupNote : "N/A"
-        },
-        items: cart,
-        subtotal: cartTotal, // Keep track of pure product cost
-        deliveryFee: deliveryFee,
-        total: finalTotal,
-        date: new Date().toISOString(),
-        status: "pending",
-      };
+      // 2. THE TRANSACTION (Stock Check & Save Order)
+      await runTransaction(db, async (transaction) => {
+        const validatedItems = [];
 
-      await addDoc(collection(db, "orders"), orderData);
+        // Check stock for every item in the cart
+        for (const item of cart) {
+          const productRef = doc(db, "products", item.id);
+          const productSnap = await transaction.get(productRef);
 
-      // Inventory update logic (Same as before)
-      for (const [id, item] of Object.entries(cart)) {
-        const p = products.find((prod) => prod.id === id);
-        if (p)
-          await updateDoc(doc(db, "products", id), {
-            stock: p.stock - item.qty,
-            sold: (p.sold || 0) + item.qty,
-          });
-      }
+          if (!productSnap.exists()) throw `Product ${item.name} no longer exists!`;
 
-      setLastOrder(orderData);
-      setCart({});
+          const currentStock = productSnap.data().stock || 0;
+
+          // ERROR FOR USER B: If stock is gone
+          if (currentStock < item.qty) {
+            throw `Sorry Bestie! Only ${currentStock} left of ${item.name}. Please update your cart!`;
+          }
+
+          validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
+        }
+
+        // Apply stock updates
+        validatedItems.forEach(update => {
+          transaction.update(update.ref, { stock: update.newStock });
+        });
+
+        // Save the Order document
+        const newOrderRef = doc(collection(db, "orders"));
+        const orderData = {
+          orderId,
+          customer: {
+            name: customerName,
+            phone: customerPhone,
+            deliveryMethod,
+            deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : '',
+            meetupNote: deliveryMethod !== 'delivery' ? meetupNote : ''
+          },
+          items: cart,
+          total,
+          proofUrl,
+          journeyStatus: "pending",
+          createdAt: serverTimestamp(),
+        };
+        transaction.set(newOrderRef, orderData);
+        setLastOrder(orderData); // For your success screen
+      });
+
+      // 3. Success!
       setCheckoutStep("success");
-      // Reset forms
-      setDeliveryAddress("");
-      setMeetupNote("");
-    } catch (e) {
-      console.error(e);
-      showNotification("Error processing order", "error");
-    }
-    setIsSubmitting(false);
-  };
+      setCart([]);
+      showNotification("Order placed successfully! ✧");
 
-  const toggleAdmin = () => {
-    if (adminPin === "742472") {
-      setIsAdmin(true);
-      setShowAdminLogin(false);
-      setAdminPin("");
-      setViewMode("dashboard");
-      showNotification("Welcome back!");
-    } else {
-      showNotification("Incorrect PIN", "error");
+    } catch (error) {
+      console.error("Checkout error:", error);
+      // User B gets the error here
+      showNotification(error.toString(), "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const availableCategories = useMemo(
-    () =>
-      Object.keys(categories).filter((cat) =>
-        products.some((p) => p.active && p.category === cat)
-      ),
-    [categories, products]
-  );
-
-  // NEW: Calculate Current Main Category based on Selection
-  const currentMainCategory = useMemo(() => {
-    if (categories[selectedCategory]) return selectedCategory; // Is a Main Category
-    // Check if it's a subcategory
-    const mainParent = Object.keys(categories).find((main) =>
-      categories[main].includes(selectedCategory)
-    );
-    return mainParent || null;
-  }, [selectedCategory, categories]);
-
-  // NEW: Subcategories to display (only if they have active products)
-  const displaySubcategories = useMemo(() => {
-    if (!currentMainCategory) return [];
-    const subs = categories[currentMainCategory] || [];
-    return subs.filter((sub) =>
-      products.some((p) => p.active && p.subcategory === sub)
-    );
-  }, [currentMainCategory, categories, products]);
-
-  // --- HELPER: CHECK IF NEW (30 DAYS) ---
-  const isNewArrival = (createdAt) => {
-    if (!createdAt) return false;
-    const today = new Date();
-    // Handle both Firebase Timestamp (.seconds) and standard Date objects
-    const productDate = new Date(
-      createdAt.seconds ? createdAt.seconds * 1000 : createdAt
-    );
-    const diffTime = Math.abs(today - productDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 30; // 30 Day Limit
-  };
-
-  // --- FILTERED PRODUCTS LOGIC ---
-  const filteredProducts = useMemo(() => {
-    // 1. Start with the initial filter
-    let result = products.filter((p) => {
-      // Basic Active Check
-      if (!p.active && !isAdmin) return false;
-
-      // Hide Out of Stock Check
-      if (hideOutOfStock && p.stock === 0) return false;
-
-      // Search Filter
-      const matchesSearch = (p.name || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-
-      // Category Filter
-      let matchesCategory = false;
-      if (selectedCategory === "All") matchesCategory = true;
-      else if (categories[selectedCategory])
-        matchesCategory = p.category === selectedCategory;
-      else if (Object.values(categories).flat().includes(selectedCategory))
-        matchesCategory = p.subcategory === selectedCategory;
-      else {
-        const promo = promotions.find((pr) => pr.title === selectedCategory);
-        if (promo) matchesCategory = promo.productIds.includes(p.id);
-      }
-      return matchesCategory && matchesSearch;
-    });
-
-    // 2. Apply Sorting
-    result.sort((a, b) => {
-      if (sortOption === "price-asc") return a.price - b.price;
-      if (sortOption === "price-desc") return b.price - a.price;
-      if (sortOption === "alpha-asc") return (a.name || "").localeCompare(b.name || "");
-      if (sortOption === "newest") {
-        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0);
-        return dateB - dateA;
-      }
-      if (sortOption === "bestseller") return (b.sold || 0) - (a.sold || 0);
-      if (sortOption === "available") return (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0);
-      return 0; // Default
-    });
-
-    return result; // 👈 THIS IS THE CRITICAL RETURN!
-  }, [
-    products,
-    selectedCategory,
-    searchQuery,
-    isAdmin,
-    categories,
-    promotions,
-    sortOption,
-    hideOutOfStock
-  ]);
-
-  const displayedProducts = filteredProducts.slice(0, visibleCount);
-
-  // --- WELCOME SCREEN ---
-  if (
-    products.length === 0 &&
-    firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE" &&
-    !isAdmin
-  ) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFBF7] p-4 animate-fade-in font-sans">
-        <img
-          src={LOGO_URL}
-          alt="Shepherdess"
-          className="w-24 h-24 rounded-full shadow-xl mb-6 object-cover border-2 border-white"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.nextSibling.style.display = "flex";
-          }}
-        />
-        <div className="hidden w-24 h-24 bg-purple-600 rounded-full items-center justify-center text-white font-serif text-3xl shadow-lg mb-6">
-          S
-        </div>
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 tracking-tight mb-2">
-          Welcome to Shepherdess
-        </h1>
-        <p className="text-sm text-purple-600 font-bold tracking-[0.3em] uppercase mb-12">
-          K-Beauty Store
-        </p>
-        <button
-          onClick={() => setShowAdminLogin(true)}
-          className="text-gray-300 hover:text-purple-400 transition-colors p-2"
-          title="Owner Access"
-        >
-          <Key size={20} />
-        </button>
-        {showAdminLogin && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-              <input
-                type="password"
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter PIN"
-                className="w-full text-center text-xl p-3 border rounded-lg mb-4"
-              />
-              <button
-                onClick={toggleAdmin}
-                className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold"
-              >
-                Enter
-              </button>
-              <button
-                onClick={() => setShowAdminLogin(false)}
-                className="mt-2 text-sm text-gray-400 underline"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
+const toggleAdmin = () => {
+  if (adminPin === "742472") {
+    setIsAdmin(true);
+    setShowAdminLogin(false);
+    setAdminPin("");
+    setViewMode("dashboard");
+    showNotification("Welcome back!");
+  } else {
+    showNotification("Incorrect PIN", "error");
   }
+};
 
+const availableCategories = useMemo(
+  () =>
+    Object.keys(categories).filter((cat) =>
+      products.some((p) => p.active && p.category === cat)
+    ),
+  [categories, products]
+);
+
+// NEW: Calculate Current Main Category based on Selection
+const currentMainCategory = useMemo(() => {
+  if (categories[selectedCategory]) return selectedCategory; // Is a Main Category
+  // Check if it's a subcategory
+  const mainParent = Object.keys(categories).find((main) =>
+    categories[main].includes(selectedCategory)
+  );
+  return mainParent || null;
+}, [selectedCategory, categories]);
+
+// NEW: Subcategories to display (only if they have active products)
+const displaySubcategories = useMemo(() => {
+  if (!currentMainCategory) return [];
+  const subs = categories[currentMainCategory] || [];
+  return subs.filter((sub) =>
+    products.some((p) => p.active && p.subcategory === sub)
+  );
+}, [currentMainCategory, categories, products]);
+
+// --- HELPER: CHECK IF NEW (30 DAYS) ---
+const isNewArrival = (createdAt) => {
+  if (!createdAt) return false;
+  const today = new Date();
+  // Handle both Firebase Timestamp (.seconds) and standard Date objects
+  const productDate = new Date(
+    createdAt.seconds ? createdAt.seconds * 1000 : createdAt
+  );
+  const diffTime = Math.abs(today - productDate);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays <= 30; // 30 Day Limit
+};
+
+// --- FILTERED PRODUCTS LOGIC ---
+const filteredProducts = useMemo(() => {
+  // 1. Start with the initial filter
+  let result = products.filter((p) => {
+    // Basic Active Check
+    if (!p.active && !isAdmin) return false;
+
+    // Hide Out of Stock Check
+    if (hideOutOfStock && p.stock === 0) return false;
+
+    // Search Filter
+    const matchesSearch = (p.name || "")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    // Category Filter
+    let matchesCategory = false;
+    if (selectedCategory === "All") matchesCategory = true;
+    else if (categories[selectedCategory])
+      matchesCategory = p.category === selectedCategory;
+    else if (Object.values(categories).flat().includes(selectedCategory))
+      matchesCategory = p.subcategory === selectedCategory;
+    else {
+      const promo = promotions.find((pr) => pr.title === selectedCategory);
+      if (promo) matchesCategory = promo.productIds.includes(p.id);
+    }
+    return matchesCategory && matchesSearch;
+  });
+
+  // 2. Apply Sorting
+  result.sort((a, b) => {
+    if (sortOption === "price-asc") return a.price - b.price;
+    if (sortOption === "price-desc") return b.price - a.price;
+    if (sortOption === "alpha-asc") return (a.name || "").localeCompare(b.name || "");
+    if (sortOption === "newest") {
+      const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0);
+      const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0);
+      return dateB - dateA;
+    }
+    if (sortOption === "bestseller") return (b.sold || 0) - (a.sold || 0);
+    if (sortOption === "available") return (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0);
+    return 0; // Default
+  });
+
+  return result; // 👈 THIS IS THE CRITICAL RETURN!
+}, [
+  products,
+  selectedCategory,
+  searchQuery,
+  isAdmin,
+  categories,
+  promotions,
+  sortOption,
+  hideOutOfStock
+]);
+
+const displayedProducts = filteredProducts.slice(0, visibleCount);
+
+// --- WELCOME SCREEN ---
+if (
+  products.length === 0 &&
+  firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE" &&
+  !isAdmin
+) {
   return (
-    <div className={`min-h-screen font-sans ${THEME.bg} text-slate-800`}>
-      <style>{`
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFBF7] p-4 animate-fade-in font-sans">
+      <img
+        src={LOGO_URL}
+        alt="Shepherdess"
+        className="w-24 h-24 rounded-full shadow-xl mb-6 object-cover border-2 border-white"
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+          e.currentTarget.nextSibling.style.display = "flex";
+        }}
+      />
+      <div className="hidden w-24 h-24 bg-purple-600 rounded-full items-center justify-center text-white font-serif text-3xl shadow-lg mb-6">
+        S
+      </div>
+      <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 tracking-tight mb-2">
+        Welcome to Shepherdess
+      </h1>
+      <p className="text-sm text-purple-600 font-bold tracking-[0.3em] uppercase mb-12">
+        K-Beauty Store
+      </p>
+      <button
+        onClick={() => setShowAdminLogin(true)}
+        className="text-gray-300 hover:text-purple-400 transition-colors p-2"
+        title="Owner Access"
+      >
+        <Key size={20} />
+      </button>
+      {showAdminLogin && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <input
+              type="password"
+              value={adminPin}
+              onChange={(e) => setAdminPin(e.target.value)}
+              placeholder="Enter PIN"
+              className="w-full text-center text-xl p-3 border rounded-lg mb-4"
+            />
+            <button
+              onClick={toggleAdmin}
+              className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold"
+            >
+              Enter
+            </button>
+            <button
+              onClick={() => setShowAdminLogin(false)}
+              className="mt-2 text-sm text-gray-400 underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+return (
+  <div className={`min-h-screen font-sans ${THEME.bg} text-slate-800`}>
+    <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&display=swap');
         h1, h2, h3, .font-serif { font-family: 'Playfair Display', serif; }
         body { font-family: 'Lato', sans-serif; }
@@ -2489,677 +2568,678 @@ export default function App() {
         .animate-spin-slow { animation: spin-slow 3s linear infinite; }
       `}</style>
 
-      {notification && (
-        <Notification {...notification} onClose={() => setNotification(null)} />
-      )}
+    {notification && (
+      <Notification {...notification} onClose={() => setNotification(null)} />
+    )}
 
-      {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
-        <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-20">
-          <div
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={() => {
-              setViewMode("shop");
-              window.scrollTo({ top: 0, behavior: "smooth" });
+    {/* HEADER */}
+    <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
+      <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-20">
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => {
+            setViewMode("shop");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
+          <img
+            src={LOGO_URL}
+            className="w-12 h-12 rounded-full border border-purple-100 object-cover"
+            onError={(e) => {
+              e.target.style.display = "none";
+              e.target.nextSibling.style.display = "flex";
             }}
-          >
-            <img
-              src={LOGO_URL}
-              className="w-12 h-12 rounded-full border border-purple-100 object-cover"
-              onError={(e) => {
-                e.target.style.display = "none";
-                e.target.nextSibling.style.display = "flex";
-              }}
-            />
-            <div className="hidden w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white font-serif">
-              S
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold font-serif">Shepherdess</h1>
-              <p className="text-xs text-purple-600 font-bold uppercase tracking-widest">
-                K-Beauty
-              </p>
-            </div>
+          />
+          <div className="hidden w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white font-serif">
+            S
           </div>
-          <div className="flex items-center gap-4">
-            {isAdmin && (
-              <button
-                onClick={() =>
-                  setViewMode((prev) =>
-                    prev === "shop" ? "dashboard" : "shop"
-                  )
-                }
-                className="hidden sm:flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-bold hover:bg-purple-200 transition-colors"
-              >
-                {viewMode === "shop" ? (
-                  <LayoutDashboard size={16} />
-                ) : (
-                  <Store size={16} />
-                )}{" "}
-                {viewMode === "shop" ? "Dashboard" : "Shop View"}
-              </button>
-            )}
-            {viewMode === "shop" && (
-              <button
-                onClick={() => {
-                  setCheckoutStep("cart"); // <--- This is the magic line!
-                  setIsCartOpen(true);
-                }}
-                className="relative p-2 hover:text-purple-600 transition-colors"
-              >
-                <ShoppingBag size={24} />
-                {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
-                  <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                    {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
-                  </span>
-                )}
-              </button>
-            )}
+          <div>
+            <h1 className="text-2xl font-bold font-serif">Shepherdess</h1>
+            <p className="text-xs text-purple-600 font-bold uppercase tracking-widest">
+              K-Beauty
+            </p>
           </div>
         </div>
-      </header>
-
-      {/* DASHBOARD OR SHOP */}
-      {viewMode === "dashboard" && isAdmin ? (
-        <AdminDashboard
-          db={db}
-          products={products}
-          content={shopContent}
-          categories={categories}
-          promotions={promotions}
-          whatsappTemplates={whatsappTemplates}
-          onUpdateStock={handleUpdateStock}
-          onUpdateExpiry={handleUpdateExpiry}
-          onUpdatePrice={handleUpdatePrice}
-          onToggleStatus={handleToggleStatus}
-          onDeleteProduct={handleDeleteProduct}
-          onAddProduct={handleAddProduct}
-          onUpdateProduct={handleUpdateProduct}
-          onUpdateContent={handleUpdateContent}
-          onUpdateCategories={handleUpdateCategories}
-          onAddPromotion={handleAddPromotion}
-          onUpdatePromotion={handleUpdatePromotion}
-          onDeletePromotion={handleDeletePromotion}
-          generateReceipt={generateReceipt}
-        />
-      ) : (
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center mb-12">
-            <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-              {shopContent.heroTag}
-            </span>
-            <h2 className="text-4xl font-serif mt-2 mb-4 text-gray-900">
-              {shopContent.heroTitle}
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed">
-              {shopContent.heroDescription}
-            </p>
-            <div className="mt-4">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-100">
-                <Clock size={12} /> {shopContent.heroNote}
-              </span>
-            </div>
-          </div>
-
-          {/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
-          <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            {/* Search Bar */}
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search for product, or a keyword..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
-              />
-              <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-            </div>
-
-            {/* Category Buttons */}
-            <div className="flex flex-wrap gap-2 justify-center">
-              <button
-                onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-              >
-                All
-              </button>
-              {promotions.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
-                >
-                  <Tag size={12} /> {p.title}
-                </button>
-              ))}
-              {availableCategories.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. THE STICKY CONTROL BAR (Only Sort & Toggle - Stays at top) */}
-          <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-
-              {/* Sort Option */}
-              <div className="relative flex-1 max-w-[180px]">
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  className="appearance-none bg-gray-50 pl-9 pr-4 py-2 rounded-xl text-xs font-bold cursor-pointer focus:outline-none border border-gray-200 w-full"
-                >
-                  <option value="default">Sort: Default</option>
-                  <option value="price-asc">Price: Low</option>
-                  <option value="price-desc">Price: High</option>
-                  <option value="newest">New Arrivals</option>
-                </select>
-                <ArrowUpDown size={14} className="absolute left-3 top-2.5 text-gray-400" />
-              </div>
-
-              {/* Toggle Switch */}
-              <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
-                <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
-                  Hide Sold Out
+        <div className="flex items-center gap-4">
+          {isAdmin && (
+            <button
+              onClick={() =>
+                setViewMode((prev) =>
+                  prev === "shop" ? "dashboard" : "shop"
+                )
+              }
+              className="hidden sm:flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-bold hover:bg-purple-200 transition-colors"
+            >
+              {viewMode === "shop" ? (
+                <LayoutDashboard size={16} />
+              ) : (
+                <Store size={16} />
+              )}{" "}
+              {viewMode === "shop" ? "Dashboard" : "Shop View"}
+            </button>
+          )}
+          {viewMode === "shop" && (
+            <button
+              onClick={() => {
+                setCheckoutStep("cart"); // <--- This is the magic line!
+                setIsCartOpen(true);
+              }}
+              className="relative p-2 hover:text-purple-600 transition-colors"
+            >
+              <ShoppingBag size={24} />
+              {Object.values(cart).reduce((a, b) => a + b.qty, 0) > 0 && (
+                <span className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
+                  {Object.values(cart).reduce((a, b) => a + b.qty, 0)}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}
-                >
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hideOutOfStock ? 'translate-x-5' : 'translate-x-1'}`} />
-                </button>
-              </div>
-            </div>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+
+    {/* DASHBOARD OR SHOP */}
+    {viewMode === "dashboard" && isAdmin ? (
+      <AdminDashboard
+        db={db}
+        products={products}
+        content={shopContent}
+        categories={categories}
+        promotions={promotions}
+        whatsappTemplates={whatsappTemplates}
+        setWhatsappTemplates={setWhatsappTemplates}
+        onUpdateStock={handleUpdateStock}
+        onUpdateExpiry={handleUpdateExpiry}
+        onUpdatePrice={handleUpdatePrice}
+        onToggleStatus={handleToggleStatus}
+        onDeleteProduct={handleDeleteProduct}
+        onAddProduct={handleAddProduct}
+        onUpdateProduct={handleUpdateProduct}
+        onUpdateContent={handleUpdateContent}
+        onUpdateCategories={handleUpdateCategories}
+        onAddPromotion={handleAddPromotion}
+        onUpdatePromotion={handleUpdatePromotion}
+        onDeletePromotion={handleDeletePromotion}
+        generateReceipt={generateReceipt}
+      />
+    ) : (
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="text-center mb-12">
+          <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+            {shopContent.heroTag}
+          </span>
+          <h2 className="text-4xl font-serif mt-2 mb-4 text-gray-900">
+            {shopContent.heroTitle}
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed">
+            {shopContent.heroDescription}
+          </p>
+          <div className="mt-4">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-100">
+              <Clock size={12} /> {shopContent.heroNote}
+            </span>
+          </div>
+        </div>
+
+        {/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
+        <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          {/* Search Bar */}
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="Search for product, or a keyword..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
+            />
+            <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {displayedProducts.map((p) => (
-              <div
+          {/* Category Buttons */}
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button
+              onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+            >
+              All
+            </button>
+            {promotions.map((p) => (
+              <button
                 key={p.id}
-                className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+                onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
+                className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
               >
-                <ProductImage
-                  src={p.image}
-                  alt={p.name}
-                  stock={p.stock}
-                  // Add this new line below:
-                  isNew={isNewArrival(p.createdAt)}
-                  discount={
-                    p.originalPrice
-                      ? Math.round(
-                        ((p.originalPrice - p.price) / p.originalPrice) * 100
-                      )
-                      : 0
-                  }
-                />
-                <div className="flex-1 flex flex-col">
-                  <div className="flex gap-1 mb-1">
-                    <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                      {p.category}
-                    </span>
-                    {p.subcategory && (
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-                        {p.subcategory}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-serif font-bold text-lg leading-tight mb-1 text-gray-900">
-                    {p.name}
-                  </h3>
-
-                  {/* EXPIRY DATE ADDED HERE */}
-                  {p.expiryDate && (
-                    <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
-                      <Clock size={12} /> Expiry: {p.expiryDate}
-                    </p>
-                  )}
-
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
-                    {p.description}
-                  </p>
-                  <div className="mt-auto flex justify-between items-center">
-                    <div className="flex flex-col">
-                      {p.originalPrice && (
-                        <span className="text-xs text-gray-400 line-through font-medium">
-                          {p.originalPrice.toFixed(3)} BHD
-                        </span>
-                      )}
-                      <span className="text-lg font-bold text-red-600">
-                        {p.price.toFixed(3)} BHD
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => addToCart(p)}
-                      disabled={p.stock === 0}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
-                        }`}
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                <Tag size={12} /> {p.title}
+              </button>
+            ))}
+            {availableCategories.map((c) => (
+              <button
+                key={c}
+                onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
+              >
+                {c}
+              </button>
             ))}
           </div>
-          {displayedProducts.length < filteredProducts.length && (
-            <div className="text-center mt-12 pb-12">
-              <button
-                onClick={() => setVisibleCount((c) => c + 12)}
-                className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
-              >
-                <ChevronDown size={20} /> Show More Products
-              </button>
-            </div>
-          )}
-        </main>
-      )}
+        </div>
 
-      {/* CART */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setIsCartOpen(false)}
-          />
-          <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-            {/* Cart Header */}
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50/50">
-              <h2 className="text-2xl font-serif font-bold text-gray-900">
-                {checkoutStep === "success" ? "Thank You!" : "Your Bag"}
-              </h2>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+        {/* 2. THE STICKY CONTROL BAR (Only Sort & Toggle - Stays at top) */}
+        <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+
+            {/* Sort Option */}
+            <div className="relative flex-1 max-w-[180px]">
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value)}
+                className="appearance-none bg-gray-50 pl-9 pr-4 py-2 rounded-xl text-xs font-bold cursor-pointer focus:outline-none border border-gray-200 w-full"
               >
-                <X size={24} />
-              </button>
+                <option value="default">Sort: Default</option>
+                <option value="price-asc">Price: Low</option>
+                <option value="price-desc">Price: High</option>
+                <option value="newest">New Arrivals</option>
+              </select>
+              <ArrowUpDown size={14} className="absolute left-3 top-2.5 text-gray-400" />
             </div>
 
-            {/* Cart Body */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {checkoutStep === "success" ? (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-6 animate-fade-in px-4">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 shadow-sm">
-                    <Check size={40} />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-serif font-bold text-gray-900 mb-1">Order Placed!</h3>
-                    <p className="text-xl font-mono font-bold text-purple-600 mb-2">{lastOrder?.orderId || "#ORDER"}</p>
-                    <p className="text-gray-500 text-sm max-w-xs mx-auto">Your order has been received and is waiting for payment verification.</p>
+            {/* Toggle Switch */}
+            <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+              <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
+                Hide Sold Out
+              </span>
+              <button
+                type="button"
+                onClick={() => setHideOutOfStock(!hideOutOfStock)}
+                className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hideOutOfStock ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {displayedProducts.map((p) => (
+            <div
+              key={p.id}
+              className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+            >
+              <ProductImage
+                src={p.image}
+                alt={p.name}
+                stock={p.stock}
+                // Add this new line below:
+                isNew={isNewArrival(p.createdAt)}
+                discount={
+                  p.originalPrice
+                    ? Math.round(
+                      ((p.originalPrice - p.price) / p.originalPrice) * 100
+                    )
+                    : 0
+                }
+              />
+              <div className="flex-1 flex flex-col">
+                <div className="flex gap-1 mb-1">
+                  <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    {p.category}
+                  </span>
+                  {p.subcategory && (
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                      {p.subcategory}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-serif font-bold text-lg leading-tight mb-1 text-gray-900">
+                  {p.name}
+                </h3>
+
+                {/* EXPIRY DATE ADDED HERE */}
+                {p.expiryDate && (
+                  <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
+                    <Clock size={12} /> Expiry: {p.expiryDate}
+                  </p>
+                )}
+
+                <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
+                  {p.description}
+                </p>
+                <div className="mt-auto flex justify-between items-center">
+                  <div className="flex flex-col">
+                    {p.originalPrice && (
+                      <span className="text-xs text-gray-400 line-through font-medium">
+                        {p.originalPrice.toFixed(3)} BHD
+                      </span>
+                    )}
+                    <span className="text-lg font-bold text-red-600">
+                      {p.price.toFixed(3)} BHD
+                    </span>
                   </div>
                   <button
-                    onClick={() => generateReceipt(lastOrder)}
-                    className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg"
+                    onClick={() => addToCart(p)}
+                    disabled={p.stock === 0}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                      }`}
                   >
-                    <Download size={18} /> Download Receipt PDF
-                  </button>
-                  {/* WhatsApp Button: Aesthetic Unicode Edition ♡ */}
-                  <a
-                    href={(() => {
-                      // These symbols are 100% safe and will NOT turn into question marks
-                      const symHeart = "\u2661"; // ♡
-                      const symStar = "\u22C6";  // ⋆
-                      const symSparkle = "\u2727"; // ✧
-                      const symArrow = "\u279C"; // ➜
-
-                      const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
-                        lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
-
-                      const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery'
-                        ? lastOrder.customer.deliveryAddress
-                        : lastOrder.customer.meetupNote;
-
-                      const itemList = Object.values(lastOrder?.items || {})
-                        .map(i => `${symStar} ${i.qty} x ${i.name}`)
-                        .join('\n');
-
-                      const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! ${symSparkle}\n\n` +
-                        `*ORDER SUMMARY* ${symHeart}\n` +
-                        `${symArrow} *Name:* ${lastOrder?.customer?.name}\n` +
-                        `${symArrow} *Order ID:* ${lastOrder?.orderId}\n` +
-                        `${symArrow} *Method:* ${deliveryType}\n` +
-                        `${symArrow} *Details:* ${deliveryDetail}\n\n` +
-                        `*THE GOODIES:* ${symSparkle}\n${itemList}\n\n` +
-                        `*Total:* ${lastOrder?.total?.toFixed(3)} BHD`;
-
-                      return `https://wa.me/97333027588?text=${encodeURIComponent(message)}`;
-                    })()}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full"
-                  >
-                    <MessageSquare size={18} /> Chat on WhatsApp
-                  </a>
-                  <button onClick={() => { setCheckoutStep("cart"); setIsCartOpen(false); setLastOrder(null); }} className="text-gray-400 font-bold hover:text-gray-600 text-sm mt-4">
-                    Close & Continue Shopping
+                    <Plus size={20} />
                   </button>
                 </div>
-              ) : Object.keys(cart).length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-                  <ShoppingBag size={48} className="text-purple-200" />
-                  <p>Your bag is empty.</p>
-                  <button onClick={() => setIsCartOpen(false)} className="text-purple-600 font-semibold hover:underline">Start Shopping</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {displayedProducts.length < filteredProducts.length && (
+          <div className="text-center mt-12 pb-12">
+            <button
+              onClick={() => setVisibleCount((c) => c + 12)}
+              className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
+            >
+              <ChevronDown size={20} /> Show More Products
+            </button>
+          </div>
+        )}
+      </main>
+    )}
+
+    {/* CART */}
+    {isCartOpen && (
+      <div className="fixed inset-0 z-50 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+          onClick={() => setIsCartOpen(false)}
+        />
+        <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+          {/* Cart Header */}
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50/50">
+            <h2 className="text-2xl font-serif font-bold text-gray-900">
+              {checkoutStep === "success" ? "Thank You!" : "Your Bag"}
+            </h2>
+            <button
+              onClick={() => setIsCartOpen(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Cart Body */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {checkoutStep === "success" ? (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-6 animate-fade-in px-4">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 shadow-sm">
+                  <Check size={40} />
                 </div>
-              ) : checkoutStep === "cart" ? (
-                /* --- STEP 1: SUMMARY VIEW --- */
-                <div className="space-y-6 animate-fade-in">
-                  {Object.values(cart).map((i) => (
-                    <div key={i.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 relative">
-                      <div className="w-20 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-                        <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div className="pr-6">
-                          <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{i.name}</h4>
-                          <p className="text-[10px] text-purple-600 font-bold uppercase mt-1">{i.category}</p>
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
-                          <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
-                            <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
-                            <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
-                            <button onClick={() => updateCartQty(i.id, 1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Plus size={14} /></button>
-                          </div>
-                        </div>
-                        <button onClick={() => updateCartQty(i.id, -i.qty)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
-                      </div>
+                <div>
+                  <h3 className="text-2xl font-serif font-bold text-gray-900 mb-1">Order Placed!</h3>
+                  <p className="text-xl font-mono font-bold text-purple-600 mb-2">{lastOrder?.orderId || "#ORDER"}</p>
+                  <p className="text-gray-500 text-sm max-w-xs mx-auto">Your order has been received and is waiting for payment verification.</p>
+                </div>
+                <button
+                  onClick={() => generateReceipt(lastOrder)}
+                  className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg"
+                >
+                  <Download size={18} /> Download Receipt PDF
+                </button>
+                {/* WhatsApp Button: Aesthetic Unicode Edition ♡ */}
+                <a
+                  href={(() => {
+                    // These symbols are 100% safe and will NOT turn into question marks
+                    const symHeart = "\u2661"; // ♡
+                    const symStar = "\u22C6";  // ⋆
+                    const symSparkle = "\u2727"; // ✧
+                    const symArrow = "\u279C"; // ➜
+
+                    const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
+                      lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
+
+                    const deliveryDetail = lastOrder?.customer?.deliveryMethod === 'delivery'
+                      ? lastOrder.customer.deliveryAddress
+                      : lastOrder.customer.meetupNote;
+
+                    const itemList = Object.values(lastOrder?.items || {})
+                      .map(i => `${symStar} ${i.qty} x ${i.name}`)
+                      .join('\n');
+
+                    const message = `Hi K-Beauty Bestie! I just placed an order from Shepherdess! ${symSparkle}\n\n` +
+                      `*ORDER SUMMARY* ${symHeart}\n` +
+                      `${symArrow} *Name:* ${lastOrder?.customer?.name}\n` +
+                      `${symArrow} *Order ID:* ${lastOrder?.orderId}\n` +
+                      `${symArrow} *Method:* ${deliveryType}\n` +
+                      `${symArrow} *Details:* ${deliveryDetail}\n\n` +
+                      `*THE GOODIES:* ${symSparkle}\n${itemList}\n\n` +
+                      `*Total:* ${lastOrder?.total?.toFixed(3)} BHD`;
+
+                    return `https://wa.me/97333027588?text=${encodeURIComponent(message)}`;
+                  })()}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#128C7E] transition-colors w-full"
+                >
+                  <MessageSquare size={18} /> Chat on WhatsApp
+                </a>
+                <button onClick={() => { setCheckoutStep("cart"); setIsCartOpen(false); setLastOrder(null); }} className="text-gray-400 font-bold hover:text-gray-600 text-sm mt-4">
+                  Close & Continue Shopping
+                </button>
+              </div>
+            ) : Object.keys(cart).length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+                <ShoppingBag size={48} className="text-purple-200" />
+                <p>Your bag is empty.</p>
+                <button onClick={() => setIsCartOpen(false)} className="text-purple-600 font-semibold hover:underline">Start Shopping</button>
+              </div>
+            ) : checkoutStep === "cart" ? (
+              /* --- STEP 1: SUMMARY VIEW --- */
+              <div className="space-y-6 animate-fade-in">
+                {Object.values(cart).map((i) => (
+                  <div key={i.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 relative">
+                    <div className="w-20 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
+                      <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
                     </div>
-                  ))}
-                  <p className="text-[10px] text-center text-gray-400 italic">Review your items before proceeding</p>
+                    <div className="flex-1 flex flex-col justify-between py-1">
+                      <div className="pr-6">
+                        <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{i.name}</h4>
+                        <p className="text-[10px] text-purple-600 font-bold uppercase mt-1">{i.category}</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
+                        <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
+                          <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
+                          <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
+                          <button onClick={() => updateCartQty(i.id, 1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Plus size={14} /></button>
+                        </div>
+                      </div>
+                      <button onClick={() => updateCartQty(i.id, -i.qty)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-[10px] text-center text-gray-400 italic">Review your items before proceeding</p>
+              </div>
+            ) : (
+              /* --- STEP 2: DELIVERY & PAYMENT DETAILS --- */
+              <div className="space-y-6 animate-fade-in">
+                <div className="space-y-3">
+                  <h3 className="font-bold text-gray-900 text-sm">Select Delivery Method</h3>
+
+                  {/* Option 1: Meet-Up */}
+                  <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-3 mb-1" onClick={() => setDeliveryMethod('meetup')}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                        {deliveryMethod === 'meetup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-bold text-gray-900 block">Meet-Up</span>
+                        <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                      </div>
+                      <Store size={20} className="text-gray-400" />
+                    </div>
+                    {deliveryMethod === 'meetup' && (
+                      <div className="ml-8 text-[11px] text-gray-600 space-y-1 mt-2 bg-white/50 p-2 rounded border border-purple-100 animate-fade-in">
+                        <p><strong>Manama Centre:</strong> Sun-Thu (9AM - 3PM)</p>
+                        <p><strong>Bahrain Tower:</strong> Mon/Tue/Thu (8PM-11PM) or Fri (11AM-2PM)</p>
+                        <p className="italic text-purple-700 mt-1">"Or let's coordinate somewhere else!"</p>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Option 2: Pick-Up */}
+                  <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('pickup')}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                        {deliveryMethod === 'pickup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-bold text-gray-900 block">Pick-Up (Sanabis)</span>
+                        <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
+                      </div>
+                      <Store size={20} className="text-gray-400" />
+                    </div>
+                    {deliveryMethod === 'pickup' && (
+                      <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
+                        I can leave it for you to pick up in Sanabis anytime!
+                      </p>
+                    )}
+                  </label>
+
+                  {/* Option 3: Delivery */}
+                  <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('delivery')}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
+                        {deliveryMethod === 'delivery' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-bold text-gray-900 block">Delivery</span>
+                        <span className="text-xs text-red-600 font-bold">+ 1.000 BHD</span>
+                      </div>
+                      <Truck size={20} className="text-gray-400" />
+                    </div>
+                    {deliveryMethod === 'delivery' && (
+                      <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
+                        Same Day Delivery for orders until 2:30PM
+                      </p>
+                    )}
+                  </label>
                 </div>
-              ) : (
-                /* --- STEP 2: DELIVERY & PAYMENT DETAILS --- */
-                <div className="space-y-6 animate-fade-in">
-                  <div className="space-y-3">
-                    <h3 className="font-bold text-gray-900 text-sm">Select Delivery Method</h3>
 
-                    {/* Option 1: Meet-Up */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
-                      <div className="flex items-center gap-3 mb-1" onClick={() => setDeliveryMethod('meetup')}>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'meetup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
-                          {deliveryMethod === 'meetup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900 block">Meet-Up</span>
-                          <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
-                        </div>
-                        <Store size={20} className="text-gray-400" />
-                      </div>
-                      {deliveryMethod === 'meetup' && (
-                        <div className="ml-8 text-[11px] text-gray-600 space-y-1 mt-2 bg-white/50 p-2 rounded border border-purple-100 animate-fade-in">
-                          <p><strong>Manama Centre:</strong> Sun-Thu (9AM - 3PM)</p>
-                          <p><strong>Bahrain Tower:</strong> Mon/Tue/Thu (8PM-11PM) or Fri (11AM-2PM)</p>
-                          <p className="italic text-purple-700 mt-1">"Or let's coordinate somewhere else!"</p>
-                        </div>
-                      )}
+                {/* Dynamic Inputs */}
+                <div className="space-y-4">
+                  <div className="animate-fade-in">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
+                      {deliveryMethod === 'delivery' ? "Delivery Address" :
+                        deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
                     </label>
-
-                    {/* Option 2: Pick-Up */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
-                      <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('pickup')}>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'pickup' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
-                          {deliveryMethod === 'pickup' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900 block">Pick-Up (Sanabis)</span>
-                          <span className="text-xs text-purple-600 font-bold">+ 0.000 BHD</span>
-                        </div>
-                        <Store size={20} className="text-gray-400" />
-                      </div>
-                      {deliveryMethod === 'pickup' && (
-                        <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
-                          I can leave it for you to pick up in Sanabis anytime!
-                        </p>
-                      )}
-                    </label>
-
-                    {/* Option 3: Delivery */}
-                    <label className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
-                      <div className="flex items-center gap-3" onClick={() => setDeliveryMethod('delivery')}>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${deliveryMethod === 'delivery' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'}`}>
-                          {deliveryMethod === 'delivery' && <div className="w-2 h-2 bg-white rounded-full shadow-inner" />}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900 block">Delivery</span>
-                          <span className="text-xs text-red-600 font-bold">+ 1.000 BHD</span>
-                        </div>
-                        <Truck size={20} className="text-gray-400" />
-                      </div>
-                      {deliveryMethod === 'delivery' && (
-                        <p className="ml-8 mt-2 text-[11px] text-gray-500 italic animate-fade-in">
-                          Same Day Delivery for orders until 2:30PM
-                        </p>
-                      )}
-                    </label>
+                    <textarea
+                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
+                      placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." :
+                        deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
+                      rows="2"
+                      value={deliveryMethod === 'delivery' ? deliveryAddress : meetupNote}
+                      onChange={(e) => deliveryMethod === 'delivery' ? setDeliveryAddress(e.target.value) : setMeetupNote(e.target.value)}
+                    />
                   </div>
 
-                  {/* Dynamic Inputs */}
                   <div className="space-y-4">
-                    <div className="animate-fade-in">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
-                        {deliveryMethod === 'delivery' ? "Delivery Address" :
-                          deliveryMethod === 'meetup' ? "Preferred Time / Location?" : "When will you pick up?"}
-                      </label>
-                      <textarea
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
-                        placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." :
-                          deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
-                        rows="2"
-                        value={deliveryMethod === 'delivery' ? deliveryAddress : meetupNote}
-                        onChange={(e) => deliveryMethod === 'delivery' ? setDeliveryAddress(e.target.value) : setMeetupNote(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-4">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Contact Details</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Your Name" value={customerDetails.name} onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })} required />
-                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Phone Number" type="tel" value={customerDetails.phone} onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })} required />
-                      </div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Contact Details</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="w-full p-3 border rounded-lg text-sm" placeholder="Your Name" value={customerDetails.name} onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })} required />
+                      <input className="w-full p-3 border rounded-lg text-sm" placeholder="Phone Number" type="tel" value={customerDetails.phone} onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })} required />
                     </div>
                   </div>
+                </div>
 
-                  {/* Summary Section matching Image 3 */}
-                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                    <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Subtotal:</span>
-                      <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-3 border-b border-purple-200 pb-2">
-                      <span>Delivery Fee:</span>
-                      <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
-                    </div>
-
-                    <div className="flex justify-between items-end mb-4">
-                      <span className="text-purple-700 font-bold text-lg">Total:</span>
-                      <span className="font-mono text-2xl font-bold text-gray-900">
-                        {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
-                      </span>
-                    </div>
-
-                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => { navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!"); }}>
-                      <p className="text-[10px] text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
-                      <p className="font-mono text-lg font-bold text-gray-900 tracking-wider">+973 3302 7588</p>
-                      <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
-                    </div>
-                    <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
+                {/* Summary Section matching Image 3 */}
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                  <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Subtotal:</span>
+                    <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-3 border-b border-purple-200 pb-2">
+                    <span>Delivery Fee:</span>
+                    <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
                   </div>
 
-                  {/* Proof Upload */}
-                  <div className="pt-2">
-                    <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer bg-white transition-all ${proofFile ? "border-green-400" : "border-gray-200"}`}>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => setProofFile(e.target.files[0])} />
-                      <div className="flex items-center gap-2 text-gray-400">
-                        {proofFile ? <CheckCircle size={18} className="text-green-500" /> : <Upload size={18} />}
-                        <span className="text-xs font-bold">{proofFile ? proofFile.name : "Upload Payment Screenshot"}</span>
-                      </div>
-                    </label>
+                  <div className="flex justify-between items-end mb-4">
+                    <span className="text-purple-700 font-bold text-lg">Total:</span>
+                    <span className="font-mono text-2xl font-bold text-gray-900">
+                      {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
+                    </span>
                   </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => { navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!"); }}>
+                    <p className="text-[10px] text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
+                    <p className="font-mono text-lg font-bold text-gray-900 tracking-wider">+973 3302 7588</p>
+                    <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
+                  </div>
+                  <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
+                </div>
+
+                {/* Proof Upload */}
+                <div className="pt-2">
+                  <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer bg-white transition-all ${proofFile ? "border-green-400" : "border-gray-200"}`}>
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => setProofFile(e.target.files[0])} />
+                    <div className="flex items-center gap-2 text-gray-400">
+                      {proofFile ? <CheckCircle size={18} className="text-green-500" /> : <Upload size={18} />}
+                      <span className="text-xs font-bold">{proofFile ? proofFile.name : "Upload Payment Screenshot"}</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Cart Footer (Sticky) */}
+          {Object.keys(cart).length > 0 && checkoutStep !== "success" && (
+            <div className="p-6 border-t border-gray-100 bg-gray-50">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="text-xl font-bold text-gray-900">
+                  {Object.values(cart)
+                    .reduce((s, i) => s + i.price * i.qty, 0)
+                    .toFixed(3)}{" "}
+                  BHD
+                </span>
+              </div>
+              {checkoutStep === "cart" ? (
+                <button
+                  onClick={() => setCheckoutStep("form")}
+                  className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  Proceed to Checkout <ChevronRight size={18} />
+                </button>
+              ) : (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setCheckoutStep("cart")}
+                    className="px-6 py-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleCheckout}
+                    disabled={isSubmitting || !proofFile}
+                    className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting || !proofFile
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                      : "bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200"
+                      }`}
+                  >
+                    {isSubmitting ? "Uploading..." : "Confirm Order"}
+                  </button>
                 </div>
               )}
             </div>
-            {/* Cart Footer (Sticky) */}
-            {Object.keys(cart).length > 0 && checkoutStep !== "success" && (
-              <div className="p-6 border-t border-gray-100 bg-gray-50">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="text-xl font-bold text-gray-900">
-                    {Object.values(cart)
-                      .reduce((s, i) => s + i.price * i.qty, 0)
-                      .toFixed(3)}{" "}
-                    BHD
-                  </span>
-                </div>
-                {checkoutStep === "cart" ? (
-                  <button
-                    onClick={() => setCheckoutStep("form")}
-                    className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Proceed to Checkout <ChevronRight size={18} />
-                  </button>
-                ) : (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setCheckoutStep("cart")}
-                      className="px-6 py-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={handleCheckout}
-                      disabled={isSubmitting || !proofFile}
-                      className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting || !proofFile
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
-                        : "bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200"
-                        }`}
-                    >
-                      {isSubmitting ? "Uploading..." : "Confirm Order"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
+    )}
 
-      {/* FOOTER */}
-      <footer className="bg-white border-t border-gray-200 py-12 mt-12">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">
-            {shopContent.footerTitle}
-          </h2>
-          <p className="text-gray-500 mb-8">{shopContent.footerText}</p>
+    {/* FOOTER */}
+    <footer className="bg-white border-t border-gray-200 py-12 mt-12">
+      <div className="max-w-7xl mx-auto px-4 text-center">
+        <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">
+          {shopContent.footerTitle}
+        </h2>
+        <p className="text-gray-500 mb-8">{shopContent.footerText}</p>
 
-          {/* --- SOCIAL MEDIA LINKS (Dynamic) --- */}
-          <div className="flex justify-center gap-6 mb-8">
-            {/* Instagram - Only shows if link exists */}
-            {shopContent.instagramUrl && (
-              <a
-                href={shopContent.instagramUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-gray-400 hover:text-purple-600 transition-colors transform hover:scale-110"
-              >
-                <Instagram size={24} />
-              </a>
-            )}
-
-            {/* Facebook - Only shows if link exists */}
-            {shopContent.facebookUrl && (
-              <a
-                href={shopContent.facebookUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-gray-400 hover:text-blue-600 transition-colors transform hover:scale-110"
-              >
-                <Facebook size={24} />
-              </a>
-            )}
-
-            {/* WhatsApp - Only shows if number exists */}
-            {shopContent.whatsappNumber && (
-              <a
-                href={`https://wa.me/${shopContent.whatsappNumber.replace(
-                  /[^0-9]/g,
-                  ""
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-gray-400 hover:text-green-500 transition-colors transform hover:scale-110"
-              >
-                <MessageCircle size={24} />
-              </a>
-            )}
-          </div>
-
-          <div className="flex justify-center items-center gap-4 text-sm text-gray-400">
-            <span>
-              © {new Date().getFullYear()} {shopContent.footerCopyright}
-            </span>
-            <span>•</span>
-            <button
-              onClick={() =>
-                isAdmin ? setIsAdmin(false) : setShowAdminLogin(true)
-              }
-              className="hover:text-purple-600 transition-colors"
+        {/* --- SOCIAL MEDIA LINKS (Dynamic) --- */}
+        <div className="flex justify-center gap-6 mb-8">
+          {/* Instagram - Only shows if link exists */}
+          {shopContent.instagramUrl && (
+            <a
+              href={shopContent.instagramUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gray-400 hover:text-purple-600 transition-colors transform hover:scale-110"
             >
-              {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
+              <Instagram size={24} />
+            </a>
+          )}
+
+          {/* Facebook - Only shows if link exists */}
+          {shopContent.facebookUrl && (
+            <a
+              href={shopContent.facebookUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gray-400 hover:text-blue-600 transition-colors transform hover:scale-110"
+            >
+              <Facebook size={24} />
+            </a>
+          )}
+
+          {/* WhatsApp - Only shows if number exists */}
+          {shopContent.whatsappNumber && (
+            <a
+              href={`https://wa.me/${shopContent.whatsappNumber.replace(
+                /[^0-9]/g,
+                ""
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gray-400 hover:text-green-500 transition-colors transform hover:scale-110"
+            >
+              <MessageCircle size={24} />
+            </a>
+          )}
+        </div>
+
+        <div className="flex justify-center items-center gap-4 text-sm text-gray-400">
+          <span>
+            © {new Date().getFullYear()} {shopContent.footerCopyright}
+          </span>
+          <span>•</span>
+          <button
+            onClick={() =>
+              isAdmin ? setIsAdmin(false) : setShowAdminLogin(true)
+            }
+            className="hover:text-purple-600 transition-colors"
+          >
+            {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
+          </button>
+        </div>
+      </div>
+    </footer>
+
+    {/* ADMIN LOGIN MODAL */}
+    {showAdminLogin && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">
+            Owner Access
+          </h3>
+          <input
+            type="password"
+            value={adminPin}
+            onChange={(e) => setAdminPin(e.target.value)}
+            placeholder="PIN"
+            className="text-center text-3xl tracking-widest w-full p-4 border border-gray-200 rounded-xl focus:border-purple-500 outline-none mb-6"
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowAdminLogin(false)}
+              className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={toggleAdmin}
+              className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700"
+            >
+              Enter
             </button>
           </div>
         </div>
-      </footer>
-
-      {/* ADMIN LOGIN MODAL */}
-      {showAdminLogin && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Owner Access
-            </h3>
-            <input
-              type="password"
-              value={adminPin}
-              onChange={(e) => setAdminPin(e.target.value)}
-              placeholder="PIN"
-              className="text-center text-3xl tracking-widest w-full p-4 border border-gray-200 rounded-xl focus:border-purple-500 outline-none mb-6"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowAdminLogin(false)}
-                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={toggleAdmin}
-                className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700"
-              >
-                Enter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* CUSTOMER RECEIPT MODAL */}
-      {customerReceipt && (
-        <OrderReceiptModal
-          order={customerReceipt}
-          onClose={() => setCustomerReceipt(null)}
-        />
-      )}
-    </div>
-  );
+      </div>
+    )}
+    {/* CUSTOMER RECEIPT MODAL */}
+    {customerReceipt && (
+      <OrderReceiptModal
+        order={customerReceipt}
+        onClose={() => setCustomerReceipt(null)}
+      />
+    )}
+  </div>
+);
 }
 
 
