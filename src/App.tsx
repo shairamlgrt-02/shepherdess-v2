@@ -61,6 +61,8 @@ import {
   MessageCircle,
   Archive,
   RefreshCw,
+  FileText,
+  Printer,
   ChevronUp,
 } from "lucide-react";
 
@@ -231,6 +233,157 @@ const ProductImage = ({ src, alt, stock, discount, isNew }) => {
 };
 
 // --- ADMIN DASHBOARD ---
+// --- 🧾 FINAL PERFECT PRINT RECEIPT ---
+const OrderReceiptModal = ({ order, onClose }) => {
+  if (!order) return null;
+
+  const subtotal = order.items
+    ? Object.values(order.items).reduce((sum, item) => sum + (item.price * item.qty), 0)
+    : 0;
+  const deliveryFee = order.deliveryFee !== undefined
+    ? order.deliveryFee
+    : (order.customer?.deliveryMethod === 'delivery' ? 1.000 : 0);
+  const total = subtotal + deliveryFee;
+
+  return (
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4">
+      <div className="relative w-full max-w-[360px] my-8">
+
+        {/* RECEIPT CARD */}
+        <div id="receipt-card" className="bg-white shadow-2xl overflow-hidden rounded-sm relative">
+
+          <button onClick={onClose} className="absolute top-3 right-3 z-10 text-gray-400 hover:text-red-500 bg-white/50 rounded-full p-1 print:hidden">
+            <X size={24} />
+          </button>
+
+          <div className="p-6 flex flex-col items-center text-gray-800 font-sans">
+
+            {/* LOGO AREA */}
+            <div className="flex flex-col items-center mb-6 mt-2">
+              <div className="bg-[#8B5CF6] text-white w-12 h-12 rounded-full flex items-center justify-center mb-2 shadow-sm print-color-exact">
+                <span className="font-serif text-2xl italic">S</span>
+              </div>
+              <h1 className="text-2xl font-serif font-bold text-gray-900 tracking-tight leading-none">Shepherdess</h1>
+              <p className="text-[10px] font-bold text-[#8B5CF6] tracking-[0.25em] uppercase mt-1 print-color-exact">K-BEAUTY</p>
+            </div>
+
+            {/* ORDER INFO */}
+            <div className="w-full text-center mb-5">
+              <h2 className="text-lg font-bold text-[#7C3AED] uppercase tracking-wide print-color-exact">
+                ORDER ID: {order.orderId || "000000"}
+              </h2>
+            </div>
+
+            <div className="w-full border-t-2 border-[#7C3AED] border-dashed mb-5 print-color-exact"></div>
+
+            {/* CUSTOMER DETAILS */}
+            <div className="w-full text-sm space-y-2 mb-6 font-medium text-gray-700">
+              <div className="flex justify-between">
+                <span className="font-bold">Customer:</span>
+                <span className="text-right">{order.customer?.name || "Guest"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold">Phone:</span>
+                <span className="text-right">{order.customer?.phone || "N/A"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold">Method:</span>
+                <span className="uppercase text-right">{order.customer?.deliveryMethod || order.method || "Pickup"}</span>
+              </div>
+            </div>
+
+            <div className="w-full border-t border-gray-200 mb-5"></div>
+
+            {/* ITEMS */}
+            <div className="w-full space-y-3 mb-6">
+              {order.items && Object.values(order.items).map((item, i) => (
+                <div key={i} className="flex justify-between items-start text-sm">
+                  <div className="flex gap-2">
+                    <span className="font-bold text-gray-900">{item.qty}x</span>
+                    <span className="text-gray-700 leading-tight max-w-[160px]">{item.name}</span>
+                  </div>
+                  <span className="font-mono text-gray-900">{(item.price * item.qty).toFixed(3)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="w-full border-t-2 border-gray-800 mb-6"></div>
+
+            {/* TOTALS */}
+            <div className="w-full space-y-2 mb-8">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span className="font-mono">{subtotal.toFixed(3)} BHD</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Delivery</span>
+                <span className="font-mono">{deliveryFee.toFixed(3)} BHD</span>
+              </div>
+              <div className="flex justify-between items-center text-xl font-bold text-[#7C3AED] mt-4 pt-4 border-t border-dashed border-gray-300 print-color-exact">
+                <span className="uppercase">Total</span>
+                <span>{total.toFixed(3)} BHD</span>
+              </div>
+            </div>
+
+            {/* BARCODE */}
+            <div className="w-full flex flex-col items-center mt-auto pt-4">
+              <div
+                className="h-10 w-full mb-2 opacity-80 print-color-exact"
+                style={{
+                  background: `repeating-linear-gradient(90deg, #333 0px, #333 2px, transparent 2px, transparent 4px, #333 4px, #333 6px, transparent 6px, transparent 9px)`
+                }}
+              ></div>
+              <div className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.2em] text-gray-600 uppercase">
+                Thank you for shopping!
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* PRINT BUTTON */}
+        <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50 print:hidden">
+          <button
+            onClick={() => window.print()}
+            className="pointer-events-auto shadow-2xl flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-full font-bold text-sm hover:bg-purple-600 transition-colors border-2 border-white/20"
+          >
+            <Printer size={20} /> PRINT RECEIPT
+          </button>
+        </div>
+
+      </div>
+
+      {/* PRINT STYLES */}
+      <style>{`
+        @media print {
+          body > * { display: none !important; }
+          .fixed.inset-0.z-\\[9999\\] {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
+            width: 100% !important; height: 100% !important;
+            background: white !important;
+            padding: 0 !important;
+          }
+          #receipt-card {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+          #receipt-card * { visibility: visible !important; }
+          /* FORCE COLORS TO PRINT */
+          .print-color-exact {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
 // --- NEW ANALYTICS COMPONENT ---
 const AnalyticsSummary = ({ products, orders }) => {
   // 1. Calculate Revenue (Only delivered/completed orders)
@@ -364,6 +517,12 @@ const AdminDashboard = ({
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("orders");
   const [editableContent, setEditableContent] = useState(content);
+  // --- NEW STATES & LOGIC ---
+  const [receiptOrder, setReceiptOrder] = useState(null);
+
+  const updateOrderJourney = async (orderId, newJourney) => {
+    await updateDoc(doc(db, "orders", orderId), { journeyStatus: newJourney });
+  };
   // --- PASTE THIS HERE ---
   const toggleArchiveStatus = async (product) => {
     const newStatus = !product.archived;
@@ -640,16 +799,36 @@ const AdminDashboard = ({
       await deleteDoc(doc(db, "orders", orderId));
   };
 
-  // --- ADD THIS NEW ONE HERE ---
+  // --- UPDATED: Smart Item Addition ---
   const addItemToOrder = async (orderId, currentItems, product) => {
-    const newItem = {
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      qty: 1,
-      image: product.image
-    };
-    const updatedItems = { ...currentItems, [product.id]: newItem };
+    // 1. Check if the item already exists in the order
+    const existingItem = currentItems[product.id];
+    let updatedItems;
+
+    if (existingItem) {
+      // 2. If it exists, create a copy and increase qty by 1
+      updatedItems = {
+        ...currentItems,
+        [product.id]: {
+          ...existingItem,
+          qty: existingItem.qty + 1
+        }
+      };
+    } else {
+      // 3. If it's new, add it with qty 1
+      updatedItems = {
+        ...currentItems,
+        [product.id]: {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          qty: 1,
+          image: product.image
+        }
+      };
+    }
+
+    // 4. Update Firebase
     await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
   };
 
@@ -903,18 +1082,45 @@ const AdminDashboard = ({
                         <Calendar size={12} />{" "}
                         {new Date(order.date).toLocaleString()}
                       </p>
+                      {/* ✨ NEW: ORDER JOURNEY DROPDOWN */}
+                      <div className="relative mt-2">
+                        <select
+                          value={order.journeyStatus || "Payment Under Verification"}
+                          onChange={(e) => updateOrderJourney(order.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()} // Prevents clicking the card
+                          className="appearance-none pl-2 pr-6 py-1.5 rounded-lg text-[10px] font-bold uppercase cursor-pointer border border-purple-100 bg-purple-50 text-purple-700 focus:outline-none focus:ring-1 focus:ring-purple-500 w-full tracking-wide transition-colors hover:bg-purple-100"
+                        >
+                          <option value="Payment Under Verification">Payment Under Verification</option>
+                          <option value="Payment Verified">Payment Verified</option>
+                          <option value="Processing Order">Processing Order</option>
+                          <option value="Ready for Pickup">Ready for Pickup</option>
+                          <option value="Out for Delivery">Out for Delivery</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                        <ChevronDown
+                          size={10}
+                          className="absolute right-2 top-2 pointer-events-none text-purple-400"
+                        />
+                      </div>
                     </div>
 
                     <div className="text-right w-full md:w-auto flex flex-row md:flex-col justify-between items-center md:items-end">
                       <p className="text-xl font-bold text-purple-600">
                         {order.total?.toFixed(3)} BHD
                       </p>
-                      <button
-                        onClick={() => generateReceipt(order)}
-                        className="text-xs flex items-center gap-1 text-gray-500 hover:text-purple-600 mt-0 md:mt-2"
-                      >
-                        <Download size={14} /> Receipt
-                      </button>
+                      {/* 💎 DOWNLOAD PDF BUTTON (No more Print) */}
+                      <div className="flex gap-2 mt-2 justify-end">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generateReceipt(order); // Calls the new generator
+                          }}
+                          className="text-xs flex items-center gap-1 text-white font-bold bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded border border-purple-600 shadow-sm transition-all"
+                          title="Download Official Receipt"
+                        >
+                          <Download size={14} /> Download Receipt
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1641,6 +1847,13 @@ const AdminDashboard = ({
           </div>
         </form>
       )}
+      {/* ✨ RENDER RECEIPT MODAL */}
+      {receiptOrder && (
+        <OrderReceiptModal
+          order={receiptOrder}
+          onClose={() => setReceiptOrder(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1657,11 +1870,209 @@ export default function App() {
     }
     link.href = LOGO_URL;
   }, []);
+// --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
+const generateReceipt = async (order) => {
+  // 1. CALCULATE HEIGHT BEFORE CREATING PDF
+  const items = Object.values(order.items || {});
+  const itemCount = items.length;
+  
+  // Check for notes/address to add extra space
+  const methodRaw = order.customer?.deliveryMethod || order.method || "Pickup";
+  let noteText = "";
+  if (methodRaw.toLowerCase() === 'delivery') noteText = order.customer?.deliveryAddress || "";
+  else noteText = order.customer?.meetupNote || "";
+  
+  const hasNote = noteText && noteText !== "N/A" && noteText.trim() !== "";
 
+  // Math: Base Header/Footer (130mm) + Items (7mm each) + Note Buffer (20mm)
+  const dynamicHeight = 130 + (itemCount * 7) + (hasNote ? 20 : 0);
+
+  // 2. SETUP PDF WITH CALCULATED HEIGHT
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [80, dynamicHeight] // <--- THIS CUTS THE PAPER TO FIT!
+  });
+  
+  const centerX = 40; 
+  let y = 10; 
+
+  // --- HELPER: Circular Image ---
+  const loadCircularImage = (url) => {
+    return new Promise((resolve) => {
+      if (!url) return resolve(null);
+      const img = new Image();
+      img.src = url;
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = Math.min(img.width, img.height);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve(null);
+    });
+  };
+
+  // 3. 🌸 LOGO & HEADER
+  const logoData = await loadCircularImage(LOGO_URL);
+  if (logoData) {
+    doc.addImage(logoData, "PNG", centerX - 9, y, 18, 18);
+    y += 24; 
+  }
+  
+  doc.setFont("times", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Shepherdess", centerX, y, null, "center");
+  y += 5;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(124, 58, 237); 
+  doc.text("K-BEAUTY STORE", centerX, y, null, "center");
+  y += 8;
+
+  // 4. 🆔 ORDER INFO
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  const cleanId = order.orderId.replace('#', '');
+  doc.text(`ORDER #${cleanId}`, centerX, y, null, "center");
+  y += 5;
+
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.setFont("helvetica", "normal");
+  doc.text(new Date(order.date).toLocaleDateString(), centerX, y, null, "center");
+  y += 6;
+
+  // --- DASHED DIVIDER ---
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineDash([1, 1], 0);
+  doc.line(6, y, 74, y);
+  y += 6;
+
+  // 5. 👤 CUSTOMER DETAILS
+  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+  
+  const drawRow = (label, value) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, 6, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(value, 74, y, null, "right");
+    y += 5;
+  };
+
+  drawRow("Customer:", order.customer?.name || "Guest");
+  drawRow("Phone:", order.customer?.phone || "N/A");
+  drawRow("Method:", methodRaw.toUpperCase());
+  
+  // --- NOTE / ADDRESS ---
+  if (hasNote) {
+      y += 1;
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(7);
+      const splitNote = doc.splitTextToSize(noteText, 65);
+      doc.text(splitNote, centerX, y, null, "center");
+      y += (splitNote.length * 3.5) + 2; 
+      doc.setTextColor(0, 0, 0);
+  } else {
+      y += 2;
+  }
+
+  // --- DASHED DIVIDER ---
+  doc.setLineDash([1, 1], 0);
+  doc.setDrawColor(200, 200, 200);
+  doc.line(6, y, 74, y);
+  y += 6;
+
+  // 6. 🛒 ITEMS LIST
+  items.forEach(item => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    
+    let name = item.name;
+    if (name.length > 22) name = name.substring(0, 20) + "...";
+
+    doc.text(`${item.qty}x ${name}`, 6, y);
+    
+    doc.setFont("courier", "bold");
+    doc.text(`${(item.price * item.qty).toFixed(3)}`, 74, y, null, "right");
+    y += 5;
+  });
+
+  y += 2;
+  // --- SOLID TOTALS LINE ---
+  doc.setLineDash([], 0);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.line(6, y, 74, y);
+  y += 6;
+
+  // 7. 💰 TOTALS
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  
+  const subtotal = order.items ? Object.values(order.items).reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
+  const deliveryFee = order.deliveryFee || 0;
+  const total = subtotal + deliveryFee;
+
+  doc.text("Subtotal", 6, y);
+  doc.text(`${subtotal.toFixed(3)} BHD`, 74, y, null, "right");
+  y += 5;
+
+  doc.text("Delivery", 6, y);
+  doc.text(`${deliveryFee.toFixed(3)} BHD`, 74, y, null, "right");
+  y += 8;
+
+  // GRAND TOTAL
+  doc.setTextColor(124, 58, 237); 
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("TOTAL", 6, y);
+  doc.text(`${total.toFixed(3)} BHD`, 74, y, null, "right");
+  y += 12;
+
+  // 8. ║█║ BARCODE (Bottom Anchor)
+  doc.setFillColor(0, 0, 0);
+  const barcodeH = 12; 
+  const barcodeW = 60;
+  const startX = (80 - barcodeW) / 2; 
+  const endX = startX + barcodeW;    
+  
+  let currentBarX = startX;
+  while(currentBarX < endX) {
+      const w = Math.random() > 0.5 ? 1.5 : 0.6; 
+      if (currentBarX + w > endX) break;
+      doc.rect(currentBarX, y, w, barcodeH, "F");
+      const gap = Math.random() > 0.5 ? 0.5 : 0.8;
+      currentBarX += w + gap;
+  }
+  
+  y += barcodeH + 4;
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("courier", "normal");
+  doc.setFontSize(9);
+  doc.text("THANK YOU FOR SHOPPING!", centerX, y, null, "center");
+
+  doc.save(`Receipt-${cleanId}.pdf`);
+};
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [promotions, setPromotions] = useState([]);
+  // Add this with your other states inside App()
+  const [customerReceipt, setCustomerReceipt] = useState(null);
 
   // --- LOAD/SAVE CART ---
   const [cart, setCart] = useState(() => {
@@ -1830,78 +2241,7 @@ export default function App() {
       return { ...prev, [id]: { ...item, qty: newQty } };
     });
   };
-  // --- Helper: Generate PDF Receipt ---
-  const generateReceipt = (orderData) => {
-    const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(20);
-    doc.text("Shepherdess K-Beauty", 14, 22);
-    doc.setFontSize(10);
-    doc.text("Authentic Korean Skincare", 14, 28);
-
-    // Order Details
-    doc.setFontSize(12);
-    doc.text(`Order Receipt: ${orderData.orderId}`, 14, 40);
-    doc.setFontSize(10);
-    doc.text(`Date: ${new Date(orderData.date).toLocaleDateString()}`, 14, 46);
-    doc.text(`Customer: ${orderData.customer.name}`, 14, 52);
-    doc.text(`Phone: ${orderData.customer.phone}`, 14, 58);
-
-    // --- ADDED: DELIVERY/MEETUP INFO ---
-    doc.setFont("helvetica", "bold");
-    const methodTitle = orderData.customer.deliveryMethod === 'delivery' ? 'Delivery' :
-      orderData.customer.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
-    doc.text(`Method: ${methodTitle}`, 14, 64);
-    doc.setFont("helvetica", "normal");
-
-    const deliveryInfo = orderData.customer.deliveryMethod === 'delivery'
-      ? orderData.customer.deliveryAddress
-      : orderData.customer.meetupNote;
-    doc.text(`${deliveryInfo}`, 14, 70);
-
-    // Table (startY moved to 78 to make room for delivery info)
-    const tableColumn = ["Item", "Qty", "Price", "Total"];
-    const tableRows = [];
-
-    Object.values(orderData.items).forEach((item) => {
-      const itemData = [
-        item.name,
-        item.qty,
-        `${item.price.toFixed(3)} BHD`,
-        `${(item.price * item.qty).toFixed(3)} BHD`,
-      ];
-      tableRows.push(itemData);
-    });
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 78,
-      theme: "grid",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [147, 51, 234] }, // Purple color
-    });
-
-    // Total Section
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Subtotal: ${orderData.subtotal.toFixed(3)} BHD`, 14, finalY);
-    doc.text(`Delivery Fee: ${orderData.deliveryFee.toFixed(3)} BHD`, 14, finalY + 6);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total Amount: ${orderData.total.toFixed(3)} BHD`, 14, finalY + 14);
-
-    // Footer Note
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Status: Payment Under Verification", 14, finalY + 24);
-    doc.text("Thank you for shopping with Shepherdess!", 14, finalY + 30);
-
-    doc.save(`Shepherdess-Receipt-${orderData.orderId}.pdf`);
-  };
   // Helper to generate short ID
   const generateOrderId = () => {
     return "#" + Math.floor(100000 + Math.random() * 900000).toString();
@@ -2227,7 +2567,6 @@ export default function App() {
       {/* DASHBOARD OR SHOP */}
       {viewMode === "dashboard" && isAdmin ? (
         <AdminDashboard
-          generateReceipt={generateReceipt} // <--- ADD THIS LINE!
           db={db}
           products={products}
           content={shopContent}
@@ -2245,6 +2584,7 @@ export default function App() {
           onAddPromotion={handleAddPromotion}
           onUpdatePromotion={handleUpdatePromotion}
           onDeletePromotion={handleDeletePromotion}
+          generateReceipt={generateReceipt}
         />
       ) : (
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -2460,8 +2800,11 @@ export default function App() {
                     <p className="text-xl font-mono font-bold text-purple-600 mb-2">{lastOrder?.orderId || "#ORDER"}</p>
                     <p className="text-gray-500 text-sm max-w-xs mx-auto">Your order has been received and is waiting for payment verification.</p>
                   </div>
-                  <button onClick={() => generateReceipt(lastOrder)} className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg">
-                    <Download size={18} /> Download Receipt (PDF)
+                  <button
+                    onClick={() => generateReceipt(lastOrder)}
+                    className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all w-full shadow-lg"
+                  >
+                    <Download size={18} /> Download Receipt PDF
                   </button>
                   {/* WhatsApp Button: Aesthetic Unicode Edition ♡ */}
                   <a
@@ -2811,6 +3154,13 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+      {/* CUSTOMER RECEIPT MODAL */}
+      {customerReceipt && (
+        <OrderReceiptModal
+          order={customerReceipt}
+          onClose={() => setCustomerReceipt(null)}
+        />
       )}
     </div>
   );
