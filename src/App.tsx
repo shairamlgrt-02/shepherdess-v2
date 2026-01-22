@@ -653,1258 +653,1246 @@ const AdminDashboard = ({
   };
 
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("date", "desc"));
+    // 1. FETCH EVERYTHING: We remove "orderBy" to get ALL orders (Old & New)
+    const q = query(collection(db, "orders"));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const allOrders = snapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        // 2. THE TRANSLATOR: Standardize the time for the Dashboard
+        let usableDate = new Date(); // Fallback default
+
+        if (data.createdAt && data.createdAt.seconds) {
+          // Case A: It's a NEW order (Firestore Timestamp) -> Convert to Date
+          usableDate = new Date(data.createdAt.seconds * 1000);
+        } else if (data.date) {
+          // Case B: It's an OLD order (String or Date) -> Use as is
+          usableDate = new Date(data.date);
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          // We save this standardized "date" so your UI works for EVERY order
+          date: usableDate
+        };
+      });
+
+      // 3. SORTING: We do the sorting here in the browser to mix them correctly
+      const sortedOrders = allOrders.sort((a, b) => b.date - a.date);
+
+      setOrders(sortedOrders);
     });
     return () => unsubscribe();
   }, [db]);
 
-  useEffect(() => {
-    setEditableContent(content);
-  }, [content]);
-  useEffect(() => {
-    setLocalCategories(categories);
-  }, [categories]);
+  return result;
+}, [orders, orderSearch, orderSort, filterStatus]);
 
-  // --- FILTERED ORDERS LOGIC ---
-  const filteredOrders = useMemo(() => {
-    let result = [...orders];
-
-    // 1. Search
-    if (orderSearch) {
-      const search = orderSearch.toLowerCase();
-      result = result.filter(
-        (order) =>
-          (order.orderId && order.orderId.toLowerCase().includes(search)) ||
-          (order.customer?.name &&
-            order.customer.name.toLowerCase().includes(search)) ||
-          (order.customer?.phone && order.customer.phone.includes(search))
-      );
-    }
-
-    // 2. Status Filter (NEW)
-    if (filterStatus !== "all") {
-      result = result.filter((o) => (o.status || "pending") === filterStatus);
-    }
-
-    // 3. Sorting
-    result.sort((a, b) => {
-      const statusA = a.status || "pending";
-      const statusB = b.status || "pending";
-
-      if (orderSort === "date-desc") return new Date(b.date) - new Date(a.date);
-      if (orderSort === "date-asc") return new Date(a.date) - new Date(b.date);
-      // Removed "Group by Status" sort because the Filter is better
-      return 0;
-    });
-
-    return result;
-  }, [orders, orderSearch, orderSort, filterStatus]);
-
-  // --- HANDLERS ---
-  const handleProductSubmit = (e) => {
-    e.preventDefault();
-    const formattedData = {
-      ...productForm,
-      price: parseFloat(productForm.price),
-      originalPrice: productForm.originalPrice
-        ? parseFloat(productForm.originalPrice)
-        : null,
-      stock: parseInt(productForm.stock),
-      active: true,
-    };
-    if (editingId) onUpdateProduct(editingId, formattedData);
-    else onAddProduct(formattedData);
-    setProductForm({
-      name: "",
-      category: "",
-      subcategory: "",
-      price: "",
-      originalPrice: "",
-      stock: "",
-      expiryDate: "",
-      description: "",
-      image: "",
-    });
-    setEditingId(null);
-    setShowProductForm(false);
+// --- HANDLERS ---
+const handleProductSubmit = (e) => {
+  e.preventDefault();
+  const formattedData = {
+    ...productForm,
+    price: parseFloat(productForm.price),
+    originalPrice: productForm.originalPrice
+      ? parseFloat(productForm.originalPrice)
+      : null,
+    stock: parseInt(productForm.stock),
+    active: true,
   };
+  if (editingId) onUpdateProduct(editingId, formattedData);
+  else onAddProduct(formattedData);
+  setProductForm({
+    name: "",
+    category: "",
+    subcategory: "",
+    price: "",
+    originalPrice: "",
+    stock: "",
+    expiryDate: "",
+    description: "",
+    image: "",
+  });
+  setEditingId(null);
+  setShowProductForm(false);
+};
 
-  const startEditProduct = (product) => {
-    setProductForm({
-      name: product.name,
-      category: product.category,
-      subcategory: product.subcategory || "",
-      price: product.price,
-      originalPrice: product.originalPrice || "",
-      stock: product.stock,
-      expiryDate: product.expiryDate || "",
-      description: product.description || "",
-      image: product.image || "",
-    });
-    setEditingId(product.id);
-    setShowProductForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+const startEditProduct = (product) => {
+  setProductForm({
+    name: product.name,
+    category: product.category,
+    subcategory: product.subcategory || "",
+    price: product.price,
+    originalPrice: product.originalPrice || "",
+    stock: product.stock,
+    expiryDate: product.expiryDate || "",
+    description: product.description || "",
+    image: product.image || "",
+  });
+  setEditingId(product.id);
+  setShowProductForm(true);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 
-  const handleContentSubmit = (e) => {
-    e.preventDefault();
-    onUpdateContent(editableContent);
-  };
-  const addMainCategory = () => {
-    if (!newMainCat) return;
-    onUpdateCategories({ ...localCategories, [newMainCat]: [] });
-    setNewMainCat("");
-  };
-  const deleteMainCategory = (cat) => {
-    if (!window.confirm(`Delete ${cat}?`)) return;
-    const updated = { ...localCategories };
-    delete updated[cat];
-    onUpdateCategories(updated);
-  };
-  const addSubCategory = () => {
-    if (!newSubCat.main || !newSubCat.sub) return;
-    onUpdateCategories({
-      ...localCategories,
-      [newSubCat.main]: [
-        ...(localCategories[newSubCat.main] || []),
-        newSubCat.sub,
-      ],
-    });
-    setNewSubCat({ ...newSubCat, sub: "" });
-  };
-  const deleteSubCategory = (main, sub) => {
-    onUpdateCategories({
-      ...localCategories,
-      [main]: localCategories[main].filter((s) => s !== sub),
-    });
-  };
+const handleContentSubmit = (e) => {
+  e.preventDefault();
+  onUpdateContent(editableContent);
+};
+const addMainCategory = () => {
+  if (!newMainCat) return;
+  onUpdateCategories({ ...localCategories, [newMainCat]: [] });
+  setNewMainCat("");
+};
+const deleteMainCategory = (cat) => {
+  if (!window.confirm(`Delete ${cat}?`)) return;
+  const updated = { ...localCategories };
+  delete updated[cat];
+  onUpdateCategories(updated);
+};
+const addSubCategory = () => {
+  if (!newSubCat.main || !newSubCat.sub) return;
+  onUpdateCategories({
+    ...localCategories,
+    [newSubCat.main]: [
+      ...(localCategories[newSubCat.main] || []),
+      newSubCat.sub,
+    ],
+  });
+  setNewSubCat({ ...newSubCat, sub: "" });
+};
+const deleteSubCategory = (main, sub) => {
+  onUpdateCategories({
+    ...localCategories,
+    [main]: localCategories[main].filter((s) => s !== sub),
+  });
+};
 
-  const filteredPromoProducts = useMemo(
-    () =>
-      products.filter((p) =>
-        // The fix is here: we added (p.name || "")
-        (p.name || "").toLowerCase().includes(promoSearchQuery.toLowerCase())
-      ),
-    [products, promoSearchQuery]
-  );
+const filteredPromoProducts = useMemo(
+  () =>
+    products.filter((p) =>
+      // The fix is here: we added (p.name || "")
+      (p.name || "").toLowerCase().includes(promoSearchQuery.toLowerCase())
+    ),
+  [products, promoSearchQuery]
+);
 
-  const togglePromoProduct = (id) =>
-    setNewPromo((prev) => ({
-      ...prev,
-      productIds: prev.productIds.includes(id)
-        ? prev.productIds.filter((pid) => pid !== id)
-        : [...prev.productIds, id],
-    }));
-  const selectAllFiltered = () =>
-    setNewPromo((prev) => ({
-      ...prev,
-      productIds: [
-        ...new Set([
-          ...prev.productIds,
-          ...filteredPromoProducts.map((p) => p.id),
-        ]),
-      ],
-    }));
-  const deselectAllFiltered = () =>
-    setNewPromo((prev) => ({
-      ...prev,
-      productIds: prev.productIds.filter(
-        (pid) => !filteredPromoProducts.map((p) => p.id).includes(pid)
-      ),
-    }));
+const togglePromoProduct = (id) =>
+  setNewPromo((prev) => ({
+    ...prev,
+    productIds: prev.productIds.includes(id)
+      ? prev.productIds.filter((pid) => pid !== id)
+      : [...prev.productIds, id],
+  }));
+const selectAllFiltered = () =>
+  setNewPromo((prev) => ({
+    ...prev,
+    productIds: [
+      ...new Set([
+        ...prev.productIds,
+        ...filteredPromoProducts.map((p) => p.id),
+      ]),
+    ],
+  }));
+const deselectAllFiltered = () =>
+  setNewPromo((prev) => ({
+    ...prev,
+    productIds: prev.productIds.filter(
+      (pid) => !filteredPromoProducts.map((p) => p.id).includes(pid)
+    ),
+  }));
 
-  const savePromo = (e) => {
-    e.preventDefault();
-    if (isEditingPromo) {
-      onUpdatePromotion(isEditingPromo, newPromo);
-      setIsEditingPromo(null);
-    } else onAddPromotion(newPromo);
-    setNewPromo({ title: "", productIds: [] });
-    setPromoSearchQuery("");
-  };
+const savePromo = (e) => {
+  e.preventDefault();
+  if (isEditingPromo) {
+    onUpdatePromotion(isEditingPromo, newPromo);
+    setIsEditingPromo(null);
+  } else onAddPromotion(newPromo);
+  setNewPromo({ title: "", productIds: [] });
+  setPromoSearchQuery("");
+};
 
-  const updateOrderStatus = async (orderId, newStatus) => {
-    await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-  };
+const updateOrderStatus = async (orderId, newStatus) => {
+  await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+};
 
-  const updateOrderNote = async (orderId, note) => {
-    await updateDoc(doc(db, "orders", orderId), { adminNote: note });
-  };
+const updateOrderNote = async (orderId, note) => {
+  await updateDoc(doc(db, "orders", orderId), { adminNote: note });
+};
 
-  const updateOrderTotal = async (orderId, newTotal) => {
-    await updateDoc(doc(db, "orders", orderId), { total: parseFloat(newTotal) });
-  };
+const updateOrderTotal = async (orderId, newTotal) => {
+  await updateDoc(doc(db, "orders", orderId), { total: parseFloat(newTotal) });
+};
 
-  const deleteOrder = async (orderId) => {
-    if (window.confirm("Delete order?"))
-      await deleteDoc(doc(db, "orders", orderId));
-  };
+const deleteOrder = async (orderId) => {
+  if (window.confirm("Delete order?"))
+    await deleteDoc(doc(db, "orders", orderId));
+};
 
-  // --- UPDATED: Smart Item Addition ---
-  const addItemToOrder = async (orderId, currentItems, product) => {
-    // 1. Check if the item already exists in the order
-    const existingItem = currentItems[product.id];
-    let updatedItems;
+// --- UPDATED: Smart Item Addition ---
+const addItemToOrder = async (orderId, currentItems, product) => {
+  // 1. Check if the item already exists in the order
+  const existingItem = currentItems[product.id];
+  let updatedItems;
 
-    if (existingItem) {
-      // 2. If it exists, create a copy and increase qty by 1
-      updatedItems = {
-        ...currentItems,
-        [product.id]: {
-          ...existingItem,
-          qty: existingItem.qty + 1
-        }
-      };
-    } else {
-      // 3. If it's new, add it with qty 1
-      updatedItems = {
-        ...currentItems,
-        [product.id]: {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          qty: 1,
-          image: product.image
-        }
-      };
-    }
-
-    // 4. Update Firebase
-    await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
-  };
-
-  // --- FILTERED INVENTORY (Smart Stack Sort) ---
-  const filteredInventory = useMemo(() => {
-    let data = [...products];
-
-    // 1. ARCHIVE & SEARCH & CATEGORY FILTERS (Standard)
-    if (showArchived) data = data.filter((p) => p.archived === true);
-    else data = data.filter((p) => !p.archived);
-
-    if (invSearch) data = data.filter((p) => (p.name || "").toLowerCase().includes(invSearch.toLowerCase()));
-
-    if (invCategory !== "All") data = data.filter((p) => p.category === invCategory);
-    if (invCategory !== "All" && invSubCategory !== "All") data = data.filter((p) => p.subcategory === invSubCategory);
-
-    if (hideOutOfStock) data = data.filter((p) => (p.stock || 0) > 0);
-
-    // 2. NEW: VISIBILITY FILTER 👁️
-    if (visFilter === "visible") data = data.filter(p => p.active);
-    if (visFilter === "hidden") data = data.filter(p => !p.active);
-
-    // 3. ✨ POWER MULTI-COLUMN SORTING (With Chronological Expiry)
-    data.sort((a, b) => {
-      for (const sort of sortConfig) {
-        let aVal = a[sort.key] ?? 0;
-        let bVal = b[sort.key] ?? 0;
-
-        if (sort.key === "name") {
-          aVal = (a.name || "").toLowerCase();
-          bVal = (b.name || "").toLowerCase();
-        } else if (sort.key === "expiryDate") {
-          // 💡 This turns "2025-01-01" into a number. 
-          // Missing dates are set to a huge number so they always stay at the bottom.
-          aVal = a.expiryDate ? new Date(a.expiryDate).getTime() : 9999999999999;
-          bVal = b.expiryDate ? new Date(b.expiryDate).getTime() : 9999999999999;
-        } else {
-          aVal = Number(aVal);
-          bVal = Number(bVal);
-        }
-
-        if (aVal !== bVal) {
-          if (aVal < bVal) return sort.direction === "asc" ? -1 : 1;
-          if (aVal > bVal) return sort.direction === "asc" ? 1 : -1;
-        }
+  if (existingItem) {
+    // 2. If it exists, create a copy and increase qty by 1
+    updatedItems = {
+      ...currentItems,
+      [product.id]: {
+        ...existingItem,
+        qty: existingItem.qty + 1
       }
-      return 0;
-    });
+    };
+  } else {
+    // 3. If it's new, add it with qty 1
+    updatedItems = {
+      ...currentItems,
+      [product.id]: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        qty: 1,
+        image: product.image
+      }
+    };
+  }
 
-    return data;
-  }, [products, invSearch, invCategory, invSubCategory, sortConfig, hideOutOfStock, showArchived, visFilter]);
+  // 4. Update Firebase
+  await updateDoc(doc(db, "orders", orderId), { items: updatedItems });
+};
+
+// --- FILTERED INVENTORY (Smart Stack Sort) ---
+const filteredInventory = useMemo(() => {
+  let data = [...products];
+
+  // 1. ARCHIVE & SEARCH & CATEGORY FILTERS (Standard)
+  if (showArchived) data = data.filter((p) => p.archived === true);
+  else data = data.filter((p) => !p.archived);
+
+  if (invSearch) data = data.filter((p) => (p.name || "").toLowerCase().includes(invSearch.toLowerCase()));
+
+  if (invCategory !== "All") data = data.filter((p) => p.category === invCategory);
+  if (invCategory !== "All" && invSubCategory !== "All") data = data.filter((p) => p.subcategory === invSubCategory);
+
+  if (hideOutOfStock) data = data.filter((p) => (p.stock || 0) > 0);
+
+  // 2. NEW: VISIBILITY FILTER 👁️
+  if (visFilter === "visible") data = data.filter(p => p.active);
+  if (visFilter === "hidden") data = data.filter(p => !p.active);
+
+  // 3. ✨ POWER MULTI-COLUMN SORTING (With Chronological Expiry)
+  data.sort((a, b) => {
+    for (const sort of sortConfig) {
+      let aVal = a[sort.key] ?? 0;
+      let bVal = b[sort.key] ?? 0;
+
+      if (sort.key === "name") {
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
+      } else if (sort.key === "expiryDate") {
+        // 💡 This turns "2025-01-01" into a number. 
+        // Missing dates are set to a huge number so they always stay at the bottom.
+        aVal = a.expiryDate ? new Date(a.expiryDate).getTime() : 9999999999999;
+        bVal = b.expiryDate ? new Date(b.expiryDate).getTime() : 9999999999999;
+      } else {
+        aVal = Number(aVal);
+        bVal = Number(bVal);
+      }
+
+      if (aVal !== bVal) {
+        if (aVal < bVal) return sort.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return sort.direction === "asc" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  return data;
+}, [products, invSearch, invCategory, invSubCategory, sortConfig, hideOutOfStock, showArchived, visFilter]);
 
 
-  // Counts for Filter Badges
-  const getCount = (status) =>
-    orders.filter((o) => (o.status || "pending") === status).length;
+// Counts for Filter Badges
+const getCount = (status) =>
+  orders.filter((o) => (o.status || "pending") === status).length;
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h2 className="text-3xl font-serif font-bold text-gray-900 mb-8 flex items-center gap-3">
-        <LayoutDashboard className="text-purple-600" /> Admin Dashboard
-      </h2>
+return (
+  <div className="max-w-7xl mx-auto px-4 py-8">
+    <h2 className="text-3xl font-serif font-bold text-gray-900 mb-8 flex items-center gap-3">
+      <LayoutDashboard className="text-purple-600" /> Admin Dashboard
+    </h2>
 
-      <AnalyticsSummary products={products} orders={orders} />
+    <AnalyticsSummary products={products} orders={orders} />
 
-      {/* Main Navigation Tabs */}
-      <div className="flex gap-4 mb-8 border-b border-gray-200 overflow-x-auto">
-        {[
-          { id: "orders", icon: Users, label: "Orders" },
-          { id: "inventory", icon: Package, label: "Inventory" },
-          { id: "categories", icon: ListFilter, label: "Categories" },
-          { id: "promos", icon: Tag, label: "Promotions" },
-          { id: "content", icon: Settings, label: "Content" },
-          { id: "wa-templates", icon: MessageCircle, label: "WA Templates" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${tab === t.id
-              ? "border-purple-600 text-purple-600"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-          >
-            <t.icon size={18} /> {t.label}
-          </button>
-        ))}
-      </div>
+    {/* Main Navigation Tabs */}
+    <div className="flex gap-4 mb-8 border-b border-gray-200 overflow-x-auto">
+      {[
+        { id: "orders", icon: Users, label: "Orders" },
+        { id: "inventory", icon: Package, label: "Inventory" },
+        { id: "categories", icon: ListFilter, label: "Categories" },
+        { id: "promos", icon: Tag, label: "Promotions" },
+        { id: "content", icon: Settings, label: "Content" },
+        { id: "wa-templates", icon: MessageCircle, label: "WA Templates" },
+      ].map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTab(t.id)}
+          className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${tab === t.id
+            ? "border-purple-600 text-purple-600"
+            : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+        >
+          <t.icon size={18} /> {t.label}
+        </button>
+      ))}
+    </div>
 
-      {/* --- ORDERS TAB --- */}
-      {tab === "orders" && (
-        <div className="space-y-4">
-          {/* 1. FILTER TABS (View Only specific status) */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {[
-              {
-                id: "all",
-                label: "All Orders",
-                count: orders.length,
-                color: "bg-gray-100 text-gray-700",
-              },
-              {
-                id: "pending",
-                label: "Pending",
-                count: getCount("pending"),
-                color: "bg-amber-100 text-amber-800",
-              },
-              {
-                id: "confirmed",
-                label: "Confirmed",
-                count: getCount("confirmed"),
-                color: "bg-blue-100 text-blue-800",
-              },
-              {
-                id: "delivered",
-                label: "Delivered",
-                count: getCount("delivered"),
-                color: "bg-green-100 text-green-800",
-              },
-              {
-                id: "canceled",
-                label: "Canceled",
-                count: getCount("canceled"),
-                color: "bg-red-100 text-red-800",
-              },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilterStatus(f.id)}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${filterStatus === f.id
-                  ? "ring-2 ring-purple-500 ring-offset-1 border-transparent transform scale-105"
-                  : "border-transparent opacity-70 hover:opacity-100"
-                  } ${f.color}`}
-              >
-                {f.label} ({f.count})
-              </button>
-            ))}
+    {/* --- ORDERS TAB --- */}
+    {tab === "orders" && (
+      <div className="space-y-4">
+        {/* 1. FILTER TABS (View Only specific status) */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {[
+            {
+              id: "all",
+              label: "All Orders",
+              count: orders.length,
+              color: "bg-gray-100 text-gray-700",
+            },
+            {
+              id: "pending",
+              label: "Pending",
+              count: getCount("pending"),
+              color: "bg-amber-100 text-amber-800",
+            },
+            {
+              id: "confirmed",
+              label: "Confirmed",
+              count: getCount("confirmed"),
+              color: "bg-blue-100 text-blue-800",
+            },
+            {
+              id: "delivered",
+              label: "Delivered",
+              count: getCount("delivered"),
+              color: "bg-green-100 text-green-800",
+            },
+            {
+              id: "canceled",
+              label: "Canceled",
+              count: getCount("canceled"),
+              color: "bg-red-100 text-red-800",
+            },
+          ].map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilterStatus(f.id)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${filterStatus === f.id
+                ? "ring-2 ring-purple-500 ring-offset-1 border-transparent transform scale-105"
+                : "border-transparent opacity-70 hover:opacity-100"
+                } ${f.color}`}
+            >
+              {f.label} ({f.count})
+            </button>
+          ))}
+        </div>
+
+        {/* 2. SEARCH & SORT */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search
+              className="absolute left-3 top-2.5 text-gray-400"
+              size={16}
+            />
+            <input
+              placeholder="Search ID, Name, Phone..."
+              className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              value={orderSearch}
+              onChange={(e) => setOrderSearch(e.target.value)}
+            />
           </div>
-
-          {/* 2. SEARCH & SORT */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-3 top-2.5 text-gray-400"
-                size={16}
-              />
-              <input
-                placeholder="Search ID, Name, Phone..."
-                className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-              />
-            </div>
-            <div className="relative">
-              <Filter
-                className="absolute left-3 top-2.5 text-gray-400"
-                size={16}
-              />
-              <select
-                className="pl-9 pr-8 py-2 border rounded-lg text-sm appearance-none bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={orderSort}
-                onChange={(e) => setOrderSort(e.target.value)}
-              >
-                <option value="date-desc">Newest First</option>
-                <option value="date-asc">Oldest First</option>
-              </select>
-            </div>
+          <div className="relative">
+            <Filter
+              className="absolute left-3 top-2.5 text-gray-400"
+              size={16}
+            />
+            <select
+              className="pl-9 pr-8 py-2 border rounded-lg text-sm appearance-none bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              value={orderSort}
+              onChange={(e) => setOrderSort(e.target.value)}
+            >
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+            </select>
           </div>
+        </div>
 
-          {/* 3. ORDER LIST */}
-          {filteredOrders.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 bg-white rounded-xl border border-dashed">
-              No orders found in this view.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => {
-                const status = order.status || "pending";
-                const statusColors = {
-                  delivered: "border-green-500 bg-green-50/30 text-green-700",
-                  confirmed: "border-blue-500 bg-blue-50/30 text-blue-700",
-                  canceled: "border-red-500 bg-red-50/30 text-red-700",
-                  pending: "border-amber-500 bg-amber-50/30 text-amber-700"
-                };
+        {/* 3. ORDER LIST */}
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-20 text-gray-500 bg-white rounded-xl border border-dashed">
+            No orders found in this view.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders.map((order) => {
+              const status = order.status || "pending";
+              const statusColors = {
+                delivered: "border-green-500 bg-green-50/30 text-green-700",
+                confirmed: "border-blue-500 bg-blue-50/30 text-blue-700",
+                canceled: "border-red-500 bg-red-50/30 text-red-700",
+                pending: "border-amber-500 bg-amber-50/30 text-amber-700"
+              };
 
-                return (
-                  <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-4 md:p-6 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
-                    {/* Status Indicator Line */}
-                    <div className={`absolute top-0 left-0 right-0 h-1 ${statusColors[status].split(' ')[0]}`} />
+              return (
+                <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-4 md:p-6 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+                  {/* Status Indicator Line */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 ${statusColors[status].split(' ')[0]}`} />
 
-                    {/* --- TOP HEADER: NAME, STATUS, DATE, JOURNEY --- */}
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-gray-900 text-lg">{order.customer?.name}</h3>
-                          <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">
-                            {order.orderId}
-                          </span>
-                        </div>
-
-                        {/* Order Status Badge */}
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={status}
-                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                            className={`text-[10px] font-bold uppercase py-1 px-3 rounded-full border cursor-pointer focus:outline-none transition-colors ${statusColors[status]}`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="canceled">Canceled</option>
-                          </select>
-                        </div>
-
-                        {/* Date & Time below Status */}
-                        <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1.5 ml-1">
-                          <Clock size={12} className="opacity-70" />
-                          {new Date(order.date).toLocaleString()}
-                        </p>
-
-                        {/* Detailed Journey below Date */}
-                        <div className="mt-1 ml-1">
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Detailed Journey</label>
-                          <select
-                            value={order.journeyStatus || "pending"}
-                            onChange={(e) => updateDoc(doc(db, "orders", order.id), { journeyStatus: e.target.value })}
-                            className="w-full max-w-[220px] p-2 text-[11px] border border-gray-100 rounded-xl bg-gray-50/50 outline-none focus:ring-1 focus:ring-purple-200 transition-all font-medium text-gray-600"
-                          >
-                            <option value="pending">🕒 Payment Under Verfication</option>
-                            <option value="confirmed">💳 Payment Verified</option>
-                            <option value="packing">📦 Preparing Order</option>
-                            <option value="out_for_delivery">🚚 Out for Delivery</option>
-                            <option value="ready_for_pickup">🏪 Ready for Pickup</option>
-                            <option value="delivered">✅ Order Completed</option>
-                            <option value="canceled"> ❌ Order Canceled</option>
-                          </select>
-                        </div>
+                  {/* --- TOP HEADER: NAME, STATUS, DATE, JOURNEY --- */}
+                  <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 text-lg">{order.customer?.name}</h3>
+                        <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">
+                          {order.orderId}
+                        </span>
                       </div>
 
-                      {/* Right Side: Price & Receipt Link */}
-                      <div className="flex flex-col items-end gap-2">
-                        <p className="text-2xl font-bold text-purple-600 leading-none">
-                          {order.total?.toFixed(3)} <span className="text-xs">BHD</span>
-                        </p>
-                        <button
-                          onClick={() => generateReceipt(order)}
-                          className="text-[11px] font-bold text-gray-400 hover:text-purple-600 flex items-center gap-2 transition-colors bg-white border border-gray-100 px-3 py-1.5 rounded-lg shadow-sm"
+                      {/* Order Status Badge */}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={status}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className={`text-[10px] font-bold uppercase py-1 px-3 rounded-full border cursor-pointer focus:outline-none transition-colors ${statusColors[status]}`}
                         >
-                          <Download size={14} />
-                          <span>Receipt</span>
-                        </button>
+                          <option value="pending">Pending</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="canceled">Canceled</option>
+                        </select>
+                      </div>
+
+                      {/* Date & Time below Status */}
+                      <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1.5 ml-1">
+                        <Clock size={12} className="opacity-70" />
+                        {new Date(order.date).toLocaleString()}
+                      </p>
+
+                      {/* Detailed Journey below Date */}
+                      <div className="mt-1 ml-1">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Detailed Journey</label>
+                        <select
+                          value={order.journeyStatus || "pending"}
+                          onChange={(e) => updateDoc(doc(db, "orders", order.id), { journeyStatus: e.target.value })}
+                          className="w-full max-w-[220px] p-2 text-[11px] border border-gray-100 rounded-xl bg-gray-50/50 outline-none focus:ring-1 focus:ring-purple-200 transition-all font-medium text-gray-600"
+                        >
+                          <option value="pending">🕒 Payment Under Verfication</option>
+                          <option value="confirmed">💳 Payment Verified</option>
+                          <option value="packing">📦 Preparing Order</option>
+                          <option value="out_for_delivery">🚚 Out for Delivery</option>
+                          <option value="ready_for_pickup">🏪 Ready for Pickup</option>
+                          <option value="delivered">✅ Order Completed</option>
+                          <option value="canceled"> ❌ Order Canceled</option>
+                        </select>
                       </div>
                     </div>
 
-                    {/* --- BOTTOM GRID: SHIPPING & ITEMS (NOTES/TOOLS PRESERVED) --- */}
-                    <div className="grid md:grid-cols-2 gap-8 text-sm border-t border-gray-50 pt-6">
+                    {/* Right Side: Price & Receipt Link */}
+                    <div className="flex flex-col items-end gap-2">
+                      <p className="text-2xl font-bold text-purple-600 leading-none">
+                        {order.total?.toFixed(3)} <span className="text-xs">BHD</span>
+                      </p>
+                      <button
+                        onClick={() => generateReceipt(order)}
+                        className="text-[11px] font-bold text-gray-400 hover:text-purple-600 flex items-center gap-2 transition-colors bg-white border border-gray-100 px-3 py-1.5 rounded-lg shadow-sm"
+                      >
+                        <Download size={14} />
+                        <span>Receipt</span>
+                      </button>
+                    </div>
+                  </div>
 
-                      {/* LEFT: Shipping & Proof */}
-                      <div className="space-y-4">
-                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Customer & Shipping</h4>
-                        <div className="flex items-center gap-3 text-gray-700 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-                          <div className="bg-purple-50 p-2 rounded-lg text-purple-600">
-                            {order.customer?.deliveryMethod === 'delivery' ? <Truck size={18} /> : <Store size={18} />}
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-900">{order.customer?.phone}</p>
-                            <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">{order.customer?.deliveryMethod}</p>
-                            <p className="text-xs italic text-gray-500 mt-1">
-                              {order.customer?.deliveryMethod === 'delivery' ? order.customer?.deliveryAddress : order.customer?.meetupNote}
-                            </p>
-                          </div>
+                  {/* --- BOTTOM GRID: SHIPPING & ITEMS (NOTES/TOOLS PRESERVED) --- */}
+                  <div className="grid md:grid-cols-2 gap-8 text-sm border-t border-gray-50 pt-6">
+
+                    {/* LEFT: Shipping & Proof */}
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Customer & Shipping</h4>
+                      <div className="flex items-center gap-3 text-gray-700 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                        <div className="bg-purple-50 p-2 rounded-lg text-purple-600">
+                          {order.customer?.deliveryMethod === 'delivery' ? <Truck size={18} /> : <Store size={18} />}
                         </div>
-
-                        {order.customer?.proof && (
-                          <div className="mt-2">
-                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Payment Proof</label>
-                            <img
-                              src={order.customer.proof}
-                              className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => window.open(order.customer.proof)}
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <p className="font-bold text-gray-900">{order.customer?.phone}</p>
+                          <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">{order.customer?.deliveryMethod}</p>
+                          <p className="text-xs italic text-gray-500 mt-1">
+                            {order.customer?.deliveryMethod === 'delivery' ? order.customer?.deliveryAddress : order.customer?.meetupNote}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* RIGHT: Items & Tools (PRESERVED) */}
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Items</h4>
-                          <span className="text-[10px] italic text-purple-400">(click x to remove)</span>
-                        </div>
-
-                        <ul className="space-y-2">
-                          {order.items && Object.values(order.items).map((i: any) => (
-                            <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50/50 p-2 rounded-xl border border-gray-100 group">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-purple-600">{i.qty}x</span>
-                                <span className="text-gray-700">{i.name}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className="font-mono text-gray-400">{i.price.toFixed(3)}</span>
-                                <button
-                                  onClick={async () => { if (window.confirm("Remove?")) { const n = { ...order.items }; delete n[i.id]; await updateDoc(doc(db, "orders", order.id), { items: n }); } }}
-                                  className="text-gray-300 hover:text-red-500 transition-colors"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {/* PRESERVED: Replacement Tool */}
-                        <div className="p-3 border border-dashed border-purple-100 rounded-xl bg-purple-50/30">
-                          <p className="text-[10px] font-bold text-purple-700 mb-2">✨ ADD REPLACEMENT ITEM</p>
-                          <select
-                            className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none"
-                            onChange={(e) => { const prod = products.find(p => p.id === e.target.value); if (prod) { addItemToOrder(order.id, order.items, prod); e.target.value = ""; } }}
-                          >
-                            <option value="">Select a product to add...</option>
-                            {products.filter(p => p.active && p.stock > 0).map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                          </select>
-                        </div>
-
-                        {/* PRESERVED: Grand Total Adjustment */}
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">Adjust Total:</span>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number" step="0.001" defaultValue={order.total}
-                              onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
-                              className="w-20 p-1 border border-gray-200 rounded text-right font-bold text-purple-600 text-xs"
-                            />
-                            <span className="text-[10px] font-bold text-gray-400">BHD</span>
-                          </div>
-                        </div>
-
-                        {/* PRESERVED: Admin Notes */}
-                        <div>
-                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
-                          <textarea
-                            className="w-full p-3 text-xs border border-gray-100 rounded-xl bg-gray-50/50 outline-none focus:bg-white focus:border-purple-200 transition-all"
-                            placeholder="e.g. Swapped out toner..."
-                            defaultValue={order.adminNote || ""}
-                            rows={2}
-                            onBlur={(e) => updateOrderNote(order.id, e.target.value)}
+                      {order.customer?.proof && (
+                        <div className="mt-2">
+                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Payment Proof</label>
+                          <img
+                            src={order.customer.proof}
+                            className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(order.customer.proof)}
                           />
                         </div>
+                      )}
+                    </div>
+
+                    {/* RIGHT: Items & Tools (PRESERVED) */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Items</h4>
+                        <span className="text-[10px] italic text-purple-400">(click x to remove)</span>
+                      </div>
+
+                      <ul className="space-y-2">
+                        {order.items && Object.values(order.items).map((i: any) => (
+                          <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50/50 p-2 rounded-xl border border-gray-100 group">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-purple-600">{i.qty}x</span>
+                              <span className="text-gray-700">{i.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-gray-400">{i.price.toFixed(3)}</span>
+                              <button
+                                onClick={async () => { if (window.confirm("Remove?")) { const n = { ...order.items }; delete n[i.id]; await updateDoc(doc(db, "orders", order.id), { items: n }); } }}
+                                className="text-gray-300 hover:text-red-500 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* PRESERVED: Replacement Tool */}
+                      <div className="p-3 border border-dashed border-purple-100 rounded-xl bg-purple-50/30">
+                        <p className="text-[10px] font-bold text-purple-700 mb-2">✨ ADD REPLACEMENT ITEM</p>
+                        <select
+                          className="w-full p-2 text-xs border border-purple-100 rounded-lg bg-white outline-none"
+                          onChange={(e) => { const prod = products.find(p => p.id === e.target.value); if (prod) { addItemToOrder(order.id, order.items, prod); e.target.value = ""; } }}
+                        >
+                          <option value="">Select a product to add...</option>
+                          {products.filter(p => p.active && p.stock > 0).map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                        </select>
+                      </div>
+
+                      {/* PRESERVED: Grand Total Adjustment */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Adjust Total:</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number" step="0.001" defaultValue={order.total}
+                            onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
+                            className="w-20 p-1 border border-gray-200 rounded text-right font-bold text-purple-600 text-xs"
+                          />
+                          <span className="text-[10px] font-bold text-gray-400">BHD</span>
+                        </div>
+                      </div>
+
+                      {/* PRESERVED: Admin Notes */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
+                        <textarea
+                          className="w-full p-3 text-xs border border-gray-100 rounded-xl bg-gray-50/50 outline-none focus:bg-white focus:border-purple-200 transition-all"
+                          placeholder="e.g. Swapped out toner..."
+                          defaultValue={order.adminNote || ""}
+                          rows={2}
+                          onBlur={(e) => updateOrderNote(order.id, e.target.value)}
+                        />
                       </div>
                     </div>
-
-                    {/* Action Hub */}
-                    <div className="mt-6 pt-4 border-t border-gray-50 flex justify-end gap-2">
-                      <button onClick={() => setWhatsappOrder(order)} className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-lg text-[10px] font-bold">
-                        <MessageCircle size={14} /> WhatsApp
-                      </button>
-                      <button onClick={() => updateOrderStatus(order.id, "delivered")} className="px-4 py-2 bg-green-500 text-white rounded-lg text-[10px] font-bold">
-                        Quick Deliver
-                      </button>
-                      <button onClick={() => deleteOrder(order.id)} className="p-2 text-gray-300 hover:text-red-500">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* INVENTORY TAB */}
-      {tab === "inventory" && (
-        <div className="space-y-6">
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col md:flex-row gap-2 flex-1 w-full">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                <input
-                  className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm bg-gray-50 focus:bg-white transition-colors"
-                  placeholder="Search product name..."
-                  value={invSearch}
-                  onChange={(e) => setInvSearch(e.target.value)}
-                />
-              </div>
-              <select
-                className="border p-2 rounded-lg text-sm bg-white"
-                value={invCategory}
-                onChange={(e) => {
-                  setInvCategory(e.target.value);
-                  setInvSubCategory("All");
-                }}
-              >
-                <option value="All">All Categories</option>
-                {Object.keys(categories).map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              {invCategory !== "All" && (
-                <select
-                  className="border p-2 rounded-lg text-sm bg-white animate-fade-in"
-                  value={invSubCategory}
-                  onChange={(e) => setInvSubCategory(e.target.value)}
-                >
-                  <option value="All">All {invCategory}</option>
-                  {(categories[invCategory] || []).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* --- TOOLBAR GROUP --- */}
-            <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto mt-3 md:mt-0">
-
-              {/* CLEAR ALL BUTTON */}
-              <button
-                onClick={clearAllFilters}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-bold border border-gray-200 uppercase tracking-tighter hover:bg-red-50 hover:text-red-600 transition-colors"
-              >
-                <RefreshCw size={14} /> Clear All
-              </button>
-
-              {/* TOGGLE SWITCH */}
-              <div
-                onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                className="flex items-center gap-2 cursor-pointer group select-none bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100"
-              >
-                <div className={`relative w-9 h-5 rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
-                  <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow transform transition-transform ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
+                  {/* Action Hub */}
+                  <div className="mt-6 pt-4 border-t border-gray-50 flex justify-end gap-2">
+                    <button onClick={() => setWhatsappOrder(order)} className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-lg text-[10px] font-bold">
+                      <MessageCircle size={14} /> WhatsApp
+                    </button>
+                    <button onClick={() => updateOrderStatus(order.id, "delivered")} className="px-4 py-2 bg-green-500 text-white rounded-lg text-[10px] font-bold">
+                      Quick Deliver
+                    </button>
+                    <button onClick={() => deleteOrder(order.id)} className="p-2 text-gray-300 hover:text-red-500">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-                <span className="text-[9px] font-bold text-gray-500 uppercase">Hide 0</span>
-              </div>
-
-              {/* 2. ARCHIVE BUTTON */}
-              <button
-                onClick={() => setShowArchived(!showArchived)}
-                className={`p-2 rounded-lg transition-all border ${showArchived
-                  ? "bg-amber-100 text-amber-800 border-amber-200"
-                  : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
-                  }`}
-                title={showArchived ? "Back to Inventory" : "View Archived Items"}
-              >
-                {showArchived ? <RefreshCw size={20} /> : <Archive size={20} />}
-              </button>
-
-              {/* 3. ADD PRODUCT BUTTON */}
-              {!showArchived && (
-                <button
-                  onClick={() => {
-                    setEditingId(null);
-                    setProductForm({
-                      name: "", category: Object.keys(categories)[0] || "", subcategory: "", price: "", originalPrice: "", stock: "", expiryDate: "", description: "", image: "",
-                    });
-                    setShowProductForm(!showProductForm);
-                  }}
-                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
-                >
-                  {showProductForm ? <X size={16} /> : <Plus size={16} />}{" "}
-                  {showProductForm ? "Cancel" : "Add Product"}
-                </button>
-              )}
-            </div>
+              );
+            })}
           </div>
+        )}
+      </div>
+    )}
 
-          {showProductForm && (
-            <form
-              onSubmit={handleProductSubmit}
-              className="bg-white border border-purple-200 rounded-xl p-6 shadow-sm space-y-4 animate-fade-in"
+    {/* INVENTORY TAB */}
+    {tab === "inventory" && (
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex flex-col md:flex-row gap-2 flex-1 w-full">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+              <input
+                className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm bg-gray-50 focus:bg-white transition-colors"
+                placeholder="Search product name..."
+                value={invSearch}
+                onChange={(e) => setInvSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="border p-2 rounded-lg text-sm bg-white"
+              value={invCategory}
+              onChange={(e) => {
+                setInvCategory(e.target.value);
+                setInvSubCategory("All");
+              }}
             >
-              <h3 className="font-bold text-gray-900">
-                {editingId ? "Edit Product" : "Add New Product"}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input required placeholder="Name" className="p-3 border rounded-lg text-sm" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
-                <select className="p-3 border rounded-lg text-sm" value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value, subcategory: "" })}>
-                  <option value="">Select Category</option>
-                  {Object.keys(categories).map((c) => (<option key={c} value={c}>{c}</option>))}
-                </select>
-                <select className="p-3 border rounded-lg text-sm" value={productForm.subcategory} onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value })}>
-                  <option value="">Select Subcategory</option>
-                  {(categories[productForm.category] || []).map((s) => (<option key={s} value={s}>{s}</option>))}
-                </select>
-                <div className="flex gap-2">
-                  <input required type="number" step="0.001" placeholder="Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
-                  <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
-                </div>
-                <input required type="number" placeholder="Stock" className="p-3 border rounded-lg text-sm" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
-                <input placeholder="Expiry (YYYY-MM-DD)" className="p-3 border rounded-lg text-sm" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
-                <input placeholder="Image URL" className="p-3 border rounded-lg text-sm" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} />
-                <textarea placeholder="Description" className="p-3 border rounded-lg text-sm md:col-span-2" rows="2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
-              </div>
-              <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black">
-                {editingId ? "Update Product" : "Save Product"}
-              </button>
-            </form>
-          )}
-
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
-                  <tr>
-                    {/* PRODUCT HEADER */}
-                    <th className="p-4 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("name")}>
-                      <div className="flex items-center gap-1">
-                        Product
-                        {sortConfig.map((s, index) => s.key === "name" && (
-                          <span key="name-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* STOCK HEADER */}
-                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("stock")}>
-                      <div className="flex items-center justify-center gap-1">
-                        Stock
-                        {sortConfig.map((s, index) => s.key === "stock" && (
-                          <span key="stock-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* PRICE HEADER */}
-                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("price")}>
-                      <div className="flex items-center justify-center gap-1">
-                        Price
-                        {sortConfig.map((s, index) => s.key === "price" && (
-                          <span key="price-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* --- EXPIRY HEADER --- */}
-                    <th
-                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                      onClick={() => handleHeaderSort("expiryDate")}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        Expiry
-                        {sortConfig.map((s, index) => s.key === "expiryDate" && (
-                          <span key="expiry-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            {sortConfig.length > 1 && (
-                              <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px] font-bold">
-                                {index + 1}
-                              </span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* --- VISIBLE HEADER (FILTER) --- */}
-                    <th
-                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                      onClick={cycleVisFilter}
-                      title="Click to toggle: All -> Visible -> Hidden"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        {visFilter === "all" && <span>Visible</span>}
-                        {visFilter === "visible" && <span className="text-green-600 flex items-center gap-1"><Eye size={14} /> Only</span>}
-                        {visFilter === "hidden" && <span className="text-gray-400 flex items-center gap-1"><EyeOff size={14} /> Only</span>}
-
-                        {/* The Filter Icon you requested */}
-                        <div className="text-gray-300">
-                          {visFilter === "all" ? <Filter size={12} /> : <Filter size={12} className="text-purple-500" />}
-                        </div>
-                      </div>
-                    </th>
-
-                    <th className="p-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-gray-100">
-                  {filteredInventory.map((p) => (
-                    <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""}`}>
-                      <td className="p-4">
-                        <div className="font-bold text-gray-900">{p.name}</div>
-                        {p.expiryDate && (() => {
-                          const diff = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
-                          if (diff < 0) return <span className="inline-block mt-1 text-[10px] font-bold text-white bg-red-800 px-2 py-0.5 rounded animate-pulse">⚠️ EXPIRED</span>;
-                          if (diff <= 90) return <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">⏳ Expiring in {diff} days</span>;
-                          return null;
-                        })()}
-                        <div className="flex gap-2 mt-1">
-                          <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 font-bold">{p.category}</span>
-                          {p.subcategory && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{p.subcategory}</span>}
-                        </div>
-                      </td>
-                      <td className="p-4 text-center">
-                        <input type="number" className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3 ? "text-red-600 border-red-200 bg-red-50" : "border-gray-200"}`} value={p.stock} onChange={(e) => onUpdateStock(p.id, e.target.value)} />
-                      </td>
-                      <td className="p-4 text-center">
-                        <input type="number" step="0.001" className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
-                      </td>
-                      <td className="p-4 text-center text-[11px] font-mono text-gray-500">
-                        {p.expiryDate ? p.expiryDate : "—"}
-                      </td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-2 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
-                          {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
-                        </button>
-                      </td>
-                      <td className="p-4 text-center flex justify-center gap-2">
-                        <button onClick={() => startEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full" title="Edit">
-                          <Edit size={18} />
-                        </button>
-
-                        {/* ARCHIVE BUTTON */}
-                        <button
-                          onClick={() => toggleArchiveStatus(p)}
-                          className={`p-2 rounded-full transition-colors ${p.archived ? "text-green-500 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
-                          title={p.archived ? "Restore" : "Archive"}
-                        >
-                          {p.archived ? <RefreshCw size={18} /> : <Archive size={18} />}
-                        </button>
-
-                        <button onClick={() => onDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full" title="Delete">
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CATEGORIES TAB */}
-      {tab === "categories" && (
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold mb-4 text-lg">Main Categories</h3>
-            <div className="flex gap-2 mb-4">
-              <input
-                className="border p-2 rounded-lg flex-1 text-sm"
-                placeholder="New Category Name"
-                value={newMainCat}
-                onChange={(e) => setNewMainCat(e.target.value)}
-              />
-              <button
-                onClick={addMainCategory}
-                className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
-              >
-                Add
-              </button>
-            </div>
-            <ul className="space-y-2">
-              {Object.keys(localCategories).map((cat) => (
-                <li
-                  key={cat}
-                  className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100"
-                >
-                  <span className="font-medium">{cat}</span>
-                  <button
-                    onClick={() => deleteMainCategory(cat)}
-                    className="text-gray-400 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </li>
+              <option value="All">All Categories</option>
+              {Object.keys(categories).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
-            </ul>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold mb-4 text-lg">Subcategories</h3>
-            <div className="flex gap-2 mb-4">
+            </select>
+            {invCategory !== "All" && (
               <select
-                className="border p-2 rounded-lg text-sm bg-white"
-                value={newSubCat.main}
-                onChange={(e) =>
-                  setNewSubCat({ ...newSubCat, main: e.target.value })
-                }
+                className="border p-2 rounded-lg text-sm bg-white animate-fade-in"
+                value={invSubCategory}
+                onChange={(e) => setInvSubCategory(e.target.value)}
               >
-                <option value="">Select Main</option>
-                {Object.keys(localCategories).map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                <option value="All">All {invCategory}</option>
+                {(categories[invCategory] || []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
-              <input
-                className="border p-2 rounded-lg flex-1 text-sm"
-                placeholder="Subcategory Name"
-                value={newSubCat.sub}
-                onChange={(e) =>
-                  setNewSubCat({ ...newSubCat, sub: e.target.value })
-                }
-              />
-              <button
-                onClick={addSubCategory}
-                className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
-              >
-                Add
-              </button>
-            </div>
-            <div className="space-y-4 h-[400px] overflow-y-auto pr-2">
-              {Object.entries(localCategories).map(([main, subs]) => (
-                <div key={main}>
-                  <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-white py-1">
-                    {main}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {subs.map((sub) => (
-                      <span
-                        key={sub}
-                        className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-purple-100"
-                      >
-                        {sub}
-                        <button
-                          onClick={() => deleteSubCategory(main, sub)}
-                          className="text-purple-300 hover:text-red-500"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* PROMOTIONS TAB */}
-      {tab === "promos" && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm">
-            <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
-              <Tag size={20} className="text-purple-600" />{" "}
-              {isEditingPromo ? "Edit Promotion" : "Create New Promotion"}
-            </h3>
-            <div className="mb-4">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Promo Title
-              </label>
-              <input
-                className="w-full border p-2 rounded-lg mt-1"
-                placeholder="e.g. Valentine's Sale"
-                value={newPromo.title}
-                onChange={(e) =>
-                  setNewPromo({ ...newPromo, title: e.target.value })
-                }
-              />
-            </div>
-            <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Select Products
-              </label>
-              <div className="relative w-full md:w-auto flex-1 max-w-sm">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-2.5 text-gray-400"
-                />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="w-full pl-8 pr-4 py-2 border rounded-full text-sm bg-gray-50 focus:bg-white transition-colors"
-                  value={promoSearchQuery}
-                  onChange={(e) => setPromoSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2 w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={selectAllFiltered}
-                  className="flex-1 md:flex-none flex items-center gap-1 bg-purple-100 text-purple-700 px-3 py-2 rounded text-xs font-bold hover:bg-purple-200"
-                >
-                  <CheckSquare size={14} /> Select All
-                </button>
-                <button
-                  type="button"
-                  onClick={deselectAllFiltered}
-                  className="flex-1 md:flex-none flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-2 rounded text-xs font-bold hover:bg-gray-200"
-                >
-                  <Square size={14} /> Unselect
-                </button>
-              </div>
-            </div>
-            <div className="h-64 overflow-y-auto border rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-gray-50">
-              {filteredPromoProducts.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.productIds.includes(p.id)
-                    ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
-                    : "border-gray-200 hover:border-purple-300"
-                    }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={newPromo.productIds.includes(p.id)}
-                    onChange={() => togglePromoProduct(p.id)}
-                    className="accent-purple-600 w-4 h-4 flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="text-xs text-gray-500">{p.category}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={savePromo}
-                className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-purple-700"
-              >
-                Save Promotion
-              </button>
-              {isEditingPromo && (
-                <button
-                  onClick={() => {
-                    setIsEditingPromo(null);
-                    setNewPromo({ title: "", productIds: [] });
-                    setPromoSearchQuery("");
-                  }}
-                  className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {promotions.map((promo) => (
-              <div
-                key={promo.id}
-                className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative group hover:shadow-md transition-shadow"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-bold text-lg text-gray-900">
-                      {promo.title}
-                    </h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {promo.productIds.length} Products Included
-                    </p>
-                  </div>
-                  <Tag className="text-purple-100" size={32} />
-                </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={() => {
-                      setIsEditingPromo(promo.id);
-                      setNewPromo(promo);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-sm font-bold hover:bg-blue-100"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDeletePromotion(promo.id)}
-                    className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+          {/* --- TOOLBAR GROUP --- */}
+          <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto mt-3 md:mt-0">
 
-      {/* CONTENT TAB */}
-      {tab === "content" && (
-        <form
-          onSubmit={handleContentSubmit}
-          className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6"
-        >
-          <div className="flex justify-between items-center border-b pb-4">
-            <h3 className="font-bold text-lg">Store Content Settings</h3>
+            {/* CLEAR ALL BUTTON */}
             <button
-              type="submit"
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-700"
+              onClick={clearAllFilters}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-bold border border-gray-200 uppercase tracking-tighter hover:bg-red-50 hover:text-red-600 transition-colors"
             >
-              <Save size={16} /> Save Changes
+              <RefreshCw size={14} /> Clear All
             </button>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(editableContent).map(([key, val]) => (
-              <div
-                key={key}
-                className={key.includes("Description") ? "md:col-span-2" : ""}
-              >
-                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">
-                  {key.replace(/([A-Z])/g, " $1").trim()}
-                </label>
-                {key.includes("Description") ? (
-                  <textarea
-                    className="w-full border border-gray-200 p-3 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                    rows="3"
-                    value={val}
-                    onChange={(e) =>
-                      setEditableContent({
-                        ...editableContent,
-                        [key]: e.target.value,
-                      })
-                    }
-                  />
-                ) : (
-                  <input
-                    className="w-full border border-gray-200 p-3 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                    value={val}
-                    onChange={(e) =>
-                      setEditableContent({
-                        ...editableContent,
-                        [key]: e.target.value,
-                      })
-                    }
-                  />
-                )}
+
+            {/* TOGGLE SWITCH */}
+            <div
+              onClick={() => setHideOutOfStock(!hideOutOfStock)}
+              className="flex items-center gap-2 cursor-pointer group select-none bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100"
+            >
+              <div className={`relative w-9 h-5 rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
+                <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow transform transition-transform ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
               </div>
-            ))}
-          </div>
-        </form>
-      )}
-      {tab === "wa-templates" && (
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center border-b pb-4">
-            <div>
-              <h3 className="font-bold text-lg text-gray-900">Edit WhatsApp Templates</h3>
-              <p className="text-xs text-gray-500">Manage your message automation.</p>
+              <span className="text-[9px] font-bold text-gray-500 uppercase">Hide 0</span>
             </div>
-            <div className="flex gap-3">
-              {/* ➕ NEW ADD BUTTON */}
+
+            {/* 2. ARCHIVE BUTTON */}
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`p-2 rounded-lg transition-all border ${showArchived
+                ? "bg-amber-100 text-amber-800 border-amber-200"
+                : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
+                }`}
+              title={showArchived ? "Back to Inventory" : "View Archived Items"}
+            >
+              {showArchived ? <RefreshCw size={20} /> : <Archive size={20} />}
+            </button>
+
+            {/* 3. ADD PRODUCT BUTTON */}
+            {!showArchived && (
               <button
                 onClick={() => {
-                  const newTemp = {
-                    id: Date.now().toString(), // Generates a unique ID
-                    label: "New Template Name",
-                    text: "Type your message here... ✧"
-                  };
-                  setWhatsappTemplates([...whatsappTemplates, newTemp]);
+                  setEditingId(null);
+                  setProductForm({
+                    name: "", category: Object.keys(categories)[0] || "", subcategory: "", price: "", originalPrice: "", stock: "", expiryDate: "", description: "", image: "",
+                  });
+                  setShowProductForm(!showProductForm);
                 }}
-                className="bg-purple-50 text-purple-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-purple-100 transition-all"
+                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
               >
-                <Plus size={16} /> Add Template
+                {showProductForm ? <X size={16} /> : <Plus size={16} />}{" "}
+                {showProductForm ? "Cancel" : "Add Product"}
               </button>
-
-              <button
-                onClick={async () => {
-                  try {
-                    await setDoc(doc(db, "settings", "whatsapp_templates"), { templates: whatsappTemplates });
-                    alert("All changes saved! 🚀");
-                  } catch (e) { console.error(e); }
-                }}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm"
-              >
-                <Save size={16} /> Save All
-              </button>
-            </div>
-          </div>
-
-          {/* This section generates the actual text boxes */}
-          <div className="grid gap-6">
-            {whatsappTemplates && whatsappTemplates.length > 0 ? (
-              whatsappTemplates.map((temp, index) => (
-                <div key={temp.id || index} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-purple-400">#0{index + 1}</span>
-                    <input
-                      className="w-full font-bold bg-transparent border-b border-transparent hover:border-gray-200 focus:border-purple-400 mb-1 outline-none transition-all text-gray-800"
-                      value={temp.label}
-                      onChange={(e) => {
-                        const updated = [...whatsappTemplates];
-                        updated[index] = { ...updated[index], label: e.target.value };
-                        setWhatsappTemplates(updated);
-                      }}
-                    />
-                  </div>
-
-                  <textarea
-                    className="w-full h-40 p-4 text-sm border border-gray-100 rounded-xl bg-white resize-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 outline-none transition-all shadow-inner text-gray-700 font-medium"
-                    value={temp.text}
-                    onChange={(e) => {
-                      const updated = [...whatsappTemplates];
-                      updated[index] = { ...updated[index], text: e.target.value };
-                      setWhatsappTemplates(updated);
-                    }}
-                  />
-
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {['{name}', '{orderId}', '{total}', '{method}', '{summary}', '{status}'].map(tag => (
-                      <span key={tag} className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-purple-500">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400">
-                <p>No templates found. Try refreshing or check Firebase.</p>
-              </div>
             )}
           </div>
         </div>
-      )}
-      {/* ✨ WHATSAPP HUB POPUP */}
-      {whatsappOrder && (
-        <WhatsAppModal
-          order={whatsappOrder}
-          templates={whatsappTemplates}
-          onClose={() => setWhatsappOrder(null)}
-        />
-      )}
 
-      {/* ✨ RECEIPT MODAL */}
-      {receiptOrder && (
-        <OrderReceiptModal
-          order={receiptOrder}
-          onClose={() => setReceiptOrder(null)}
-        />
-      )}
-    </div>
-  );
+        {showProductForm && (
+          <form
+            onSubmit={handleProductSubmit}
+            className="bg-white border border-purple-200 rounded-xl p-6 shadow-sm space-y-4 animate-fade-in"
+          >
+            <h3 className="font-bold text-gray-900">
+              {editingId ? "Edit Product" : "Add New Product"}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input required placeholder="Name" className="p-3 border rounded-lg text-sm" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+              <select className="p-3 border rounded-lg text-sm" value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value, subcategory: "" })}>
+                <option value="">Select Category</option>
+                {Object.keys(categories).map((c) => (<option key={c} value={c}>{c}</option>))}
+              </select>
+              <select className="p-3 border rounded-lg text-sm" value={productForm.subcategory} onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value })}>
+                <option value="">Select Subcategory</option>
+                {(categories[productForm.category] || []).map((s) => (<option key={s} value={s}>{s}</option>))}
+              </select>
+              <div className="flex gap-2">
+                <input required type="number" step="0.001" placeholder="Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+                <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
+              </div>
+              <input required type="number" placeholder="Stock" className="p-3 border rounded-lg text-sm" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
+              <input placeholder="Expiry (YYYY-MM-DD)" className="p-3 border rounded-lg text-sm" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
+              <input placeholder="Image URL" className="p-3 border rounded-lg text-sm" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} />
+              <textarea placeholder="Description" className="p-3 border rounded-lg text-sm md:col-span-2" rows="2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
+            </div>
+            <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black">
+              {editingId ? "Update Product" : "Save Product"}
+            </button>
+          </form>
+        )}
+
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
+                <tr>
+                  {/* PRODUCT HEADER */}
+                  <th className="p-4 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("name")}>
+                    <div className="flex items-center gap-1">
+                      Product
+                      {sortConfig.map((s, index) => s.key === "name" && (
+                        <span key="name-sort" className="text-purple-600 flex items-center">
+                          {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </th>
+
+                  {/* STOCK HEADER */}
+                  <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("stock")}>
+                    <div className="flex items-center justify-center gap-1">
+                      Stock
+                      {sortConfig.map((s, index) => s.key === "stock" && (
+                        <span key="stock-sort" className="text-purple-600 flex items-center">
+                          {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </th>
+
+                  {/* PRICE HEADER */}
+                  <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("price")}>
+                    <div className="flex items-center justify-center gap-1">
+                      Price
+                      {sortConfig.map((s, index) => s.key === "price" && (
+                        <span key="price-sort" className="text-purple-600 flex items-center">
+                          {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </th>
+
+                  {/* --- EXPIRY HEADER --- */}
+                  <th
+                    className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={() => handleHeaderSort("expiryDate")}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Expiry
+                      {sortConfig.map((s, index) => s.key === "expiryDate" && (
+                        <span key="expiry-sort" className="text-purple-600 flex items-center">
+                          {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          {sortConfig.length > 1 && (
+                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px] font-bold">
+                              {index + 1}
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </th>
+
+                  {/* --- VISIBLE HEADER (FILTER) --- */}
+                  <th
+                    className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={cycleVisFilter}
+                    title="Click to toggle: All -> Visible -> Hidden"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      {visFilter === "all" && <span>Visible</span>}
+                      {visFilter === "visible" && <span className="text-green-600 flex items-center gap-1"><Eye size={14} /> Only</span>}
+                      {visFilter === "hidden" && <span className="text-gray-400 flex items-center gap-1"><EyeOff size={14} /> Only</span>}
+
+                      {/* The Filter Icon you requested */}
+                      <div className="text-gray-300">
+                        {visFilter === "all" ? <Filter size={12} /> : <Filter size={12} className="text-purple-500" />}
+                      </div>
+                    </div>
+                  </th>
+
+                  <th className="p-4 text-center">Actions</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-gray-100">
+                {filteredInventory.map((p) => (
+                  <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""}`}>
+                    <td className="p-4">
+                      <div className="font-bold text-gray-900">{p.name}</div>
+                      {p.expiryDate && (() => {
+                        const diff = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+                        if (diff < 0) return <span className="inline-block mt-1 text-[10px] font-bold text-white bg-red-800 px-2 py-0.5 rounded animate-pulse">⚠️ EXPIRED</span>;
+                        if (diff <= 90) return <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">⏳ Expiring in {diff} days</span>;
+                        return null;
+                      })()}
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 font-bold">{p.category}</span>
+                        {p.subcategory && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{p.subcategory}</span>}
+                      </div>
+                    </td>
+                    <td className="p-4 text-center">
+                      <input type="number" className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3 ? "text-red-600 border-red-200 bg-red-50" : "border-gray-200"}`} value={p.stock} onChange={(e) => onUpdateStock(p.id, e.target.value)} />
+                    </td>
+                    <td className="p-4 text-center">
+                      <input type="number" step="0.001" className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
+                    </td>
+                    <td className="p-4 text-center text-[11px] font-mono text-gray-500">
+                      {p.expiryDate ? p.expiryDate : "—"}
+                    </td>
+                    <td className="p-4 text-center">
+                      <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-2 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
+                        {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
+                      </button>
+                    </td>
+                    <td className="p-4 text-center flex justify-center gap-2">
+                      <button onClick={() => startEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full" title="Edit">
+                        <Edit size={18} />
+                      </button>
+
+                      {/* ARCHIVE BUTTON */}
+                      <button
+                        onClick={() => toggleArchiveStatus(p)}
+                        className={`p-2 rounded-full transition-colors ${p.archived ? "text-green-500 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
+                        title={p.archived ? "Restore" : "Archive"}
+                      >
+                        {p.archived ? <RefreshCw size={18} /> : <Archive size={18} />}
+                      </button>
+
+                      <button onClick={() => onDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full" title="Delete">
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* CATEGORIES TAB */}
+    {tab === "categories" && (
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <h3 className="font-bold mb-4 text-lg">Main Categories</h3>
+          <div className="flex gap-2 mb-4">
+            <input
+              className="border p-2 rounded-lg flex-1 text-sm"
+              placeholder="New Category Name"
+              value={newMainCat}
+              onChange={(e) => setNewMainCat(e.target.value)}
+            />
+            <button
+              onClick={addMainCategory}
+              className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
+            >
+              Add
+            </button>
+          </div>
+          <ul className="space-y-2">
+            {Object.keys(localCategories).map((cat) => (
+              <li
+                key={cat}
+                className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100"
+              >
+                <span className="font-medium">{cat}</span>
+                <button
+                  onClick={() => deleteMainCategory(cat)}
+                  className="text-gray-400 hover:text-red-600"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <h3 className="font-bold mb-4 text-lg">Subcategories</h3>
+          <div className="flex gap-2 mb-4">
+            <select
+              className="border p-2 rounded-lg text-sm bg-white"
+              value={newSubCat.main}
+              onChange={(e) =>
+                setNewSubCat({ ...newSubCat, main: e.target.value })
+              }
+            >
+              <option value="">Select Main</option>
+              {Object.keys(localCategories).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <input
+              className="border p-2 rounded-lg flex-1 text-sm"
+              placeholder="Subcategory Name"
+              value={newSubCat.sub}
+              onChange={(e) =>
+                setNewSubCat({ ...newSubCat, sub: e.target.value })
+              }
+            />
+            <button
+              onClick={addSubCategory}
+              className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
+            >
+              Add
+            </button>
+          </div>
+          <div className="space-y-4 h-[400px] overflow-y-auto pr-2">
+            {Object.entries(localCategories).map(([main, subs]) => (
+              <div key={main}>
+                <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-white py-1">
+                  {main}
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {subs.map((sub) => (
+                    <span
+                      key={sub}
+                      className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-purple-100"
+                    >
+                      {sub}
+                      <button
+                        onClick={() => deleteSubCategory(main, sub)}
+                        className="text-purple-300 hover:text-red-500"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* PROMOTIONS TAB */}
+    {tab === "promos" && (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm">
+          <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
+            <Tag size={20} className="text-purple-600" />{" "}
+            {isEditingPromo ? "Edit Promotion" : "Create New Promotion"}
+          </h3>
+          <div className="mb-4">
+            <label className="text-xs font-bold text-gray-500 uppercase">
+              Promo Title
+            </label>
+            <input
+              className="w-full border p-2 rounded-lg mt-1"
+              placeholder="e.g. Valentine's Sale"
+              value={newPromo.title}
+              onChange={(e) =>
+                setNewPromo({ ...newPromo, title: e.target.value })
+              }
+            />
+          </div>
+          <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
+            <label className="text-xs font-bold text-gray-500 uppercase">
+              Select Products
+            </label>
+            <div className="relative w-full md:w-auto flex-1 max-w-sm">
+              <Search
+                size={14}
+                className="absolute left-3 top-2.5 text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Search products..."
+                className="w-full pl-8 pr-4 py-2 border rounded-full text-sm bg-gray-50 focus:bg-white transition-colors"
+                value={promoSearchQuery}
+                onChange={(e) => setPromoSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={selectAllFiltered}
+                className="flex-1 md:flex-none flex items-center gap-1 bg-purple-100 text-purple-700 px-3 py-2 rounded text-xs font-bold hover:bg-purple-200"
+              >
+                <CheckSquare size={14} /> Select All
+              </button>
+              <button
+                type="button"
+                onClick={deselectAllFiltered}
+                className="flex-1 md:flex-none flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-2 rounded text-xs font-bold hover:bg-gray-200"
+              >
+                <Square size={14} /> Unselect
+              </button>
+            </div>
+          </div>
+          <div className="h-64 overflow-y-auto border rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-gray-50">
+            {filteredPromoProducts.map((p) => (
+              <label
+                key={p.id}
+                className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.productIds.includes(p.id)
+                  ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
+                  : "border-gray-200 hover:border-purple-300"
+                  }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={newPromo.productIds.includes(p.id)}
+                  onChange={() => togglePromoProduct(p.id)}
+                  className="accent-purple-600 w-4 h-4 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-gray-500">{p.category}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={savePromo}
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-purple-700"
+            >
+              Save Promotion
+            </button>
+            {isEditingPromo && (
+              <button
+                onClick={() => {
+                  setIsEditingPromo(null);
+                  setNewPromo({ title: "", productIds: [] });
+                  setPromoSearchQuery("");
+                }}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {promotions.map((promo) => (
+            <div
+              key={promo.id}
+              className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative group hover:shadow-md transition-shadow"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-bold text-lg text-gray-900">
+                    {promo.title}
+                  </h4>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {promo.productIds.length} Products Included
+                  </p>
+                </div>
+                <Tag className="text-purple-100" size={32} />
+              </div>
+              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    setIsEditingPromo(promo.id);
+                    setNewPromo(promo);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-sm font-bold hover:bg-blue-100"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDeletePromotion(promo.id)}
+                  className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* CONTENT TAB */}
+    {tab === "content" && (
+      <form
+        onSubmit={handleContentSubmit}
+        className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6"
+      >
+        <div className="flex justify-between items-center border-b pb-4">
+          <h3 className="font-bold text-lg">Store Content Settings</h3>
+          <button
+            type="submit"
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-700"
+          >
+            <Save size={16} /> Save Changes
+          </button>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {Object.entries(editableContent).map(([key, val]) => (
+            <div
+              key={key}
+              className={key.includes("Description") ? "md:col-span-2" : ""}
+            >
+              <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">
+                {key.replace(/([A-Z])/g, " $1").trim()}
+              </label>
+              {key.includes("Description") ? (
+                <textarea
+                  className="w-full border border-gray-200 p-3 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                  rows="3"
+                  value={val}
+                  onChange={(e) =>
+                    setEditableContent({
+                      ...editableContent,
+                      [key]: e.target.value,
+                    })
+                  }
+                />
+              ) : (
+                <input
+                  className="w-full border border-gray-200 p-3 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                  value={val}
+                  onChange={(e) =>
+                    setEditableContent({
+                      ...editableContent,
+                      [key]: e.target.value,
+                    })
+                  }
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </form>
+    )}
+    {tab === "wa-templates" && (
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center border-b pb-4">
+          <div>
+            <h3 className="font-bold text-lg text-gray-900">Edit WhatsApp Templates</h3>
+            <p className="text-xs text-gray-500">Manage your message automation.</p>
+          </div>
+          <div className="flex gap-3">
+            {/* ➕ NEW ADD BUTTON */}
+            <button
+              onClick={() => {
+                const newTemp = {
+                  id: Date.now().toString(), // Generates a unique ID
+                  label: "New Template Name",
+                  text: "Type your message here... ✧"
+                };
+                setWhatsappTemplates([...whatsappTemplates, newTemp]);
+              }}
+              className="bg-purple-50 text-purple-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-purple-100 transition-all"
+            >
+              <Plus size={16} /> Add Template
+            </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  await setDoc(doc(db, "settings", "whatsapp_templates"), { templates: whatsappTemplates });
+                  alert("All changes saved! 🚀");
+                } catch (e) { console.error(e); }
+              }}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm"
+            >
+              <Save size={16} /> Save All
+            </button>
+          </div>
+        </div>
+
+        {/* This section generates the actual text boxes */}
+        <div className="grid gap-6">
+          {whatsappTemplates && whatsappTemplates.length > 0 ? (
+            whatsappTemplates.map((temp, index) => (
+              <div key={temp.id || index} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-purple-400">#0{index + 1}</span>
+                  <input
+                    className="w-full font-bold bg-transparent border-b border-transparent hover:border-gray-200 focus:border-purple-400 mb-1 outline-none transition-all text-gray-800"
+                    value={temp.label}
+                    onChange={(e) => {
+                      const updated = [...whatsappTemplates];
+                      updated[index] = { ...updated[index], label: e.target.value };
+                      setWhatsappTemplates(updated);
+                    }}
+                  />
+                </div>
+
+                <textarea
+                  className="w-full h-40 p-4 text-sm border border-gray-100 rounded-xl bg-white resize-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 outline-none transition-all shadow-inner text-gray-700 font-medium"
+                  value={temp.text}
+                  onChange={(e) => {
+                    const updated = [...whatsappTemplates];
+                    updated[index] = { ...updated[index], text: e.target.value };
+                    setWhatsappTemplates(updated);
+                  }}
+                />
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {['{name}', '{orderId}', '{total}', '{method}', '{summary}', '{status}'].map(tag => (
+                    <span key={tag} className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-purple-500">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400">
+              <p>No templates found. Try refreshing or check Firebase.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    {/* ✨ WHATSAPP HUB POPUP */}
+    {whatsappOrder && (
+      <WhatsAppModal
+        order={whatsappOrder}
+        templates={whatsappTemplates}
+        onClose={() => setWhatsappOrder(null)}
+      />
+    )}
+
+    {/* ✨ RECEIPT MODAL */}
+    {receiptOrder && (
+      <OrderReceiptModal
+        order={receiptOrder}
+        onClose={() => setReceiptOrder(null)}
+      />
+    )}
+  </div>
+);
 };
 
 // --- MAIN APP ---
@@ -2321,11 +2309,11 @@ export default function App() {
 
     try {
       const orderId = generateOrderId();
-      let proofUrl = ""; 
+      let proofUrl = "";
       // Add your image upload logic here if you have it later
-      
+
       // 2. FIX: Convert Cart Object to Array so we can loop!
-      const cartItems = Object.values(cart); 
+      const cartItems = Object.values(cart);
 
       // 3. FIX: Calculate Total Manually (since 'total' variable was missing)
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -2376,7 +2364,7 @@ export default function App() {
           createdAt: serverTimestamp(),
         };
         transaction.set(newOrderRef, orderData);
-        setLastOrder(orderData); 
+        setLastOrder(orderData);
       });
 
       // 5. Success Steps
