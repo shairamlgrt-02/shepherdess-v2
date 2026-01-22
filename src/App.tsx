@@ -2321,21 +2321,22 @@ export default function App() {
 
     try {
       const orderId = generateOrderId();
-      let proofUrl = "";
+      let proofUrl = ""; 
       // Add your image upload logic here if you have it later
+      
+      // 2. FIX: Convert Cart Object to Array so we can loop!
+      const cartItems = Object.values(cart); 
 
-      // 2. Calculate Total & Prepare Items
-      // We must convert the cart Object to an Array to loop through it
-      const cartItems = Object.values(cart);
+      // 3. FIX: Calculate Total Manually (since 'total' variable was missing)
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
       const finalTotal = subtotal + deliveryFee;
 
-      // 3. THE TRANSACTION
+      // 4. THE TRANSACTION
       await runTransaction(db, async (transaction) => {
         const validatedItems = [];
 
-        // Check stock for every item
+        // Loop through the ARRAY (cartItems), not the object (cart)
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
           const productSnap = await transaction.get(productRef);
@@ -2362,25 +2363,25 @@ export default function App() {
         const orderData = {
           orderId,
           customer: {
-            name: customerDetails.name,   // FIXED: matches your state
-            phone: customerDetails.phone, // FIXED: matches your state
+            name: customerDetails.name,   // Fixed: Use customerDetails state
+            phone: customerDetails.phone, // Fixed: Use customerDetails state
             deliveryMethod,
             deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : '',
             meetupNote: deliveryMethod !== 'delivery' ? meetupNote : ''
           },
-          items: cart, // It's okay to save the object format to Firebase
-          total: finalTotal, // FIXED: Uses the calculated total
+          items: cart, // Saving the object structure to DB is fine
+          total: finalTotal, // Use the total we calculated above
           proofUrl,
           journeyStatus: "pending",
           createdAt: serverTimestamp(),
         };
         transaction.set(newOrderRef, orderData);
-        setLastOrder(orderData);
+        setLastOrder(orderData); 
       });
 
-      // 4. Success Steps
+      // 5. Success Steps
       setCheckoutStep("success");
-      setCart({}); // FIXED: Resets to an Object {}, not an Array []
+      setCart({}); // Reset to Object {}, NOT Array []
       setDeliveryAddress("");
       setMeetupNote("");
       showNotification("Order placed successfully! ✧", "success");
