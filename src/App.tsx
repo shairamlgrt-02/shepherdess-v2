@@ -2299,7 +2299,7 @@ export default function App() {
   const handleCheckout = async (e) => {
     e.preventDefault();
 
-    // 1. Initial Validations
+    // 1. Validation
     if (!proofFile) return showNotification("Please upload payment proof", "error");
     if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
       return showNotification("Please enter delivery address", "error");
@@ -2309,67 +2309,73 @@ export default function App() {
 
     try {
       const orderId = generateOrderId();
-      let proofUrl = "";
-      // Add your image upload logic here if you have it later
+      let proofUrl = ""; 
+      // (Add upload logic here later if needed)
 
-      // 2. FIX: Convert Cart Object to Array so we can loop!
-      const cartItems = Object.values(cart);
+      // 2. Fix the "Iterable" error
+      const cartItems = Object.values(cart); 
 
-      // 3. FIX: Calculate Total Manually (since 'total' variable was missing)
+      // 3. Calculate Total
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
       const finalTotal = subtotal + deliveryFee;
 
-      // 4. THE TRANSACTION
+      // 4. Run Transaction
       await runTransaction(db, async (transaction) => {
         const validatedItems = [];
 
-        // Loop through the ARRAY (cartItems), not the object (cart)
+        // Check Stock
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
           const productSnap = await transaction.get(productRef);
 
           if (!productSnap.exists()) throw `Product ${item.name} no longer exists!`;
-
           const currentStock = productSnap.data().stock || 0;
 
-          // Stop User B if stock is gone
           if (currentStock < item.qty) {
-            throw `Sorry Bestie! Only ${currentStock} left of ${item.name}. Please update your cart!`;
+            throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
-
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
-        // Apply stock updates
+        // Deduct Stock
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
-        // Save the Order document
+        // 5. SAVE ORDER (The Data Fix)
         const newOrderRef = doc(collection(db, "orders"));
+        
         const orderData = {
           orderId,
           customer: {
-            name: customerDetails.name,   // Fixed: Use customerDetails state
-            phone: customerDetails.phone, // Fixed: Use customerDetails state
+            name: customerDetails.name,
+            phone: customerDetails.phone,
             deliveryMethod,
             deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : '',
             meetupNote: deliveryMethod !== 'delivery' ? meetupNote : ''
           },
-          items: cart, // Saving the object structure to DB is fine
-          total: finalTotal, // Use the total we calculated above
+          items: cart,
+          total: finalTotal,
           proofUrl,
-          journeyStatus: "pending",
-          createdAt: serverTimestamp(),
+          
+          // --- ⬇️ THE CRITICAL FIX IS HERE ⬇️ ---
+          // We send BOTH the Old Format (for Dashboard) AND New Format (for Code)
+          
+          status: "pending",                  // <--- Old Dashboard needs this!
+          journeyStatus: "pending",           // <--- New Tracking needs this!
+          
+          date: new Date().toISOString(),     // <--- Old Dashboard sorts by this String!
+          createdAt: serverTimestamp(),       // <--- Database needs this Timestamp!
         };
+        
         transaction.set(newOrderRef, orderData);
-        setLastOrder(orderData);
+        setLastOrder(orderData); 
       });
 
-      // 5. Success Steps
+      // 6. Reset UI
       setCheckoutStep("success");
-      setCart({}); // Reset to Object {}, NOT Array []
+      setCart({});
       setDeliveryAddress("");
       setMeetupNote("");
       showNotification("Order placed successfully! ✧", "success");
