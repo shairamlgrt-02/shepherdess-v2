@@ -537,7 +537,25 @@ const AnalyticsSummary = ({ products, orders }) => {
   );
 };
 
-// --- ADMIN DASHBOARD (FIXED) ---
+// --- 🖼️ NEW IMAGE PREVIEW MODAL ---
+const ImagePreviewModal = ({ src, onClose }) => {
+  if (!src) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out"
+      onClick={onClose}
+    >
+      <img
+        src={src}
+        alt="Payment Proof Full"
+        className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
+      />
+      <button className="absolute top-5 right-5 text-white bg-white/20 p-2 rounded-full hover:bg-white/40">
+        <X size={24} />
+      </button>
+    </div>
+  );
+};
 // --- ADMIN DASHBOARD (FIXED: Filters & Full Status Control) ---
 const AdminDashboard = ({
   db,
@@ -566,10 +584,41 @@ const AdminDashboard = ({
   const [editableContent, setEditableContent] = useState(content);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [whatsappOrder, setWhatsappOrder] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const updateOrderJourney = async (orderId, newJourney) => {
     await updateDoc(doc(db, "orders", orderId), { journeyStatus: newJourney });
   };
+  // --- ADD THIS NEW FUNCTION ---
+  const handleDeleteProof = async (orderId) => {
+    if (window.confirm("Are you sure you want to remove this payment proof?")) {
+      try {
+        // Set the proof field to null in Firebase
+        await updateDoc(doc(db, "orders", orderId), { "customer.proof": null });
+      } catch (error) {
+        console.error("Error deleting proof:", error);
+        alert("Failed to delete proof.");
+      }
+    }
+  };
+  const handleProofUpload = async (e, orderId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (window.confirm("Replace the current payment proof with this new image?")) {
+      try {
+        const compressed = await compressImage(file);
+        await updateDoc(doc(db, "orders", orderId), {
+          "customer.proof": compressed
+        });
+        alert("Payment proof updated successfully!");
+      } catch (error) {
+        console.error("Error updating proof:", error);
+        alert("Failed to update proof.");
+      }
+    }
+  };
+
   const toggleArchiveStatus = async (product) => {
     const newStatus = !product.archived;
     const confirmMsg = newStatus
@@ -1153,16 +1202,67 @@ const AdminDashboard = ({
                           </div>
                         </div>
 
-                        {order.customer?.proof && (
-                          <div className="mt-2">
-                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Payment Proof</label>
-                            <img
-                              src={order.customer.proof}
-                              className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => window.open(order.customer.proof)}
-                            />
-                          </div>
-                        )}
+                        {/* START OF NEW PAYMENT PROOF SECTION */}
+                        <div className="mt-4">
+                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                            Payment Proof
+                          </label>
+
+                          {order.customer?.proof ? (
+                            <div className="flex items-start gap-3">
+                              {/* 1. The Image (Click to Preview) */}
+                              <div className="relative group">
+                                <img
+                                  src={order.customer.proof}
+                                  onClick={() => setPreviewImage(order.customer.proof)}
+                                  className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                                />
+                                {/* Delete Button (Appears on Hover) */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteProof(order.id);
+                                  }}
+                                  className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full p-1 shadow-md border border-gray-100 hover:bg-red-50 transition-colors"
+                                  title="Remove Proof"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+
+                              {/* 2. Change Button */}
+                              <div className="flex flex-col gap-2 pt-1">
+                                <label className="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-blue-100 transition-colors flex items-center gap-1">
+                                  <Upload size={12} /> Change
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleProofUpload(e, order.id)}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          ) : (
+                            /* 3. Upload Button (If no proof exists) */
+                            <label className="flex items-center gap-3 border border-dashed border-gray-300 rounded-xl p-3 cursor-pointer hover:bg-gray-50 hover:border-purple-300 transition-colors w-full max-w-[200px] group">
+                              <div className="bg-gray-100 group-hover:bg-purple-100 p-2 rounded-full text-gray-400 group-hover:text-purple-500 transition-colors">
+                                <Upload size={16} />
+                              </div>
+                              <div>
+                                <span className="text-xs font-bold text-gray-600 block group-hover:text-purple-700">Upload Proof</span>
+                                <span className="text-[10px] text-gray-400 block">Click to add image</span>
+                              </div>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handleProofUpload(e, order.id)}
+                              />
+                            </label>
+                          )}
+                        </div>
+                        {/* END OF NEW PAYMENT PROOF SECTION */}
                       </div>
 
                       {/* RIGHT: Items & Tools (PRESERVED) */}
@@ -1933,10 +2033,15 @@ const AdminDashboard = ({
           onClose={() => setReceiptOrder(null)}
         />
       )}
+
+      {/* ✨ PREVIEW MODAL (Restored for Admin) */}
+      <ImagePreviewModal
+        src={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 };
-
 // --- MAIN APP ---
 export default function App() {
   useEffect(() => {
@@ -2387,12 +2492,12 @@ export default function App() {
             // SAVE THE IMAGE HERE:
             proof: compressedProof
           },
-            items: cart,
-            subtotal: subtotal,
-            deliveryFee: deliveryMethod === 'delivery' ? 1.000 : 0, // <--- ADD THIS COMMA
-            total: finalTotal,
-            journeyStatus: "pending",
-            date: new Date().toISOString(),
+          items: cart,
+          subtotal: subtotal,
+          deliveryFee: deliveryMethod === 'delivery' ? 1.000 : 0, // <--- ADD THIS COMMA
+          total: finalTotal,
+          journeyStatus: "pending",
+          date: new Date().toISOString(),
         };
         transaction.set(newOrderRef, orderData);
         setLastOrder(orderData);
@@ -2646,7 +2751,7 @@ export default function App() {
             {viewMode === "shop" && (
               <button
                 onClick={() => {
-                  setCheckoutStep("cart"); // <--- This is the magic line!
+                  setCheckoutStep("cart");
                   setIsCartOpen(true);
                 }}
                 className="relative p-2 hover:text-purple-600 transition-colors"
@@ -2706,7 +2811,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* 1. TOP FILTERS (Not Sticky - Will scroll away) */}
+          {/* 1. TOP FILTERS */}
           <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
             {/* Search Bar */}
             <div className="relative w-full">
@@ -2749,7 +2854,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* 2. THE STICKY CONTROL BAR (Only Sort & Toggle - Stays at top) */}
+          {/* 2. THE STICKY CONTROL BAR */}
           <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
 
@@ -2794,7 +2899,6 @@ export default function App() {
                   src={p.image}
                   alt={p.name}
                   stock={p.stock}
-                  // Add this new line below:
                   isNew={isNewArrival(p.createdAt)}
                   discount={
                     p.originalPrice
@@ -2819,7 +2923,6 @@ export default function App() {
                     {p.name}
                   </h3>
 
-                  {/* EXPIRY DATE ADDED HERE */}
                   {p.expiryDate && (
                     <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
                       <Clock size={12} /> Expiry: {p.expiryDate}
@@ -2907,14 +3010,13 @@ export default function App() {
                   >
                     <Download size={18} /> Download Receipt PDF
                   </button>
-                  {/* WhatsApp Button: Aesthetic Unicode Edition ♡ */}
+                  {/* WhatsApp Button */}
                   <a
                     href={(() => {
-                      // These symbols are 100% safe and will NOT turn into question marks
-                      const symHeart = "\u2661"; // ♡
-                      const symStar = "\u22C6";  // ⋆
-                      const symSparkle = "\u2727"; // ✧
-                      const symArrow = "\u279C"; // ➜
+                      const symHeart = "\u2661";
+                      const symStar = "\u22C6";
+                      const symSparkle = "\u2727";
+                      const symArrow = "\u279C";
 
                       const deliveryType = lastOrder?.customer?.deliveryMethod === 'delivery' ? 'Delivery' :
                         lastOrder?.customer?.deliveryMethod === 'meetup' ? 'Meet-Up' : 'Pick-Up';
@@ -3073,7 +3175,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Summary Section matching Image 3 */}
+                  {/* Summary Section */}
                   <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                     <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -3166,9 +3268,7 @@ export default function App() {
           </h2>
           <p className="text-gray-500 mb-8">{shopContent.footerText}</p>
 
-          {/* --- SOCIAL MEDIA LINKS (Dynamic) --- */}
           <div className="flex justify-center gap-6 mb-8">
-            {/* Instagram - Only shows if link exists */}
             {shopContent.instagramUrl && (
               <a
                 href={shopContent.instagramUrl}
@@ -3179,8 +3279,6 @@ export default function App() {
                 <Instagram size={24} />
               </a>
             )}
-
-            {/* Facebook - Only shows if link exists */}
             {shopContent.facebookUrl && (
               <a
                 href={shopContent.facebookUrl}
@@ -3191,8 +3289,6 @@ export default function App() {
                 <Facebook size={24} />
               </a>
             )}
-
-            {/* WhatsApp - Only shows if number exists */}
             {shopContent.whatsappNumber && (
               <a
                 href={`https://wa.me/${shopContent.whatsappNumber.replace(
@@ -3256,16 +3352,6 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* CUSTOMER RECEIPT MODAL */}
-      {customerReceipt && (
-        <OrderReceiptModal
-          order={customerReceipt}
-          onClose={() => setCustomerReceipt(null)}
-        />
-      )}
     </div>
   );
-}
-
-
-
+};
