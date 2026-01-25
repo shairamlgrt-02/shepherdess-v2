@@ -643,7 +643,21 @@ const AdminDashboard = ({
   const [localCategories, setLocalCategories] = useState(categories);
   const [newMainCat, setNewMainCat] = useState("");
   const [newSubCat, setNewSubCat] = useState({ main: "", sub: "" });
-  const [newPromo, setNewPromo] = useState({ title: "", productIds: [] });
+  // --- UPDATED: Complex Promo State ---
+  const [newPromo, setNewPromo] = useState({
+    title: "",
+    type: "collection", // options: 'collection' (tab), 'coupon' (code), 'auto' (sale)
+    code: "",
+    discountType: "percentage", // percentage, fixed
+    value: 0,
+    startDate: "",
+    endDate: "",
+    usageLimit: "",
+    minSpend: "",
+    scope: "specific", // specific, category, all
+    targetSelections: [], // Stores product IDs OR Category names
+    active: true
+  });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
   const [promoSearchQuery, setPromoSearchQuery] = useState("");
 
@@ -839,38 +853,61 @@ const AdminDashboard = ({
     [products, promoSearchQuery]
   );
 
-  const togglePromoProduct = (id) =>
-    setNewPromo((prev) => ({
+  // --- NEW: Handle Target Selection (Products or Categories) ---
+  const toggleTarget = (item) => {
+    setNewPromo((prev) => {
+      const exists = prev.targetSelections.includes(item);
+      return {
+        ...prev,
+        targetSelections: exists
+          ? prev.targetSelections.filter((i) => i !== item)
+          : [...prev.targetSelections, item],
+      };
+    });
+  };
+
+  const selectAllFiltered = () => {
+    // If scope is specific, select all visible products
+    const ids = filteredPromoProducts.map(p => p.id);
+    setNewPromo(prev => ({
       ...prev,
-      productIds: prev.productIds.includes(id)
-        ? prev.productIds.filter((pid) => pid !== id)
-        : [...prev.productIds, id],
+      targetSelections: [...new Set([...prev.targetSelections, ...ids])]
     }));
-  const selectAllFiltered = () =>
-    setNewPromo((prev) => ({
-      ...prev,
-      productIds: [
-        ...new Set([
-          ...prev.productIds,
-          ...filteredPromoProducts.map((p) => p.id),
-        ]),
-      ],
-    }));
-  const deselectAllFiltered = () =>
-    setNewPromo((prev) => ({
-      ...prev,
-      productIds: prev.productIds.filter(
-        (pid) => !filteredPromoProducts.map((p) => p.id).includes(pid)
-      ),
-    }));
+  };
+
+  const deselectAllFiltered = () => {
+    setNewPromo(prev => ({ ...prev, targetSelections: [] }));
+  };
 
   const savePromo = (e) => {
     e.preventDefault();
+
+    // Basic Validation
+    if (newPromo.type === 'coupon' && !newPromo.code) return alert("Please enter a Promo Code");
+    if (newPromo.type === 'auto' && newPromo.value <= 0) return alert("Please enter a discount value");
+
+    const finalData = {
+      ...newPromo,
+      value: parseFloat(newPromo.value) || 0,
+      usageLimit: parseInt(newPromo.usageLimit) || null,
+      minSpend: parseFloat(newPromo.minSpend) || null,
+      // Backwards compatibility for the "Home Page Tabs" feature (Feature 2)
+      productIds: newPromo.scope === 'specific' ? newPromo.targetSelections : []
+    };
+
     if (isEditingPromo) {
-      onUpdatePromotion(isEditingPromo, newPromo);
+      onUpdatePromotion(isEditingPromo, finalData);
       setIsEditingPromo(null);
-    } else onAddPromotion(newPromo);
-    setNewPromo({ title: "", productIds: [] });
+    } else {
+      onAddPromotion(finalData);
+    }
+
+    // Reset Form
+    setNewPromo({
+      title: "", type: "collection", code: "", discountType: "percentage",
+      value: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",
+      scope: "specific", targetSelections: [], active: true
+    });
     setPromoSearchQuery("");
   };
 
@@ -1743,129 +1780,256 @@ const AdminDashboard = ({
         </div>
       )}
 
-      {/* PROMOTIONS TAB */}
+      {/* PROMOTIONS TAB (UPGRADED) */}
       {tab === "promos" && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm">
-            <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
-              <Tag size={20} className="text-purple-600" />{" "}
-              {isEditingPromo ? "Edit Promotion" : "Create New Promotion"}
+          <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm animate-fade-in">
+            <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-purple-900">
+              <Tag size={20} className="text-purple-600" />
+              {isEditingPromo ? "Edit Promotion" : "Create New Campaign"}
             </h3>
-            <div className="mb-4">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Promo Title
-              </label>
-              <input
-                className="w-full border p-2 rounded-lg mt-1"
-                placeholder="e.g. Valentine's Sale"
-                value={newPromo.title}
-                onChange={(e) =>
-                  setNewPromo({ ...newPromo, title: e.target.value })
-                }
-              />
-            </div>
-            <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Select Products
-              </label>
-              <div className="relative w-full md:w-auto flex-1 max-w-sm">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-2.5 text-gray-400"
-                />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="w-full pl-8 pr-4 py-2 border rounded-full text-sm bg-gray-50 focus:bg-white transition-colors"
-                  value={promoSearchQuery}
-                  onChange={(e) => setPromoSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2 w-full md:w-auto">
+
+            {/* 1. CAMPAIGN TYPE SELECTOR */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {[
+                { id: 'collection', label: 'Collection Tab', icon: LayoutDashboard, desc: 'Group items for Home Page' },
+                { id: 'coupon', label: 'Coupon Code', icon: Tag, desc: 'Customer enters code at checkout' },
+                { id: 'auto', label: 'Seasonal Sale', icon: Sparkles, desc: 'Auto-discount visible in shop' },
+              ].map(type => (
                 <button
+                  key={type.id}
                   type="button"
-                  onClick={selectAllFiltered}
-                  className="flex-1 md:flex-none flex items-center gap-1 bg-purple-100 text-purple-700 px-3 py-2 rounded text-xs font-bold hover:bg-purple-200"
+                  onClick={() => setNewPromo({ ...newPromo, type: type.id })}
+                  className={`p-4 rounded-xl border text-left transition-all ${newPromo.type === type.id
+                    ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600'
+                    : 'border-gray-200 hover:border-purple-300'}`}
                 >
-                  <CheckSquare size={14} /> Select All
+                  <type.icon size={24} className={`mb-2 ${newPromo.type === type.id ? 'text-purple-600' : 'text-gray-400'}`} />
+                  <div className="font-bold text-sm text-gray-900">{type.label}</div>
+                  <div className="text-[10px] text-gray-500 leading-tight mt-1">{type.desc}</div>
                 </button>
-                <button
-                  type="button"
-                  onClick={deselectAllFiltered}
-                  className="flex-1 md:flex-none flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-2 rounded text-xs font-bold hover:bg-gray-200"
-                >
-                  <Square size={14} /> Unselect
-                </button>
-              </div>
-            </div>
-            <div className="h-64 overflow-y-auto border rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-gray-50">
-              {filteredPromoProducts.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.productIds.includes(p.id)
-                    ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
-                    : "border-gray-200 hover:border-purple-300"
-                    }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={newPromo.productIds.includes(p.id)}
-                    onChange={() => togglePromoProduct(p.id)}
-                    className="accent-purple-600 w-4 h-4 flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="text-xs text-gray-500">{p.category}</p>
-                  </div>
-                </label>
               ))}
             </div>
-            <div className="flex gap-2 mt-4">
+
+            {/* 2. BASIC DETAILS */}
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Internal Title</label>
+                <input
+                  className="w-full border p-2 rounded-lg mt-1 text-sm"
+                  placeholder="e.g. Valentine's Sale 2026"
+                  value={newPromo.title}
+                  onChange={(e) => setNewPromo({ ...newPromo, title: e.target.value })}
+                />
+              </div>
+
+              {newPromo.type === 'coupon' && (
+                <div>
+                  <label className="text-xs font-bold text-purple-600 uppercase">Promo Code</label>
+                  <input
+                    className="w-full border-2 border-purple-100 p-2 rounded-lg mt-1 text-sm font-mono uppercase font-bold text-purple-700 focus:border-purple-500 outline-none"
+                    placeholder="e.g. SAVE10"
+                    value={newPromo.code}
+                    onChange={(e) => setNewPromo({ ...newPromo, code: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 3. RULES ENGINE (Only for Coupons & Sales) */}
+            {newPromo.type !== 'collection' && (
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 space-y-4">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Discount Rules</h4>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">Value</label>
+                    <div className="flex mt-1">
+                      <input
+                        type="number"
+                        className="w-full p-2 border rounded-l-lg text-sm"
+                        value={newPromo.value}
+                        onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
+                      />
+                      <select
+                        className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold"
+                        value={newPromo.discountType}
+                        onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
+                      >
+                        <option value="percentage">% OFF</option>
+                        <option value="fixed">BHD OFF</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">Min Spend (Optional)</label>
+                    <input
+                      type="number"
+                      placeholder="0.000"
+                      className="w-full p-2 border rounded-lg mt-1 text-sm"
+                      value={newPromo.minSpend}
+                      onChange={(e) => setNewPromo({ ...newPromo, minSpend: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">Start Date</label>
+                    <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.startDate} onChange={(e) => setNewPromo({ ...newPromo, startDate: e.target.value })} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">End Date</label>
+                    <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.endDate} onChange={(e) => setNewPromo({ ...newPromo, endDate: e.target.value })} />
+                  </div>
+                  {newPromo.type === 'coupon' && (
+                    <div className="flex-1">
+                      <label className="text-xs font-bold text-gray-500">Usage Limit</label>
+                      <input type="number" placeholder="∞" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.usageLimit} onChange={(e) => setNewPromo({ ...newPromo, usageLimit: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 4. SCOPE SELECTION */}
+            <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Apply To:</label>
+                <select
+                  className="text-sm border rounded-lg p-1 bg-white"
+                  value={newPromo.scope}
+                  onChange={(e) => setNewPromo({ ...newPromo, scope: e.target.value, targetSelections: [] })}
+                >
+                  <option value="specific">Specific Products</option>
+                  <option value="category">Specific Categories</option>
+                  <option value="all">Entire Store (All Items)</option>
+                </select>
+              </div>
+
+              {newPromo.scope === 'specific' && (
+                <div className="relative w-full md:w-auto flex-1 max-w-sm">
+                  <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    className="w-full pl-8 pr-4 py-2 border rounded-full text-sm bg-gray-50 focus:bg-white"
+                    value={promoSearchQuery}
+                    onChange={(e) => setPromoSearchQuery(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 5. SELECTION GRID */}
+            {newPromo.scope === 'specific' && (
+              <div className="h-64 overflow-y-auto border rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-gray-50 mb-4">
+                <div className="col-span-full flex gap-2 mb-2">
+                  <button type="button" onClick={selectAllFiltered} className="text-xs font-bold text-purple-600 hover:underline">Select All Visible</button>
+                  <button type="button" onClick={deselectAllFiltered} className="text-xs font-bold text-gray-400 hover:underline">Clear</button>
+                </div>
+                {filteredPromoProducts.map((p) => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center gap-2 bg-white p-3 rounded-lg border cursor-pointer transition-all ${newPromo.targetSelections.includes(p.id)
+                      ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
+                      : "border-gray-200 hover:border-purple-300"
+                      }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newPromo.targetSelections.includes(p.id)}
+                      onChange={() => toggleTarget(p.id)}
+                      className="accent-purple-600 w-4 h-4 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.category}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {newPromo.scope === 'category' && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {Object.keys(categories).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleTarget(cat)}
+                    className={`px-3 py-1 rounded-full text-sm font-bold border transition-colors ${newPromo.targetSelections.includes(cat) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
               <button
                 onClick={savePromo}
-                className="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-purple-700"
+                className="bg-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-700 shadow-md flex items-center gap-2"
               >
-                Save Promotion
+                <Save size={18} /> {isEditingPromo ? "Update Campaign" : "Launch Campaign"}
               </button>
               {isEditingPromo && (
                 <button
                   onClick={() => {
                     setIsEditingPromo(null);
-                    setNewPromo({ title: "", productIds: [] });
-                    setPromoSearchQuery("");
+                    setNewPromo({ title: "", type: "collection", code: "", discountType: "percentage", value: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "", scope: "specific", targetSelections: [], active: true });
                   }}
-                  className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-200"
+                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200"
                 >
                   Cancel
                 </button>
               )}
             </div>
           </div>
+
+          {/* LIST OF ACTIVE PROMOS */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {promotions.map((promo) => (
               <div
                 key={promo.id}
-                className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative group hover:shadow-md transition-shadow"
+                className={`bg-white p-5 rounded-xl border shadow-sm relative group hover:shadow-md transition-shadow ${promo.active === false ? 'opacity-60 grayscale' : 'border-purple-100'}`}
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-bold text-lg text-gray-900">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${promo.type === 'coupon' ? 'bg-blue-100 text-blue-700' :
+                          promo.type === 'auto' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                        {promo.type === 'auto' ? 'SALE' : promo.type.toUpperCase()}
+                      </span>
+                      {promo.code && <span className="font-mono text-xs font-bold bg-gray-100 px-1 rounded">{promo.code}</span>}
+                    </div>
+                    <h4 className="font-bold text-lg text-gray-900 leading-tight">
                       {promo.title}
                     </h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {promo.productIds.length} Products Included
+                    <p className="text-xs text-gray-500 mt-1">
+                      {promo.scope === 'all' ? 'Entire Store' : `${promo.targetSelections?.length || 0} Items/Cats`}
+                      {promo.value > 0 && ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF`}
                     </p>
+                    {promo.expiryDate && <p className="text-[10px] text-red-400 mt-2 font-bold">Ends: {promo.expiryDate}</p>}
                   </div>
-                  <Tag className="text-purple-100" size={32} />
                 </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+
+                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-50">
                   <button
                     onClick={() => {
                       setIsEditingPromo(promo.id);
-                      setNewPromo(promo);
+                      setNewPromo({
+                        ...promo,
+                        // Ensure new fields exist for legacy data
+                        type: promo.type || 'collection',
+                        scope: promo.scope || 'specific',
+                        targetSelections: promo.targetSelections || promo.productIds || []
+                      });
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
-                    className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-sm font-bold hover:bg-blue-100"
+                    className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-xs font-bold hover:bg-blue-100"
                   >
                     Edit
                   </button>
@@ -2257,15 +2421,15 @@ export default function App() {
     // This removes the extra white space seen in your current PDFs
     doc.save(`Receipt-${cleanId}.pdf`);
   };
+  // --- 1. ALL DATA STATES ---
   const [user, setUser] = useState(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [promotions, setPromotions] = useState([]);
-  // Add this with your other states inside App()
   const [customerReceipt, setCustomerReceipt] = useState(null);
 
-  // --- LOAD/SAVE CART ---
+  // --- 2. LOAD CART ---
   const [cart, setCart] = useState(() => {
     try {
       const savedCart = localStorage.getItem("shepherdess_cart");
@@ -2280,7 +2444,7 @@ export default function App() {
     localStorage.setItem("shepherdess_cart", JSON.stringify(cart));
   }, [cart]);
 
-  // --- UI & FILTER STATES ---
+  // --- 3. UI STATES ---
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -2294,19 +2458,105 @@ export default function App() {
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [meetupNote, setMeetupNote] = useState("");
 
-  // --- RESTORING MISSING VARIABLES ---
+  // --- 4. RESTORED VARIABLES ---
   const [visibleCount, setVisibleCount] = useState(12);
   const [sortOption, setSortOption] = useState("default");
   const [hideOutOfStock, setHideOutOfStock] = useState(false);
-  const [notification, setNotification] = useState(null); // 👈 THIS WAS THE CRASH CAUSE!
+  const [notification, setNotification] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastOrder, setLastOrder] = useState(null);
 
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     phone: "",
     proof: "",
   });
+
+  // --- 5. MARKETING ENGINE (The New Logic) ---
+  const [appliedCode, setAppliedCode] = useState(null); // Stores: { code, value, type, id }
+  const [promoError, setPromoError] = useState("");
+
+  // A. Helper: Check if a promo is active based on dates
+  const isPromoActive = (promo) => {
+    if (!promo.startDate || !promo.endDate) return true;
+    const now = new Date();
+    const start = new Date(promo.startDate);
+    const end = new Date(promo.endDate);
+    end.setHours(23, 59, 59, 999);
+    return now >= start && now <= end;
+  };
+
+  // B. Helper: Calculate "Auto-Sale" Price (Visual Discount)
+  const getProductPrice = (product) => {
+    // 1. Find an active 'auto' sale that applies to this product
+    const activeSale = promotions.find(p =>
+      p.type === 'auto' &&
+      isPromoActive(p) &&
+      (
+        p.scope === 'all' ||
+        (p.scope === 'category' && (p.targetSelections.includes(product.category) || p.targetSelections.includes(product.subcategory))) ||
+        (p.scope === 'specific' && p.targetSelections.includes(product.id))
+      )
+    );
+
+    if (!activeSale) return { final: product.price, original: product.originalPrice, isSale: false };
+
+    // 2. Calculate Discount
+    let discounted = product.price;
+    if (activeSale.discountType === 'percentage') {
+      discounted = product.price * (1 - (activeSale.value / 100));
+    } else {
+      discounted = Math.max(0, product.price - activeSale.value);
+    }
+
+    return {
+      final: discounted,
+      original: product.price,
+      isSale: true,
+      label: activeSale.title
+    };
+  };
+
+  // C. Helper: Validate Coupon Code (Checkout)
+  const validateCoupon = (code, cartTotal, cartItems) => {
+    const promo = promotions.find(p => p.code === code && p.type === 'coupon');
+
+    if (!promo) return { valid: false, error: "Invalid code" };
+    if (!isPromoActive(promo)) return { valid: false, error: "Code expired" };
+    if (promo.usageLimit && promo.usedCount >= promo.usageLimit) return { valid: false, error: "Usage limit reached" };
+    if (promo.minSpend && cartTotal < promo.minSpend) return { valid: false, error: `Min spend: ${promo.minSpend} BHD` };
+
+    // Check Scope (Does cart have eligible items?)
+    let eligibleTotal = 0;
+    if (promo.scope === 'all') {
+      eligibleTotal = cartTotal;
+    } else {
+      cartItems.forEach(item => {
+        if (
+          (promo.scope === 'category' && (promo.targetSelections.includes(item.category) || promo.targetSelections.includes(item.subcategory))) ||
+          (promo.scope === 'specific' && promo.targetSelections.includes(item.id))
+        ) {
+          eligibleTotal += (item.price * item.qty);
+        }
+      });
+    }
+
+    if (eligibleTotal === 0) return { valid: false, error: "Code not applicable to these items" };
+
+    // Calculate Discount Amount
+    let discountAmount = 0;
+    if (promo.discountType === 'percentage') {
+      discountAmount = eligibleTotal * (promo.value / 100);
+    } else {
+      discountAmount = promo.value; // Fixed amount
+    }
+
+    // Ensure we don't discount more than the total
+    discountAmount = Math.min(discountAmount, cartTotal);
+
+    return { valid: true, discount: discountAmount, promoId: promo.id };
+  };
 
   // Sync Data (Live Listeners)
   useEffect(() => {
@@ -2441,8 +2691,26 @@ export default function App() {
     return "#" + Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  const [lastOrder, setLastOrder] = useState(null); // Add this state for the success screen
+  // --- NEW: Handle Promo Code Application ---
+  const handleApplyCode = () => {
+    if (!appliedCodeInput.trim()) return;
+    const cartItems = Object.values(cart);
+    const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
+    // Use the helper from Step 1
+    const result = validateCoupon(appliedCodeInput, cartTotal, cartItems);
+
+    if (result.valid) {
+      setAppliedCode({ code: appliedCodeInput, discount: result.discount, id: result.promoId });
+      setPromoError("");
+      showNotification(`Code applied! saved ${result.discount.toFixed(3)} BHD`);
+    } else {
+      setAppliedCode(null);
+      setPromoError(result.error);
+    }
+  };
+
+  // --- UPDATED: Checkout with Discount Support ---
   const handleCheckout = async (e) => {
     e.preventDefault();
 
@@ -2454,16 +2722,18 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
-      // 1. Convert and compress the image to a Base64 string
       const compressedProof = await compressImage(proofFile);
-
       const orderId = generateOrderId();
       const cartItems = Object.values(cart);
+
+      // Calculate Totals
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
-      const finalTotal = subtotal + deliveryFee;
+      const discount = appliedCode ? appliedCode.discount : 0;
+      const finalTotal = Math.max(0, subtotal + deliveryFee - discount);
 
       await runTransaction(db, async (transaction) => {
+        // 1. Stock Check
         const validatedItems = [];
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
@@ -2471,15 +2741,27 @@ export default function App() {
           if (!productSnap.exists()) throw `Product ${item.name} no longer exists!`;
           const currentStock = productSnap.data().stock || 0;
           if (currentStock < item.qty) {
-            throw `Sorry Bestie! Only ${currentStock} left of ${item.name}.`;
+            throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
+        // 2. Update Stock
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
+        // 3. Increment Promo Usage (If used)
+        if (appliedCode && appliedCode.id) {
+          const promoRef = doc(db, "promotions", appliedCode.id);
+          const promoSnap = await transaction.get(promoRef);
+          if (promoSnap.exists()) {
+            const newCount = (promoSnap.data().usedCount || 0) + 1;
+            transaction.update(promoRef, { usedCount: newCount });
+          }
+        }
+
+        // 4. Create Order
         const newOrderRef = doc(collection(db, "orders"));
         const orderData = {
           orderId,
@@ -2489,12 +2771,13 @@ export default function App() {
             deliveryMethod,
             deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : '',
             meetupNote: deliveryMethod !== 'delivery' ? meetupNote : '',
-            // SAVE THE IMAGE HERE:
             proof: compressedProof
           },
           items: cart,
           subtotal: subtotal,
-          deliveryFee: deliveryMethod === 'delivery' ? 1.000 : 0, // <--- ADD THIS COMMA
+          deliveryFee: deliveryFee,
+          discount: discount,          // <--- SAVED TO DB
+          promoCode: appliedCode ? appliedCode.code : null, // <--- SAVED TO DB
           total: finalTotal,
           journeyStatus: "pending",
           date: new Date().toISOString(),
@@ -2505,7 +2788,8 @@ export default function App() {
 
       setCheckoutStep("success");
       setCart({});
-      setProofFile(null); // Clear the file after success
+      setProofFile(null);
+      setAppliedCode(null); // Reset code
       showNotification("Order placed successfully! ✧", "success");
 
     } catch (error) {
@@ -2515,6 +2799,9 @@ export default function App() {
       setIsSubmitting(false);
     }
   };
+
+  // New state for the input box
+  const [appliedCodeInput, setAppliedCodeInput] = useState("");
 
   const toggleAdmin = () => {
     if (adminPin === "742472") {
@@ -3176,25 +3463,61 @@ export default function App() {
                   </div>
 
                   {/* Summary Section */}
-                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                    <h3 className="font-bold text-purple-900 mb-3 text-sm">Total to Transfer</h3>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Subtotal:</span>
-                      <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-3 border-b border-purple-200 pb-2">
-                      <span>Delivery Fee:</span>
-                      <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
+                  {/* Summary Section with Promo Code */}
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 space-y-3">
+                    <h3 className="font-bold text-purple-900 text-sm">Total to Transfer</h3>
+
+                    {/* Subtotal & Delivery */}
+                    <div className="space-y-1 pb-3 border-b border-purple-200">
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Subtotal:</span>
+                        <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Delivery Fee:</span>
+                        <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
+                      </div>
+                      {appliedCode && (
+                        <div className="flex justify-between text-xs text-green-600 font-bold animate-pulse">
+                          <span>Discount ({appliedCode.code}):</span>
+                          <span>- {appliedCode.discount.toFixed(3)} BHD</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex justify-between items-end mb-4">
+                    {/* PROMO CODE INPUT */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Promo Code?"
+                        className="flex-1 p-2 text-xs border border-purple-200 rounded-lg uppercase placeholder:normal-case focus:outline-none focus:border-purple-500"
+                        value={appliedCodeInput}
+                        onChange={(e) => setAppliedCodeInput(e.target.value.toUpperCase())}
+                      />
+                      <button
+                        onClick={handleApplyCode}
+                        disabled={!!appliedCode}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${appliedCode ? 'bg-green-500 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+                      >
+                        {appliedCode ? <Check size={14} /> : "Apply"}
+                      </button>
+                    </div>
+                    {promoError && <p className="text-[10px] text-red-500 font-bold">{promoError}</p>}
+
+
+                    {/* FINAL TOTAL */}
+                    <div className="flex justify-between items-end pt-2">
                       <span className="text-purple-700 font-bold text-lg">Total:</span>
                       <span className="font-mono text-2xl font-bold text-gray-900">
-                        {(Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) + (deliveryMethod === 'delivery' ? 1.000 : 0)).toFixed(3)} BHD
+                        {(
+                          Math.max(0, Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) +
+                            (deliveryMethod === 'delivery' ? 1.000 : 0) -
+                            (appliedCode ? appliedCode.discount : 0))
+                        ).toFixed(3)} BHD
                       </span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer mb-4" onClick={() => { navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!"); }}>
+                    <div className="bg-white p-3 rounded-lg border border-purple-200 relative group cursor-pointer" onClick={() => { navigator.clipboard.writeText("+97333027588"); showNotification("Number Copied!"); }}>
                       <p className="text-[10px] text-purple-500 uppercase font-bold tracking-wider mb-1">Pay to BenefitPay</p>
                       <p className="font-mono text-lg font-bold text-gray-900 tracking-wider">+973 3302 7588</p>
                       <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
@@ -3202,16 +3525,6 @@ export default function App() {
                     <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
                   </div>
 
-                  {/* Proof Upload */}
-                  <div className="pt-2">
-                    <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer bg-white transition-all ${proofFile ? "border-green-400" : "border-gray-200"}`}>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => setProofFile(e.target.files[0])} />
-                      <div className="flex items-center gap-2 text-gray-400">
-                        {proofFile ? <CheckCircle size={18} className="text-green-500" /> : <Upload size={18} />}
-                        <span className="text-xs font-bold">{proofFile ? proofFile.name : "Upload Payment Screenshot"}</span>
-                      </div>
-                    </label>
-                  </div>
                 </div>
               )}
             </div>
@@ -3355,3 +3668,5 @@ export default function App() {
     </div>
   );
 };
+
+
