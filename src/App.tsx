@@ -1999,7 +1999,7 @@ const AdminDashboard = ({
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${promo.type === 'coupon' ? 'bg-blue-100 text-blue-700' :
-                          promo.type === 'auto' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
+                        promo.type === 'auto' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
                         }`}>
                         {promo.type === 'auto' ? 'SALE' : promo.type.toUpperCase()}
                       </span>
@@ -2879,7 +2879,19 @@ export default function App() {
         matchesCategory = p.subcategory === selectedCategory;
       else {
         const promo = promotions.find((pr) => pr.title === selectedCategory);
-        if (promo) matchesCategory = promo.productIds.includes(p.id);
+        if (promo) {
+          // Support for new scopes (Category/All) in Tabs
+          if (promo.scope === 'all') {
+            matchesCategory = true;
+          } else if (promo.scope === 'category') {
+            matchesCategory = (promo.targetSelections || []).includes(p.category) ||
+              (promo.targetSelections || []).includes(p.subcategory);
+          } else {
+            // Fallback to specific IDs (Checking both legacy productIds and new targetSelections)
+            const ids = promo.targetSelections || promo.productIds || [];
+            matchesCategory = ids.includes(p.id);
+          }
+        }
       }
       return matchesCategory && matchesSearch;
     });
@@ -3456,8 +3468,27 @@ export default function App() {
                     <div className="space-y-4">
                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Contact Details</label>
                       <div className="grid grid-cols-2 gap-2">
-                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Your Name" value={customerDetails.name} onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })} required />
-                        <input className="w-full p-3 border rounded-lg text-sm" placeholder="Phone Number" type="tel" value={customerDetails.phone} onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })} required />
+                        <input
+                          name="customerName"        // <--- Added name
+                          id="customerName"          // <--- Added id
+                          autoComplete="name"        // <--- tells browser this is a Name
+                          className="w-full p-3 border rounded-lg text-sm"
+                          placeholder="Your Name"
+                          value={customerDetails.name}
+                          onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
+                          required
+                        />
+                        <input
+                          name="customerPhone"       // <--- Added name
+                          id="customerPhone"         // <--- Added id
+                          autoComplete="tel"         // <--- tells browser this is a Phone Number
+                          className="w-full p-3 border rounded-lg text-sm"
+                          placeholder="Phone Number"
+                          type="tel"
+                          value={customerDetails.phone}
+                          onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
+                          required
+                        />
                       </div>
                     </div>
                   </div>
