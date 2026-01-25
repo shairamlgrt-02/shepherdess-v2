@@ -3112,6 +3112,7 @@ export default function App() {
 
           {/* 1. TOP FILTERS */}
           <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+
             {/* Search Bar */}
             <div className="relative w-full">
               <input
@@ -3124,7 +3125,7 @@ export default function App() {
               <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
             </div>
 
-            {/* Category Buttons */}
+            {/* Main Category Buttons */}
             <div className="flex flex-wrap gap-2 justify-center">
               <button
                 onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
@@ -3132,6 +3133,8 @@ export default function App() {
               >
                 All
               </button>
+
+              {/* Promotions/Sales Tabs */}
               {promotions.map((p) => (
                 <button
                   key={p.id}
@@ -3141,6 +3144,8 @@ export default function App() {
                   <Tag size={12} /> {p.title}
                 </button>
               ))}
+
+              {/* Dynamic Main Categories */}
               {availableCategories.map((c) => (
                 <button
                   key={c}
@@ -3151,6 +3156,27 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {/* NEW: Subcategory Filter Strip (Only shows when a Main Category is active) */}
+            {displaySubcategories.length > 0 && (
+              <div className="flex flex-wrap gap-2 justify-center pt-3 border-t border-gray-50 animate-fade-in">
+                <span className="w-full text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                  Filter {currentMainCategory}:
+                </span>
+                {displaySubcategories.map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
+                        ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
+                        : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
+                      }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 2. THE STICKY CONTROL BAR */}
