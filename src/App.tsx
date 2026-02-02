@@ -17,7 +17,7 @@ import {
   runTransaction
 } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { getMessaging, getToken } from "firebase/messaging";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import {
   ShoppingBag,
   X,
@@ -2246,6 +2246,15 @@ export default function App() {
       console.error("Notification Error:", error);
     }
   };
+  // --- FOREGROUND LISTENER (New!) ---
+  useEffect(() => {
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Foreground Message:', payload);
+      // This triggers a standard alert when you are looking at the site
+      alert(`🔔 ${payload.notification?.title}: ${payload.notification?.body}`);
+    });
+    return () => unsubscribe();
+  }, []);
   // --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
   const generateReceipt = async (order) => {
     // 1. CALCULATE HEIGHT BEFORE CREATING PDF
