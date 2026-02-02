@@ -17,6 +17,7 @@ import {
   runTransaction
 } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getMessaging, getToken } from "firebase/messaging";
 import {
   ShoppingBag,
   X,
@@ -84,6 +85,7 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
+const messaging = getMessaging(app);
 
 // --- Aesthetic Constants ---
 const THEME = {
@@ -2218,6 +2220,32 @@ export default function App() {
     }
     link.href = LOGO_URL;
   }, []);
+  // --- NOTIFICATION LOGIC ---
+  const handleNotificationSetup = async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        // Get the token identifying this specific device
+        const token = await getToken(messaging, {
+          vapidKey: "BM110yqqzY-oIJZJM8XankX3t0VdrpLFCOTTIASts_mpYJPmv3E0JlR3_KiyOAs6A4ZlNh5nE5Saf_fmIXcNJZY"
+        });
+
+        if (token) {
+          console.log("Notification Token:", token);
+          // Save token to Firebase so you can target this user later
+          await setDoc(doc(db, "notification_tokens", token), {
+            createdAt: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          });
+          alert("Success! You will now receive Shepherdess updates. 🌸");
+        }
+      } else {
+        alert("Notifications blocked. Please enable them in your browser settings.");
+      }
+    } catch (error) {
+      console.error("Notification Error:", error);
+    }
+  };
   // --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
   const generateReceipt = async (order) => {
     // 1. CALCULATE HEIGHT BEFORE CREATING PDF
@@ -3168,8 +3196,8 @@ export default function App() {
                     key={sub}
                     onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
                     className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
-                        ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
-                        : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
+                      ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
+                      : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
                       }`}
                   >
                     {sub}
@@ -3672,6 +3700,16 @@ export default function App() {
                 <MessageCircle size={24} />
               </a>
             )}
+          </div>
+
+          {/* Test Notification Button */}
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={handleNotificationSetup}
+              className="text-[10px] bg-purple-50 text-purple-600 px-3 py-1 rounded-full font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
+            >
+              🔔 Enable Notifications
+            </button>
           </div>
 
           <div className="flex justify-center items-center gap-4 text-sm text-gray-400">
