@@ -2220,30 +2220,54 @@ export default function App() {
     }
     link.href = LOGO_URL;
   }, []);
-  // --- NOTIFICATION LOGIC ---
+  // --- ROBUST NOTIFICATION SETUP ---
   const handleNotificationSetup = async () => {
-    try {
-      const permission = await window.Notification.requestPermission();
-      if (permission === "granted") {
-        // Get the token identifying this specific device
-        const token = await getToken(messaging, {
-          vapidKey: "BM110yqqzY-oIJZJM8XankX3t0VdrpLFCOTTIASts_mpYJPmv3E0JlR3_KiyOAs6A4ZlNh5nE5Saf_fmIXcNJZY"
-        });
+    console.log("1. Starting setup...");
 
-        if (token) {
-          console.log("Notification Token:", token);
-          // Save token to Firebase so you can target this user later
-          await setDoc(doc(db, "notification_tokens", token), {
-            createdAt: new Date().toISOString(),
-            userAgent: navigator.userAgent
-          });
-          alert("Success! You will now receive Shepherdess updates. 🌸");
-        }
-      } else {
-        alert("Notifications blocked. Please enable them in your browser settings.");
+    if (!('serviceWorker' in navigator)) {
+      alert("This browser does not support notifications.");
+      return;
+    }
+
+    try {
+      // A. Clear old workers to prevent conflicts
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let registration of registrations) {
+        await registration.unregister();
       }
+      console.log("2. Old workers cleared.");
+
+      // B. Ask for Permission
+      const permission = await window.Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("Permission denied. Please enable notifications in browser settings.");
+        return;
+      }
+      console.log("3. Permission granted.");
+
+      // C. Register the new worker explicitly
+      const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log("4. Service Worker registered:", swRegistration);
+
+      // D. Get the Token using that specific registration
+      const token = await getToken(messaging, {
+        vapidKey: "BM110yqqzY-oIJZJM8XankX3t0VdrpLFCOTTIASts_mpYJPmv3E0JlR3_KiyOAs6A4ZlNh5nE5Saf_fmIXcNJZY",
+        serviceWorkerRegistration: swRegistration
+      });
+
+      if (token) {
+        console.log("5. SUCCESS! Token:", token);
+        // Save to Firebase
+        await setDoc(doc(db, "notification_tokens", token), {
+          createdAt: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        });
+        alert("Success! You will now receive Shepherdess updates. 🌸");
+      }
+
     } catch (error) {
-      console.error("Notification Error:", error);
+      console.error("SETUP FAILED:", error);
+      alert("Error: " + error.message);
     }
   };
   // --- FOREGROUND LISTENER (New!) ---
