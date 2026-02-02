@@ -2223,7 +2223,7 @@ export default function App() {
   // --- NOTIFICATION LOGIC ---
   const handleNotificationSetup = async () => {
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await window.Notification.requestPermission();
       if (permission === "granted") {
         // Get the token identifying this specific device
         const token = await getToken(messaging, {
