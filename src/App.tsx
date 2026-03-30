@@ -3641,6 +3641,35 @@ export default function App() {
                       <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
                     </div>
                     <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
+                    {/* --- PAYMENT PROOF UPLOAD --- */}
+                    <div className="mt-4 pt-4 border-t border-purple-100">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">
+                        Upload Transfer Screenshot *
+                      </label>
+                      <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${proofFile ? 'border-green-400 bg-green-50' : 'border-purple-200 bg-white hover:bg-purple-50'}`}>
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          {proofFile ? (
+                            <>
+                              <CheckCircle size={24} className="text-green-500 mb-2" />
+                              <p className="text-xs font-bold text-green-700">Image Attached</p>
+                              <p className="text-[10px] text-green-600 mt-1 truncate max-w-[200px]">{proofFile.name}</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={24} className="text-purple-400 mb-2" />
+                              <p className="text-xs font-bold text-gray-600">Click to upload screenshot</p>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => setProofFile(e.target.files[0])}
+                        />
+                      </label>
+                    </div>
+                    {/* ---------------------------- */}
                   </div>
 
                 </div>
