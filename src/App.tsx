@@ -3641,7 +3641,7 @@ export default function App() {
                       <Copy size={16} className="absolute right-3 top-4 text-purple-400" />
                     </div>
                     <p className="text-[10px] text-center text-gray-400">Name: <span className="font-bold">ILA Shai</span></p>
-                    {/* --- PAYMENT PROOF UPLOAD --- */}
+                    {/* --- PAYMENT PROOF UPLOAD BPAY --- */}
                     <div className="mt-4 pt-4 border-t border-purple-100">
                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">
                         Upload Transfer Screenshot *
