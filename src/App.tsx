@@ -662,6 +662,7 @@ const AdminDashboard = ({
   });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
   const [promoSearchQuery, setPromoSearchQuery] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
 
   // --- 3. INVENTORY & MULTI-SORT STATE ---
   const [invSearch, setInvSearch] = useState("");
@@ -698,6 +699,124 @@ const AdminDashboard = ({
     setInvCategory("All");
     setInvSubCategory("All");
     setHideOutOfStock(false);
+  };
+
+  // --- 📦 BULK ACTIONS ENGINE ---
+
+  // 1. Export Current Inventory Backup
+  const handleExportCSV = () => {
+    const headers = ["name", "category", "subcategory", "price", "originalPrice", "stock", "expiryDate", "description", "image", "active"];
+    let csvContent = headers.join(",") + "\n";
+
+    products.forEach(p => {
+      const row = headers.map(header => {
+        let val = p[header] === undefined || p[header] === null ? "" : p[header];
+        // Wrap in quotes to safely handle descriptions with commas inside them
+        if (typeof val === "string") val = `"${val.replace(/"/g, '""')}"`;
+        return val;
+      });
+      csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `Shepherdess_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 2. Download Blank Template
+  const handleDownloadTemplate = () => {
+    const headers = "name,category,subcategory,price,originalPrice,stock,expiryDate,description,image\n";
+    const sample = 'Glass Skin Serum,Skincare,Serum,12.500,,50,2027-12-31,"Amazing glowing serum",https://example.com/image.jpg\n';
+    const blob = new Blob([headers + sample], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "Shepherdess_Import_Template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 3. Process & Import Uploaded CSV
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm("Import these products? They will be added to your current inventory.")) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        
+        // Smart Regex to split by commas, but IGNORE commas inside double quotes
+        const regex = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\s\S][^'\\]*)*)'|"([^"\\]*(?:\\[\s\S][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
+        
+        const rows = text.split('\n').filter(row => row.trim() !== '');
+        
+        // Extract Headers
+        const headers = [];
+        let headerMatch;
+        const headerLine = rows[0];
+        while ((headerMatch = regex.exec(headerLine)) !== null) {
+            if (headerMatch.index === regex.lastIndex) regex.lastIndex++;
+            headers.push((headerMatch[1] || headerMatch[2] || headerMatch[3] || '').trim());
+        }
+
+        let addedCount = 0;
+
+        // Loop through rows and send to Firebase
+        for (let i = 1; i < rows.length; i++) {
+          const values = [];
+          let valMatch;
+          regex.lastIndex = 0; // Reset regex
+          while ((valMatch = regex.exec(rows[i])) !== null) {
+              if (valMatch.index === regex.lastIndex) regex.lastIndex++;
+              let val = valMatch[1] || valMatch[2] || valMatch[3] || '';
+              val = val.replace(/""/g, '"'); // Fix Excel double quotes
+              values.push(val.trim());
+          }
+
+          const item = {};
+          headers.forEach((h, index) => { item[h] = values[index]; });
+
+          // Skip empty or invalid rows
+          if (!item.name || !item.category) continue;
+
+          const formattedData = {
+            name: item.name,
+            category: item.category,
+            subcategory: item.subcategory || "",
+            price: parseFloat(item.price) || 0,
+            originalPrice: item.originalPrice ? parseFloat(item.originalPrice) : null,
+            stock: parseInt(item.stock) || 0,
+            expiryDate: item.expiryDate || "",
+            description: item.description || "",
+            image: item.image || "",
+            active: true,
+            archived: false,
+            createdAt: serverTimestamp() // Time tag
+          };
+
+          // Bulk Add straight to Firebase
+          await addDoc(collection(db, "products"), formattedData);
+          addedCount++;
+        }
+        alert(`Success! 🎉 ${addedCount} products have been added to your shop.`);
+      } catch (error) {
+        console.error("Import failed:", error);
+        alert("Oops! The file format was incorrect. Please use the exact template.");
+      } finally {
+        setIsImporting(false);
+        e.target.value = ''; // Reset input so you can upload the same file again if needed
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleHeaderSort = (key) => {
@@ -1506,6 +1625,38 @@ const AdminDashboard = ({
                   {showProductForm ? "Cancel" : "Add Product"}
                 </button>
               )}
+
+              {/* 4. CSV BULK ACTIONS ENGINE */}
+              <div className="flex gap-2 border-l border-gray-200 pl-3 ml-1">
+                <button 
+                  onClick={handleDownloadTemplate} 
+                  title="Download Blank Template" 
+                  className="p-2 text-gray-400 hover:text-green-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-green-50 transition-colors"
+                >
+                  <FileText size={16} />
+                </button>
+                <button 
+                  onClick={handleExportCSV} 
+                  title="Backup & Export Inventory" 
+                  className="p-2 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+                >
+                  <Download size={16} />
+                </button>
+                <label 
+                  title="Import Products via CSV" 
+                  className={`p-2 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors relative ${isImporting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                >
+                  <Upload size={16} />
+                  <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isImporting} />
+                  {isImporting && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                    </span>
+                  )}
+                </label>
+              </div>
+              
             </div>
           </div>
 
