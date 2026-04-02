@@ -66,6 +66,8 @@ import {
   FileText,
   Printer,
   ChevronUp,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -1044,6 +1046,23 @@ const AdminDashboard = ({
       scope: "specific", targetSelections: [], active: true
     });
     setPromoSearchQuery("");
+  };
+
+  const movePromotion = async (index, direction) => {
+    const promos = [...promotions];
+    
+    // We update Firebase directly so the order is permanently saved!
+    if (direction === 'up' && index > 0) {
+      const current = promos[index];
+      const above = promos[index - 1];
+      await updateDoc(doc(db, "promotions", current.id), { orderIndex: index - 1 });
+      await updateDoc(doc(db, "promotions", above.id), { orderIndex: index });
+    } else if (direction === 'down' && index < promos.length - 1) {
+      const current = promos[index];
+      const below = promos[index + 1];
+      await updateDoc(doc(db, "promotions", current.id), { orderIndex: index + 1 });
+      await updateDoc(doc(db, "promotions", below.id), { orderIndex: index });
+    }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -2191,55 +2210,62 @@ const AdminDashboard = ({
 
           {/* LIST OF ACTIVE PROMOS */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {promotions.map((promo) => (
+          {promotions.map((promo, index) => (
               <div
                 key={promo.id}
-                className={`bg-white p-5 rounded-xl border shadow-sm relative group hover:shadow-md transition-shadow ${promo.active === false ? 'opacity-60 grayscale' : 'border-purple-100'}`}
+                className={`flex bg-white p-5 rounded-xl border shadow-sm relative group hover:shadow-md transition-shadow ${promo.active === false ? 'opacity-60 grayscale' : 'border-purple-100'}`}
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${promo.type === 'coupon' ? 'bg-blue-100 text-blue-700' :
-                        promo.type === 'auto' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                        {promo.type === 'auto' ? 'SALE' : promo.type.toUpperCase()}
-                      </span>
-                      {promo.code && <span className="font-mono text-xs font-bold bg-gray-100 px-1 rounded">{promo.code}</span>}
-                    </div>
-                    <h4 className="font-bold text-lg text-gray-900 leading-tight">
-                      {promo.title}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {promo.scope === 'all' ? 'Entire Store' : `${promo.targetSelections?.length || 0} Items/Cats`}
-                      {promo.value > 0 && ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF`}
-                    </p>
-                    {promo.expiryDate && <p className="text-[10px] text-red-400 mt-2 font-bold">Ends: {promo.expiryDate}</p>}
-                  </div>
+                {/* REORDER BUTTONS */}
+                <div className="flex flex-col gap-1 pr-4 border-r border-gray-100 mr-4 pt-1">
+                  <button onClick={() => movePromotion(index, 'up')} disabled={index === 0} className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-20 transition-colors"><ArrowUp size={16} /></button>
+                  <button onClick={() => movePromotion(index, 'down')} disabled={index === promotions.length - 1} className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-20 transition-colors"><ArrowDown size={16} /></button>
                 </div>
 
-                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-50">
-                  <button
-                    onClick={() => {
-                      setIsEditingPromo(promo.id);
-                      setNewPromo({
-                        ...promo,
-                        // Ensure new fields exist for legacy data
-                        type: promo.type || 'collection',
-                        scope: promo.scope || 'specific',
-                        targetSelections: promo.targetSelections || promo.productIds || []
-                      });
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-xs font-bold hover:bg-blue-100"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDeletePromotion(promo.id)}
-                    className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${promo.type === 'coupon' ? 'bg-blue-100 text-blue-700' :
+                          promo.type === 'auto' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                          {promo.type === 'auto' ? 'SALE' : promo.type.toUpperCase()}
+                        </span>
+                        {promo.code && <span className="font-mono text-xs font-bold bg-gray-100 px-1 rounded">{promo.code}</span>}
+                      </div>
+                      <h4 className="font-bold text-lg text-gray-900 leading-tight">
+                        {promo.title}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {promo.scope === 'all' ? 'Entire Store' : `${promo.targetSelections?.length || 0} Items/Cats`}
+                        {promo.value > 0 && ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF`}
+                      </p>
+                      {promo.expiryDate && <p className="text-[10px] text-red-400 mt-2 font-bold">Ends: {promo.expiryDate}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-50">
+                    <button
+                      onClick={() => {
+                        setIsEditingPromo(promo.id);
+                        setNewPromo({
+                          ...promo,
+                          type: promo.type || 'collection',
+                          scope: promo.scope || 'specific',
+                          targetSelections: promo.targetSelections || promo.productIds || []
+                        });
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg text-xs font-bold hover:bg-blue-100"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onDeletePromotion(promo.id)}
+                      className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -2832,9 +2858,12 @@ export default function App() {
       doc(db, "settings", "store_info"),
       (s) => s.exists() && setShopContent({ ...INITIAL_CONTENT, ...s.data() })
     );
-    const unsubPr = onSnapshot(collection(db, "promotions"), (s) =>
-      setPromotions(s.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    const unsubPr = onSnapshot(collection(db, "promotions"), (s) => {
+      const fetchedPromos = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort them by our new orderIndex (defaulting to 0 if they don't have one yet)
+      fetchedPromos.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+      setPromotions(fetchedPromos);
+    });
 
     return () => {
       unsubP();
