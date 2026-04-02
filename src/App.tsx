@@ -174,8 +174,8 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
-// --- Updated ProductImage Component (Now with Bottom-Left Promo Tag) ---
-const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle }) => {
+// --- Updated ProductImage Component (Now supports Custom Tag Images) ---
+const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle, promoImage }) => {
   const [loaded, setLoaded] = useState(false);
   return (
     <div className="aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group">
@@ -201,22 +201,17 @@ const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle }) => {
       />
 
       {/* --- BADGE CONTAINER (Top Left) --- */}
-      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
-        {/* 1. NEW BADGE (First priority) */}
+      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start z-10">
         {isNew && (
           <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-sm flex items-center gap-1">
             <Sparkles size={10} /> NEW
           </span>
         )}
-
-        {/* 2. DISCOUNT BADGE */}
         {discount > 0 && (
           <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-sm">
             Save {discount}%
           </span>
         )}
-
-        {/* 3. LOW STOCK BADGE */}
         {stock < 3 && stock > 0 && (
           <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-200 uppercase tracking-wide">
             Low Stock
@@ -224,18 +219,27 @@ const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle }) => {
         )}
       </div>
 
-      {/* --- PROMOTION CAMPAIGN TAG (Bottom Left - Premium Aesthetic) --- */}
-      {promoTitle && (
-        <div className="absolute bottom-0 left-0 z-10">
+      {/* --- 🌸 CUSTOM FLOATING PROMO TAG (Bottom Left) --- */}
+      {promoImage ? (
+        <div className="absolute bottom-2 left-2 z-20 pointer-events-none">
+          <img 
+            src={promoImage} 
+            alt="Promo Tag" 
+            className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg" 
+          />
+        </div>
+      ) : promoTitle ? (
+        /* Fallback text if you didn't upload an image for this campaign */
+        <div className="absolute bottom-0 left-0 z-20">
           <span className="bg-[#1C1C1C] block text-white text-[11px] md:text-xs font-semibold tracking-widest uppercase px-3 py-1.5 shadow-md">
             {promoTitle}
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* OUT OF STOCK OVERLAY */}
       {stock === 0 && (
-        <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[2px]">
+        <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[2px] z-30">
           <span className="bg-gray-900 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">
             Sold Out
           </span>
@@ -1974,8 +1978,8 @@ const AdminDashboard = ({
               ))}
             </div>
 
-            {/* 2. BASIC DETAILS */}
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+{/* 2. BASIC DETAILS */}
+<div className="grid md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Internal Title</label>
                 <input
@@ -1997,6 +2001,40 @@ const AdminDashboard = ({
                   />
                 </div>
               )}
+
+              {/* --- NEW: CUSTOM GRAPHIC UPLOAD --- */}
+              <div className="md:col-span-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Custom Floating Tag</label>
+                <div className="mt-1 flex items-center gap-3">
+                  {newPromo.tagImage ? (
+                    <div className="relative w-10 h-10 rounded bg-gray-100 border flex-shrink-0">
+                      <img src={newPromo.tagImage} className="w-full h-full object-contain rounded" />
+                      <button type="button" onClick={() => setNewPromo({...newPromo, tagImage: null})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"><X size={12}/></button>
+                    </div>
+                  ) : (
+<label className="flex items-center justify-center w-10 h-10 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:bg-purple-50 text-gray-400 transition-colors">
+                      <Upload size={14} />
+                      <input 
+                        type="file" 
+                        accept="image/png, image/gif, image/webp" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if(file) {
+                            // We use FileReader directly to bypass compression and keep the transparent background intact
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setNewPromo({...newPromo, tagImage: reader.result});
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }} 
+                      />
+                    </label>
+                  )}
+                  <p className="text-[9px] text-gray-400 leading-tight">Upload a square PNG for the bottom-left corner overlay.</p>
+                </div>
+              </div>
             </div>
 
             {/* 3. RULES ENGINE (Only for Coupons & Sales) */}
@@ -3454,7 +3492,7 @@ export default function App() {
                 key={p.id}
                 className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
               >
-                <ProductImage
+<ProductImage
                   src={p.image}
                   alt={p.name}
                   stock={p.stock}
@@ -3467,6 +3505,7 @@ export default function App() {
                       : 0
                   }
                   promoTitle={activePromo ? activePromo.title : null}
+                  promoImage={activePromo ? activePromo.tagImage : null}
                 />
                 <div className="flex-1 flex flex-col">
                   <div className="flex gap-1 mb-1">
@@ -3516,7 +3555,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
           {displayedProducts.length < filteredProducts.length && (
             <div className="text-center mt-12 pb-12">
