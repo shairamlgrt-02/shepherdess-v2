@@ -174,8 +174,8 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
-// --- Updated ProductImage Component (Now accepts isNew prop) ---
-const ProductImage = ({ src, alt, stock, discount, isNew }) => {
+// --- Updated ProductImage Component (Now with Bottom-Left Promo Tag) ---
+const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle }) => {
   const [loaded, setLoaded] = useState(false);
   return (
     <div className="aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group">
@@ -190,8 +190,9 @@ const ProductImage = ({ src, alt, stock, discount, isNew }) => {
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${loaded ? "opacity-100" : "opacity-0"
-          }`}
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
         onError={(e) => {
           e.currentTarget.src =
             "https://via.placeholder.com/400x500?text=Shepherdess+K-Beauty";
@@ -222,6 +223,15 @@ const ProductImage = ({ src, alt, stock, discount, isNew }) => {
           </span>
         )}
       </div>
+
+      {/* --- PROMOTION CAMPAIGN TAG (Bottom Left - Premium Aesthetic) --- */}
+      {promoTitle && (
+        <div className="absolute bottom-0 left-0 z-10">
+          <span className="bg-[#1C1C1C] block text-white text-[11px] md:text-xs font-semibold tracking-widest uppercase px-3 py-1.5 shadow-md">
+            {promoTitle}
+          </span>
+        </div>
+      )}
 
       {/* OUT OF STOCK OVERLAY */}
       {stock === 0 && (
@@ -1656,7 +1666,7 @@ const AdminDashboard = ({
                   )}
                 </label>
               </div>
-              
+
             </div>
           </div>
 
@@ -3427,7 +3437,19 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {displayedProducts.map((p) => (
+            {displayedProducts.map((p) => {
+              // We added this check to see if the product is in an active promo
+              const activePromo = promotions.find(promo => 
+                promo.active !== false && 
+                isPromoActive(promo) && 
+                (
+                  promo.scope === 'all' || 
+                  (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) || 
+                  (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id)))
+                )
+              );
+
+              return (
               <div
                 key={p.id}
                 className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
@@ -3440,10 +3462,11 @@ export default function App() {
                   discount={
                     p.originalPrice
                       ? Math.round(
-                        ((p.originalPrice - p.price) / p.originalPrice) * 100
-                      )
+                          ((p.originalPrice - p.price) / p.originalPrice) * 100
+                        )
                       : 0
                   }
+                  promoTitle={activePromo ? activePromo.title : null}
                 />
                 <div className="flex-1 flex flex-col">
                   <div className="flex gap-1 mb-1">
