@@ -676,7 +676,7 @@ const AdminDashboard = ({
     minSpend: "",
     scope: "specific", // specific, category, all
     targetSelections: [], // Stores product IDs OR Category names
-    active: true
+    active: true,
     showTag: true
   });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
@@ -2265,7 +2265,7 @@ const AdminDashboard = ({
                           ...promo,
                           type: promo.type || 'collection',
                           scope: promo.scope || 'specific',
-                          targetSelections: promo.targetSelections || promo.productIds || []
+                          targetSelections: promo.targetSelections || promo.productIds || [],
                           showTag: promo.showTag !== false
                         });
                         window.scrollTo({ top: 0, behavior: "smooth" });
