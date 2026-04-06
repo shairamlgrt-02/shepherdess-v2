@@ -177,7 +177,7 @@ const Notification = ({ message, type, onClose }) => {
 };
 
 // --- Updated ProductImage Component (Now supports Custom Tag Images) ---
-const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle, promoImage }) => {
+const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
   const [loaded, setLoaded] = useState(false);
   return (
     <div className="aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group">
@@ -221,23 +221,25 @@ const ProductImage = ({ src, alt, stock, discount, isNew, promoTitle, promoImage
         )}
       </div>
 
-      {/* --- 🌸 CUSTOM FLOATING PROMO TAG (Bottom Left) --- */}
-      {promoImage ? (
-        <div className="absolute bottom-2 left-2 z-20 pointer-events-none">
-          <img 
-            src={promoImage} 
-            alt="Promo Tag" 
-            className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg" 
-          />
+{/* --- 🌸 MULTIPLE PROMO TAGS (Bottom Left) --- */}
+{activePromos && activePromos.length > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 z-20 flex flex-wrap gap-1 items-end pointer-events-none">
+          {activePromos.map((promo, idx) => (
+            promo.tagImage ? (
+              <img 
+                key={promo.id || idx} 
+                src={promo.tagImage} 
+                alt="Promo Tag" 
+                className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg" 
+              />
+            ) : (
+              <span key={promo.id || idx} className="bg-[#1C1C1C] block text-white text-[10px] md:text-xs font-semibold tracking-widest uppercase px-2 py-1 shadow-md">
+                {promo.title}
+              </span>
+            )
+          ))}
         </div>
-      ) : promoTitle ? (
-        /* Fallback text if you didn't upload an image for this campaign */
-        <div className="absolute bottom-0 left-0 z-20">
-          <span className="bg-[#1C1C1C] block text-white text-[11px] md:text-xs font-semibold tracking-widest uppercase px-3 py-1.5 shadow-md">
-            {promoTitle}
-          </span>
-        </div>
-      ) : null}
+      )}
 
       {/* OUT OF STOCK OVERLAY */}
       {stock === 0 && (
@@ -675,6 +677,7 @@ const AdminDashboard = ({
     scope: "specific", // specific, category, all
     targetSelections: [], // Stores product IDs OR Category names
     active: true
+    showTag: true
   });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
   const [promoSearchQuery, setPromoSearchQuery] = useState("");
@@ -1043,7 +1046,7 @@ const AdminDashboard = ({
     setNewPromo({
       title: "", type: "collection", code: "", discountType: "percentage",
       value: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",
-      scope: "specific", targetSelections: [], active: true
+      scope: "specific", targetSelections: [], active: true, showTag: true
     });
     setPromoSearchQuery("");
   };
@@ -2050,8 +2053,19 @@ const AdminDashboard = ({
                         }} 
                       />
                     </label>
-                  )}
-                  <p className="text-[9px] text-gray-400 leading-tight">Upload a square PNG for the bottom-left corner overlay.</p>
+                  )}<p className="text-[9px] text-gray-400 leading-tight mb-2">Upload a square PNG for the bottom-left corner overlay.</p>
+                  
+                  {/* TAG TOGGLE */}
+                  <label className="flex items-center gap-2 cursor-pointer mt-2 bg-gray-50 p-2 rounded border border-gray-100 w-fit">
+                    <input 
+                      type="checkbox" 
+                      checked={newPromo.showTag !== false} 
+                      onChange={(e) => setNewPromo({...newPromo, showTag: e.target.checked})}
+                      className="accent-purple-600"
+                    />
+                    <span className="text-[10px] font-bold text-gray-600 uppercase">Show tag on products</span>
+                  </label>
+
                 </div>
               </div>
             </div>
@@ -2252,6 +2266,7 @@ const AdminDashboard = ({
                           type: promo.type || 'collection',
                           scope: promo.scope || 'specific',
                           targetSelections: promo.targetSelections || promo.productIds || []
+                          showTag: promo.showTag !== false
                         });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
@@ -3505,10 +3520,11 @@ export default function App() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {displayedProducts.map((p) => {
-              // We added this check to see if the product is in an active promo
-              const activePromo = promotions.find(promo => 
+// We added this check to see ALL active promos for the product
+              const activePromosForProduct = promotions.filter(promo => 
                 promo.active !== false && 
                 isPromoActive(promo) && 
+                promo.showTag !== false && // Hide if showTag is toggled off
                 (
                   promo.scope === 'all' || 
                   (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) || 
@@ -3521,7 +3537,7 @@ export default function App() {
                 key={p.id}
                 className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
               >
-<ProductImage
+                <ProductImage
                   src={p.image}
                   alt={p.name}
                   stock={p.stock}
@@ -3533,8 +3549,7 @@ export default function App() {
                         )
                       : 0
                   }
-                  promoTitle={activePromo ? activePromo.title : null}
-                  promoImage={activePromo ? activePromo.tagImage : null}
+                  activePromos={activePromosForProduct}
                 />
                 <div className="flex-1 flex flex-col">
                   <div className="flex gap-1 mb-1">
