@@ -192,9 +192,8 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${
-          loaded ? "opacity-100" : "opacity-0"
-        }`}
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${loaded ? "opacity-100" : "opacity-0"
+          }`}
         onError={(e) => {
           e.currentTarget.src =
             "https://via.placeholder.com/400x500?text=Shepherdess+K-Beauty";
@@ -221,16 +220,16 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
         )}
       </div>
 
-{/* --- 🌸 MULTIPLE PROMO TAGS (Bottom Left) --- */}
-{activePromos && activePromos.length > 0 && (
+      {/* --- 🌸 MULTIPLE PROMO TAGS (Bottom Left) --- */}
+      {activePromos && activePromos.length > 0 && (
         <div className="absolute bottom-2 left-2 right-2 z-20 flex flex-wrap gap-1 items-end pointer-events-none">
           {activePromos.map((promo, idx) => (
             promo.tagImage ? (
-              <img 
-                key={promo.id || idx} 
-                src={promo.tagImage} 
-                alt="Promo Tag" 
-                className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg" 
+              <img
+                key={promo.id || idx}
+                src={promo.tagImage}
+                alt="Promo Tag"
+                className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg"
               />
             ) : (
               <span key={promo.id || idx} className="bg-[#1C1C1C] block text-white text-[10px] md:text-xs font-semibold tracking-widest uppercase px-2 py-1 shadow-md">
@@ -677,7 +676,8 @@ const AdminDashboard = ({
     scope: "specific", // specific, category, all
     targetSelections: [], // Stores product IDs OR Category names
     active: true,
-    showTag: true
+    showTag: true,
+    showInMenu: true
   });
   const [isEditingPromo, setIsEditingPromo] = useState(null);
   const [promoSearchQuery, setPromoSearchQuery] = useState("");
@@ -772,19 +772,19 @@ const AdminDashboard = ({
     reader.onload = async (event) => {
       try {
         const text = event.target.result;
-        
+
         // Smart Regex to split by commas, but IGNORE commas inside double quotes
         const regex = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\s\S][^'\\]*)*)'|"([^"\\]*(?:\\[\s\S][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
-        
+
         const rows = text.split('\n').filter(row => row.trim() !== '');
-        
+
         // Extract Headers
         const headers = [];
         let headerMatch;
         const headerLine = rows[0];
         while ((headerMatch = regex.exec(headerLine)) !== null) {
-            if (headerMatch.index === regex.lastIndex) regex.lastIndex++;
-            headers.push((headerMatch[1] || headerMatch[2] || headerMatch[3] || '').trim());
+          if (headerMatch.index === regex.lastIndex) regex.lastIndex++;
+          headers.push((headerMatch[1] || headerMatch[2] || headerMatch[3] || '').trim());
         }
 
         let addedCount = 0;
@@ -795,10 +795,10 @@ const AdminDashboard = ({
           let valMatch;
           regex.lastIndex = 0; // Reset regex
           while ((valMatch = regex.exec(rows[i])) !== null) {
-              if (valMatch.index === regex.lastIndex) regex.lastIndex++;
-              let val = valMatch[1] || valMatch[2] || valMatch[3] || '';
-              val = val.replace(/""/g, '"'); // Fix Excel double quotes
-              values.push(val.trim());
+            if (valMatch.index === regex.lastIndex) regex.lastIndex++;
+            let val = valMatch[1] || valMatch[2] || valMatch[3] || '';
+            val = val.replace(/""/g, '"'); // Fix Excel double quotes
+            values.push(val.trim());
           }
 
           const item = {};
@@ -1046,14 +1046,14 @@ const AdminDashboard = ({
     setNewPromo({
       title: "", type: "collection", code: "", discountType: "percentage",
       value: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",
-      scope: "specific", targetSelections: [], active: true, showTag: true
+      scope: "specific", targetSelections: [], active: true, showTag: true, showInMenu: true
     });
     setPromoSearchQuery("");
   };
 
   const movePromotion = async (index, direction) => {
     const promos = [...promotions];
-    
+
     // We update Firebase directly so the order is permanently saved!
     if (direction === 'up' && index > 0) {
       const current = promos[index];
@@ -1664,22 +1664,22 @@ const AdminDashboard = ({
 
               {/* 4. CSV BULK ACTIONS ENGINE */}
               <div className="flex gap-2 border-l border-gray-200 pl-3 ml-1">
-                <button 
-                  onClick={handleDownloadTemplate} 
-                  title="Download Blank Template" 
+                <button
+                  onClick={handleDownloadTemplate}
+                  title="Download Blank Template"
                   className="p-2 text-gray-400 hover:text-green-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-green-50 transition-colors"
                 >
                   <FileText size={16} />
                 </button>
-                <button 
-                  onClick={handleExportCSV} 
-                  title="Backup & Export Inventory" 
+                <button
+                  onClick={handleExportCSV}
+                  title="Backup & Export Inventory"
                   className="p-2 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
                 >
                   <Download size={16} />
                 </button>
-                <label 
-                  title="Import Products via CSV" 
+                <label
+                  title="Import Products via CSV"
                   className={`p-2 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors relative ${isImporting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
                 >
                   <Upload size={16} />
@@ -2000,8 +2000,8 @@ const AdminDashboard = ({
               ))}
             </div>
 
-{/* 2. BASIC DETAILS */}
-<div className="grid md:grid-cols-3 gap-4 mb-4">
+            {/* 2. BASIC DETAILS */}
+            <div className="grid md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Internal Title</label>
                 <input
@@ -2031,39 +2031,50 @@ const AdminDashboard = ({
                   {newPromo.tagImage ? (
                     <div className="relative w-10 h-10 rounded bg-gray-100 border flex-shrink-0">
                       <img src={newPromo.tagImage} className="w-full h-full object-contain rounded" />
-                      <button type="button" onClick={() => setNewPromo({...newPromo, tagImage: null})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"><X size={12}/></button>
+                      <button type="button" onClick={() => setNewPromo({ ...newPromo, tagImage: null })} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"><X size={12} /></button>
                     </div>
                   ) : (
-<label className="flex items-center justify-center w-10 h-10 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:bg-purple-50 text-gray-400 transition-colors">
+                    <label className="flex items-center justify-center w-10 h-10 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:bg-purple-50 text-gray-400 transition-colors">
                       <Upload size={14} />
-                      <input 
-                        type="file" 
-                        accept="image/png, image/gif, image/webp" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        accept="image/png, image/gif, image/webp"
+                        className="hidden"
                         onChange={(e) => {
                           const file = e.target.files[0];
-                          if(file) {
+                          if (file) {
                             // We use FileReader directly to bypass compression and keep the transparent background intact
                             const reader = new FileReader();
                             reader.onloadend = () => {
-                              setNewPromo({...newPromo, tagImage: reader.result});
+                              setNewPromo({ ...newPromo, tagImage: reader.result });
                             };
                             reader.readAsDataURL(file);
                           }
-                        }} 
+                        }}
                       />
                     </label>
                   )}<p className="text-[9px] text-gray-400 leading-tight mb-2">Upload a square PNG for the bottom-left corner overlay.</p>
-                  
+
                   {/* TAG TOGGLE */}
                   <label className="flex items-center gap-2 cursor-pointer mt-2 bg-gray-50 p-2 rounded border border-gray-100 w-fit">
-                    <input 
-                      type="checkbox" 
-                      checked={newPromo.showTag !== false} 
-                      onChange={(e) => setNewPromo({...newPromo, showTag: e.target.checked})}
+                    <input
+                      type="checkbox"
+                      checked={newPromo.showTag !== false}
+                      onChange={(e) => setNewPromo({ ...newPromo, showTag: e.target.checked })}
                       className="accent-purple-600"
                     />
                     <span className="text-[10px] font-bold text-gray-600 uppercase">Show tag on products</span>
+                  </label>
+
+                  {/* MENU VISIBILITY TOGGLE */}
+                  <label className="flex items-center gap-2 cursor-pointer mt-2 bg-gray-50 p-2 rounded border border-gray-100 w-fit">
+                    <input
+                      type="checkbox"
+                      checked={newPromo.showInMenu !== false}
+                      onChange={(e) => setNewPromo({ ...newPromo, showInMenu: e.target.checked })}
+                      className="accent-purple-600"
+                    />
+                    <span className="text-[10px] font-bold text-gray-600 uppercase">Show as Tab in Shop Menu</span>
                   </label>
 
                 </div>
@@ -2224,7 +2235,7 @@ const AdminDashboard = ({
 
           {/* LIST OF ACTIVE PROMOS */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {promotions.map((promo, index) => (
+            {promotions.map((promo, index) => (
               <div
                 key={promo.id}
                 className={`flex bg-white p-5 rounded-xl border shadow-sm relative group hover:shadow-md transition-shadow ${promo.active === false ? 'opacity-60 grayscale' : 'border-purple-100'}`}
@@ -2266,7 +2277,8 @@ const AdminDashboard = ({
                           type: promo.type || 'collection',
                           scope: promo.scope || 'specific',
                           targetSelections: promo.targetSelections || promo.productIds || [],
-                          showTag: promo.showTag !== false
+                          showTag: promo.showTag !== false,
+                          showInMenu: promo.showInMenu !== false
                         });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
@@ -3439,7 +3451,7 @@ export default function App() {
               </button>
 
               {/* Promotions/Sales Tabs */}
-              {promotions.map((p) => (
+              {promotions.filter(p => p.showInMenu !== false && p.active !== false && isPromoActive(p)).map((p) => (
                 <button
                   key={p.id}
                   onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
@@ -3520,87 +3532,87 @@ export default function App() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {displayedProducts.map((p) => {
-// We added this check to see ALL active promos for the product
-              const activePromosForProduct = promotions.filter(promo => 
-                promo.active !== false && 
-                isPromoActive(promo) && 
+              // We added this check to see ALL active promos for the product
+              const activePromosForProduct = promotions.filter(promo =>
+                promo.active !== false &&
+                isPromoActive(promo) &&
                 promo.showTag !== false && // Hide if showTag is toggled off
                 (
-                  promo.scope === 'all' || 
-                  (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) || 
+                  promo.scope === 'all' ||
+                  (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
                   (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id)))
                 )
               );
 
               return (
-              <div
-                key={p.id}
-                className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
-              >
-                <ProductImage
-                  src={p.image}
-                  alt={p.name}
-                  stock={p.stock}
-                  isNew={isNewArrival(p.createdAt)}
-                  discount={
-                    p.originalPrice
-                      ? Math.round(
+                <div
+                  key={p.id}
+                  className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+                >
+                  <ProductImage
+                    src={p.image}
+                    alt={p.name}
+                    stock={p.stock}
+                    isNew={isNewArrival(p.createdAt)}
+                    discount={
+                      p.originalPrice
+                        ? Math.round(
                           ((p.originalPrice - p.price) / p.originalPrice) * 100
                         )
-                      : 0
-                  }
-                  activePromos={activePromosForProduct}
-                />
-                <div className="flex-1 flex flex-col">
-                  <div className="flex gap-1 mb-1">
-                    <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                      {p.category}
-                    </span>
-                    {p.subcategory && (
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-                        {p.subcategory}
+                        : 0
+                    }
+                    activePromos={activePromosForProduct}
+                  />
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex gap-1 mb-1">
+                      <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                        {p.category}
                       </span>
-                    )}
-                  </div>
-                  <h3 className="font-serif font-bold text-lg leading-tight mb-1 text-gray-900">
-                    {p.name}
-                  </h3>
-
-                  {p.expiryDate && (
-                    <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
-                      <Clock size={12} /> Expiry: {p.expiryDate}
-                    </p>
-                  )}
-
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
-                    {p.description}
-                  </p>
-                  <div className="mt-auto flex justify-between items-center">
-                    <div className="flex flex-col">
-                      {p.originalPrice && (
-                        <span className="text-xs text-gray-400 line-through font-medium">
-                          {p.originalPrice.toFixed(3)} BHD
+                      {p.subcategory && (
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                          {p.subcategory}
                         </span>
                       )}
-                      <span className="text-lg font-bold text-red-600">
-                        {p.price.toFixed(3)} BHD
-                      </span>
                     </div>
-                    <button
-                      onClick={() => addToCart(p)}
-                      disabled={p.stock === 0}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
-                        }`}
-                    >
-                      <Plus size={20} />
-                    </button>
+                    <h3 className="font-serif font-bold text-lg leading-tight mb-1 text-gray-900">
+                      {p.name}
+                    </h3>
+
+                    {p.expiryDate && (
+                      <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
+                        <Clock size={12} /> Expiry: {p.expiryDate}
+                      </p>
+                    )}
+
+                    <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
+                      {p.description}
+                    </p>
+                    <div className="mt-auto flex justify-between items-center">
+                      <div className="flex flex-col">
+                        {p.originalPrice && (
+                          <span className="text-xs text-gray-400 line-through font-medium">
+                            {p.originalPrice.toFixed(3)} BHD
+                          </span>
+                        )}
+                        <span className="text-lg font-bold text-red-600">
+                          {p.price.toFixed(3)} BHD
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => addToCart(p)}
+                        disabled={p.stock === 0}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                          }`}
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
           {displayedProducts.length < filteredProducts.length && (
             <div className="text-center mt-12 pb-12">
