@@ -1044,8 +1044,8 @@ const AdminDashboard = ({
 
     // Reset Form
     setNewPromo({
-      title: "", type: "collection", code: "", discountType: "percentage",
-      value: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",
+      title: "", type: "collection", code: "", discovalue: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",untType: "percentage",
+      
       scope: "specific", targetSelections: [], active: true, showTag: true, showInMenu: true
     });
     setPromoSearchQuery("");
