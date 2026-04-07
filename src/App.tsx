@@ -156,7 +156,7 @@ const compressImage = (file) => {
 
 // --- Components ---
 
-// --- ⚡ NEW FLASH TIMER COMPONENT ---
+// --- ⚡ NEW FLASH TIMER COMPONENT (SINGLE ROW) ---
 const FlashTimer = ({ endDate, endTime }) => {
   const calculateTimeLeft = () => {
     if (!endDate) return null;
@@ -165,7 +165,8 @@ const FlashTimer = ({ endDate, endTime }) => {
     
     if (difference > 0) {
       return {
-        hours: Math.floor((difference / (1000 * 60 * 60))),
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
         minutes: Math.floor((difference / 1000 / 60) % 60),
         seconds: Math.floor((difference / 1000) % 60),
       };
@@ -182,21 +183,12 @@ const FlashTimer = ({ endDate, endTime }) => {
 
   if (!timeLeft) return null;
 
-  // Format to DD/MM/YYYY
-  const dateParts = endDate.split('-');
-  const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : endDate;
-
   return (
-    <div className="flex flex-col md:flex-row items-center gap-3 bg-red-600 text-white px-4 py-2 md:px-6 md:py-3 rounded-2xl shadow-lg border border-red-500">
-      <div className="text-center md:text-right border-b md:border-b-0 md:border-r border-red-400/50 pb-2 md:pb-0 pr-0 md:pr-4">
-        <span className="block text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-200">Ends On</span>
-        <span className="block text-xs md:text-sm font-bold font-mono tracking-wider">{formattedDate}</span>
-      </div>
-      <div className="font-mono text-2xl md:text-3xl font-bold flex gap-1 tracking-tight">
-        <span>{String(timeLeft.hours).padStart(2, '0')}</span><span className="text-red-300 opacity-70 animate-pulse">:</span>
-        <span>{String(timeLeft.minutes).padStart(2, '0')}</span><span className="text-red-300 opacity-70 animate-pulse">:</span>
-        <span className="text-yellow-300">{String(timeLeft.seconds).padStart(2, '0')}</span>
-      </div>
+    <div className="bg-purple-600 text-white text-sm md:text-base font-medium py-1.5 w-full flex items-center justify-center tracking-widest">
+      {timeLeft.days > 0 && <span>{timeLeft.days}day&nbsp;</span>}
+      <span>
+        {timeLeft.hours} : {String(timeLeft.minutes).padStart(2, '0')} : {String(timeLeft.seconds).padStart(2, '0')}
+      </span>
     </div>
   );
 };
@@ -2026,7 +2018,7 @@ const AdminDashboard = ({
 
             {/* 1. CAMPAIGN TYPE SELECTOR */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-            {[
+              {[
                 { id: 'collection', label: 'Collection Tab', icon: LayoutDashboard, desc: 'Group items for Home Page' },
                 { id: 'coupon', label: 'Coupon Code', icon: Tag, desc: 'Customer enters code at checkout' },
                 { id: 'auto', label: 'Seasonal Sale', icon: Sparkles, desc: 'Auto-discount visible in shop' },
@@ -2177,7 +2169,7 @@ const AdminDashboard = ({
                   </div>
                   {newPromo.type === 'flash' && (
                     <div className="flex-1 animate-fade-in">
-                      <label className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12}/> End Time</label>
+                      <label className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12} /> End Time</label>
                       <input type="time" className="w-full p-2 border-2 border-red-100 rounded-lg mt-1 text-sm focus:border-red-400 outline-none font-mono" value={newPromo.endTime || ""} onChange={(e) => setNewPromo({ ...newPromo, endTime: e.target.value })} />
                     </div>
                   )}
@@ -3551,7 +3543,7 @@ export default function App() {
             )}
           </div>
 
-{/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STEPS 2 & 4) --- */}
+{/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
 {(() => {
             // Find active flash sale
             const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
@@ -3571,52 +3563,54 @@ export default function App() {
             if (flashProducts.length === 0) return null;
 
             return (
-              <div className="mb-10 bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-4 md:p-6 border border-red-100 shadow-sm relative overflow-hidden animate-fade-in">
-                {/* Header & Timer */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10">
+              <div className="mb-8 md:mb-10 animate-fade-in">
+                {/* Header Section */}
+                <div className="flex justify-between items-end mb-2 px-1">
                   <div>
                     <div className="flex items-center gap-1 mb-1">
-                      <Sparkles size={14} className="text-red-500" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-red-500">Limited Time Offer</span>
+                      <Sparkles size={14} className="text-purple-600" />
+                      <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-purple-600">Limited Time Offer</span>
                     </div>
-                    <h3 className="text-2xl md:text-3xl font-serif font-bold text-red-600 uppercase italic">
+                    <h3 className="text-xl md:text-2xl font-serif font-bold text-gray-900 uppercase italic">
                       {flashPromo.title}
                     </h3>
                   </div>
-                  <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                  
+                  {/* Minimalist See All Button */}
+                  <button 
+                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
+                    className="text-[10px] md:text-xs font-semibold text-gray-500 hover:text-purple-700 transition-colors border border-gray-200 px-3 py-1 bg-white hover:bg-gray-50 uppercase tracking-wider"
+                  >
+                    See All
+                  </button>
                 </div>
 
-                {/* 4 Item Preview Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 relative z-10">
+                {/* Single Row Timer */}
+                <div className="mb-4">
+                   <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                </div>
+
+                {/* 4 Item Preview Grid (2x2 on mobile) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                   {flashProducts.map(p => (
                     <div 
                       key={p.id} 
                       onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
-                      className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-red-200 transition-all group flex flex-col"
+                      className="bg-white rounded-xl p-2.5 md:p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-purple-200 transition-all group flex flex-col"
                     >
-                      <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
+                      <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
                         <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                        <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm animate-pulse">
+                        <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 md:py-1 rounded-full shadow-sm">
                           FLASH DEAL
                         </div>
                       </div>
-                      <h4 className="font-serif font-bold text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
-                      <div className="mt-auto flex flex-wrap items-center gap-2">
-                        {p.originalPrice && <span className="text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
-                        <span className="text-sm font-bold text-red-600">{p.price.toFixed(3)} BHD</span>
+                      <h4 className="font-serif font-bold text-xs md:text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
+                      <div className="mt-auto flex flex-wrap items-center gap-1.5 md:gap-2">
+                        {p.originalPrice && <span className="text-[9px] md:text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
+                        <span className="text-xs md:text-sm font-bold text-purple-600">{p.price.toFixed(3)} BHD</span>
                       </div>
                     </div>
                   ))}
-                </div>
-
-                {/* See All Button */}
-                <div className="text-center relative z-10">
-                  <button 
-                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
-                    className="bg-red-600 text-white px-8 py-3 rounded-full text-sm font-bold shadow-md hover:bg-red-700 hover:shadow-lg transition-all inline-flex items-center gap-2"
-                  >
-                    See All Flash Deals <ChevronRight size={16} />
-                  </button>
                 </div>
               </div>
             );
