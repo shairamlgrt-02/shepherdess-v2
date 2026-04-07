@@ -3670,22 +3670,22 @@ export default function App() {
                   key={p.id}
                   className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
                 >
-{/* --- ⚡ UNIVERSAL FLASH SALE BADGE (STEP 3) --- */}
-{(() => {
-                    const activeFlash = promotions.find(promo => 
+                  {/* --- ⚡ UNIVERSAL FLASH SALE BADGE (STEP 3) --- */}
+                  {(() => {
+                    const activeFlash = promotions.find(promo =>
                       promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
-                      (promo.scope === 'all' || 
-                       (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) || 
-                       (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
+                      (promo.scope === 'all' ||
+                        (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
+                        (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
                     );
-                    
+
                     if (!activeFlash) return null;
 
                     // Format date to dd/mm and time to hh:mm
                     const [y, m, d] = (activeFlash.endDate || "").split('-');
                     const shortDate = d && m ? `${d}/${m}` : '';
                     const shortTime = activeFlash.endTime || "23:59";
-                    
+
                     return (
                       <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none">
                         <div className="bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
@@ -3866,28 +3866,39 @@ export default function App() {
               ) : checkoutStep === "cart" ? (
                 /* --- STEP 1: SUMMARY VIEW --- */
                 <div className="space-y-6 animate-fade-in">
-                  {Object.values(cart).map((i) => (
-                    <div key={i.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 relative">
-                      <div className="w-20 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-                        <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div className="pr-6">
-                          <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{i.name}</h4>
-                          <p className="text-[10px] text-purple-600 font-bold uppercase mt-1">{i.category}</p>
+                  {Object.values(cart).map((i) => {
+                    const liveProduct = products.find(p => p.id === i.id);
+                    const isOutOfStock = !liveProduct || liveProduct.stock <= 0;
+
+                    return (
+                      <div key={i.id} className={`flex gap-4 p-3 rounded-xl border relative ${isOutOfStock ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="w-20 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 relative">
+                          <img src={i.image} alt={i.name} className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-40 grayscale' : ''}`} />
+                          {isOutOfStock && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="bg-red-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">SOLD OUT</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
-                          <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
-                            <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
-                            <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
-                            <button onClick={() => updateCartQty(i.id, 1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Plus size={14} /></button>
+                        <div className="flex-1 flex flex-col justify-between py-1">
+                          <div className="pr-6">
+                            <h4 className={`font-bold text-sm line-clamp-2 ${isOutOfStock ? 'text-red-900' : 'text-gray-900'}`}>{i.name}</h4>
+                            <p className="text-[10px] text-purple-600 font-bold uppercase mt-1">{i.category}</p>
+                            {isOutOfStock && <p className="text-[9px] text-red-500 font-bold italic mt-1">Item no longer available</p>}
                           </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
+                            <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
+                              <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
+                              <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
+                              <button onClick={() => updateCartQty(i.id, 1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Plus size={14} /></button>
+                            </div>
+                          </div>
+                          <button onClick={() => updateCartQty(i.id, -i.qty)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                         </div>
-                        <button onClick={() => updateCartQty(i.id, -i.qty)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                       </div>
-                    </div>
-                  ))}
+                    ); // <--- Added missing semicolon and parenthesis
+                  })} {/* <--- Added missing closing brace */}
                   <p className="text-[10px] text-center text-gray-400 italic">Review your items before proceeding</p>
                 </div>
               ) : (
@@ -4110,10 +4121,27 @@ export default function App() {
                 </div>
                 {checkoutStep === "cart" ? (
                   <button
-                    onClick={() => setCheckoutStep("form")}
-                    className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
+                    onClick={() => {
+                      const hasSoldOut = Object.values(cart).some(item => {
+                        const live = products.find(p => p.id === item.id);
+                        return !live || live.stock <= 0;
+                      });
+
+                      if (hasSoldOut) {
+                        showNotification("Please remove sold out items before proceeding", "error");
+                      } else {
+                        setCheckoutStep("form");
+                      }
+                    }}
+                    className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${Object.values(cart).some(item => (products.find(p => p.id === item.id)?.stock || 0) <= 0)
+                        ? "bg-red-100 text-red-400 cursor-not-allowed border border-red-200"
+                        : "bg-gray-900 text-white hover:bg-purple-600 shadow-lg"
+                      }`}
                   >
-                    Proceed to Checkout <ChevronRight size={18} />
+                    {Object.values(cart).some(item => (products.find(p => p.id === item.id)?.stock || 0) <= 0)
+                      ? "Remove Sold Out Items"
+                      : "Proceed to Checkout"}
+                    <ChevronRight size={18} />
                   </button>
                 ) : (
                   <div className="flex gap-3">
