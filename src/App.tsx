@@ -162,7 +162,7 @@ const FlashTimer = ({ endDate, endTime }) => {
     if (!endDate) return null;
     const targetDate = new Date(`${endDate}T${endTime || "23:59:59"}`);
     const difference = targetDate - new Date();
-    
+
     if (difference > 0) {
       return {
         days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -3543,11 +3543,11 @@ export default function App() {
             )}
           </div>
 
-{/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
-{(() => {
+          {/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
+          {(() => {
             // Find active flash sale
             const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
-            
+
             // Only show if a flash sale exists AND we are on the main "All" homepage
             if (!flashPromo || selectedCategory !== "All") return null;
 
@@ -3575,10 +3575,10 @@ export default function App() {
                       {flashPromo.title}
                     </h3>
                   </div>
-                  
+
                   {/* Minimalist See All Button */}
-                  <button 
-                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
+                  <button
+                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     className="text-[10px] md:text-xs font-semibold text-gray-500 hover:text-purple-700 transition-colors border border-gray-200 px-3 py-1 bg-white hover:bg-gray-50 uppercase tracking-wider"
                   >
                     See All
@@ -3587,15 +3587,15 @@ export default function App() {
 
                 {/* Single Row Timer */}
                 <div className="mb-4">
-                   <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                  <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
                 </div>
 
                 {/* 4 Item Preview Grid (2x2 on mobile) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                   {flashProducts.map(p => (
-                    <div 
-                      key={p.id} 
-                      onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
+                    <div
+                      key={p.id}
+                      onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       className="bg-white rounded-xl p-2.5 md:p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-purple-200 transition-all group flex flex-col"
                     >
                       <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
@@ -3670,6 +3670,36 @@ export default function App() {
                   key={p.id}
                   className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
                 >
+{/* --- ⚡ UNIVERSAL FLASH SALE BADGE (STEP 3) --- */}
+{(() => {
+                    const activeFlash = promotions.find(promo => 
+                      promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
+                      (promo.scope === 'all' || 
+                       (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) || 
+                       (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
+                    );
+                    
+                    if (!activeFlash) return null;
+
+                    // Format date to dd/mm and time to hh:mm
+                    const [y, m, d] = (activeFlash.endDate || "").split('-');
+                    const shortDate = d && m ? `${d}/${m}` : '';
+                    const shortTime = activeFlash.endTime || "23:59";
+                    
+                    return (
+                      <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none">
+                        <div className="bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                          <Sparkles size={10} className="text-purple-200" />
+                          FLASH DEAL
+                        </div>
+                        {/* Smaller date attached below the tag */}
+                        <div className="text-[8px] md:text-[9px] font-bold text-white bg-gray-900/80 px-1.5 py-0.5 rounded mt-1 shadow-sm tracking-wide">
+                          Ends {shortDate} {shortTime}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <ProductImage
                     src={p.image}
                     alt={p.name}
