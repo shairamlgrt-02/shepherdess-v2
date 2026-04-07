@@ -3346,23 +3346,25 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {isAdmin && (
+          {isAdmin && (
               <button
                 onClick={() =>
                   setViewMode((prev) =>
                     prev === "shop" ? "dashboard" : "shop"
                   )
                 }
-                className="hidden sm:flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-bold hover:bg-purple-200 transition-colors"
+                className="flex items-center gap-1.5 bg-purple-100 text-purple-800 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-sm font-bold hover:bg-purple-200 transition-colors shadow-sm"
               >
                 {viewMode === "shop" ? (
-                  <LayoutDashboard size={16} />
+                  <LayoutDashboard size={14} className="md:w-4 md:h-4" />
                 ) : (
-                  <Store size={16} />
-                )}{" "}
-                {viewMode === "shop" ? "Dashboard" : "Shop View"}
+                  <Store size={14} className="md:w-4 md:h-4" />
+                )}
+                {/* Sa mobile, icon + word lang. Sa desktop, full text */}
+                <span>{viewMode === "shop" ? "Admin" : "Shop"}</span>
               </button>
             )}
+            
             {viewMode === "shop" && (
               <button
                 onClick={() => {
