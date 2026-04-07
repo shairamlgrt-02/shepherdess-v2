@@ -156,6 +156,51 @@ const compressImage = (file) => {
 
 // --- Components ---
 
+// --- ⚡ NEW FLASH TIMER COMPONENT ---
+const FlashTimer = ({ endDate, endTime }) => {
+  const calculateTimeLeft = () => {
+    if (!endDate) return null;
+    const targetDate = new Date(`${endDate}T${endTime || "23:59:59"}`);
+    const difference = targetDate - new Date();
+    
+    if (difference > 0) {
+      return {
+        hours: Math.floor((difference / (1000 * 60 * 60))),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      };
+    }
+    return null; // Time is up!
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
+    return () => clearInterval(timer);
+  }, [endDate, endTime]);
+
+  if (!timeLeft) return null;
+
+  // Format to DD/MM/YYYY
+  const dateParts = endDate.split('-');
+  const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : endDate;
+
+  return (
+    <div className="flex flex-col md:flex-row items-center gap-3 bg-red-600 text-white px-4 py-2 md:px-6 md:py-3 rounded-2xl shadow-lg border border-red-500">
+      <div className="text-center md:text-right border-b md:border-b-0 md:border-r border-red-400/50 pb-2 md:pb-0 pr-0 md:pr-4">
+        <span className="block text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-200">Ends On</span>
+        <span className="block text-xs md:text-sm font-bold font-mono tracking-wider">{formattedDate}</span>
+      </div>
+      <div className="font-mono text-2xl md:text-3xl font-bold flex gap-1 tracking-tight">
+        <span>{String(timeLeft.hours).padStart(2, '0')}</span><span className="text-red-300 opacity-70 animate-pulse">:</span>
+        <span>{String(timeLeft.minutes).padStart(2, '0')}</span><span className="text-red-300 opacity-70 animate-pulse">:</span>
+        <span className="text-yellow-300">{String(timeLeft.seconds).padStart(2, '0')}</span>
+      </div>
+    </div>
+  );
+};
+
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
   return (
@@ -671,6 +716,7 @@ const AdminDashboard = ({
     value: 0,
     startDate: "",
     endDate: "",
+    endTime: "",
     usageLimit: "",
     minSpend: "",
     scope: "specific", // specific, category, all
@@ -1044,8 +1090,8 @@ const AdminDashboard = ({
 
     // Reset Form
     setNewPromo({
-      title: "", type: "collection", code: "", discovalue: 0, startDate: "", endDate: "", usageLimit: "", minSpend: "",untType: "percentage",
-      
+      title: "", type: "collection", code: "", discountType: "percentage", value: 0,
+      startDate: "", endDate: "", endTime: "", usageLimit: "", minSpend: "",
       scope: "specific", targetSelections: [], active: true, showTag: true, showInMenu: true
     });
     setPromoSearchQuery("");
@@ -1980,10 +2026,11 @@ const AdminDashboard = ({
 
             {/* 1. CAMPAIGN TYPE SELECTOR */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-              {[
+            {[
                 { id: 'collection', label: 'Collection Tab', icon: LayoutDashboard, desc: 'Group items for Home Page' },
                 { id: 'coupon', label: 'Coupon Code', icon: Tag, desc: 'Customer enters code at checkout' },
                 { id: 'auto', label: 'Seasonal Sale', icon: Sparkles, desc: 'Auto-discount visible in shop' },
+                { id: 'flash', label: 'Flash Sale', icon: Clock, desc: 'Time-limited deal with countdown' },
               ].map(type => (
                 <button
                   key={type.id}
@@ -2128,6 +2175,12 @@ const AdminDashboard = ({
                     <label className="text-xs font-bold text-gray-500">End Date</label>
                     <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.endDate} onChange={(e) => setNewPromo({ ...newPromo, endDate: e.target.value })} />
                   </div>
+                  {newPromo.type === 'flash' && (
+                    <div className="flex-1 animate-fade-in">
+                      <label className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12}/> End Time</label>
+                      <input type="time" className="w-full p-2 border-2 border-red-100 rounded-lg mt-1 text-sm focus:border-red-400 outline-none font-mono" value={newPromo.endTime || ""} onChange={(e) => setNewPromo({ ...newPromo, endTime: e.target.value })} />
+                    </div>
+                  )}
                   {newPromo.type === 'coupon' && (
                     <div className="flex-1">
                       <label className="text-xs font-bold text-gray-500">Usage Limit</label>
@@ -2278,7 +2331,8 @@ const AdminDashboard = ({
                           scope: promo.scope || 'specific',
                           targetSelections: promo.targetSelections || promo.productIds || [],
                           showTag: promo.showTag !== false,
-                          showInMenu: promo.showInMenu !== false
+                          showInMenu: promo.showInMenu !== false,
+                          endTime: promo.endTime || ""
                         });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
@@ -3346,7 +3400,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-          {isAdmin && (
+            {isAdmin && (
               <button
                 onClick={() =>
                   setViewMode((prev) =>
@@ -3364,7 +3418,7 @@ export default function App() {
                 <span>{viewMode === "shop" ? "Admin" : "Shop"}</span>
               </button>
             )}
-            
+
             {viewMode === "shop" && (
               <button
                 onClick={() => {
@@ -3496,6 +3550,77 @@ export default function App() {
               </div>
             )}
           </div>
+
+{/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STEPS 2 & 4) --- */}
+{(() => {
+            // Find active flash sale
+            const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
+            
+            // Only show if a flash sale exists AND we are on the main "All" homepage
+            if (!flashPromo || selectedCategory !== "All") return null;
+
+            // Get exactly 4 products for the preview
+            const flashProducts = products.filter(p =>
+              p.active && (
+                flashPromo.scope === 'all' ||
+                (flashPromo.scope === 'category' && (flashPromo.targetSelections?.includes(p.category) || flashPromo.targetSelections?.includes(p.subcategory))) ||
+                (flashPromo.scope === 'specific' && (flashPromo.targetSelections?.includes(p.id) || flashPromo.productIds?.includes(p.id)))
+              )
+            ).slice(0, 4);
+
+            if (flashProducts.length === 0) return null;
+
+            return (
+              <div className="mb-10 bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-4 md:p-6 border border-red-100 shadow-sm relative overflow-hidden animate-fade-in">
+                {/* Header & Timer */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10">
+                  <div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <Sparkles size={14} className="text-red-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-red-500">Limited Time Offer</span>
+                    </div>
+                    <h3 className="text-2xl md:text-3xl font-serif font-bold text-red-600 uppercase italic">
+                      {flashPromo.title}
+                    </h3>
+                  </div>
+                  <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                </div>
+
+                {/* 4 Item Preview Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 relative z-10">
+                  {flashProducts.map(p => (
+                    <div 
+                      key={p.id} 
+                      onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
+                      className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-red-200 transition-all group flex flex-col"
+                    >
+                      <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
+                        <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                        <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm animate-pulse">
+                          FLASH DEAL
+                        </div>
+                      </div>
+                      <h4 className="font-serif font-bold text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
+                      <div className="mt-auto flex flex-wrap items-center gap-2">
+                        {p.originalPrice && <span className="text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
+                        <span className="text-sm font-bold text-red-600">{p.price.toFixed(3)} BHD</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* See All Button */}
+                <div className="text-center relative z-10">
+                  <button 
+                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }} 
+                    className="bg-red-600 text-white px-8 py-3 rounded-full text-sm font-bold shadow-md hover:bg-red-700 hover:shadow-lg transition-all inline-flex items-center gap-2"
+                  >
+                    See All Flash Deals <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 2. THE STICKY CONTROL BAR */}
           <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
