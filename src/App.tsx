@@ -3305,54 +3305,97 @@ export default function App() {
     !isAdmin
   ) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFBF7] p-4 animate-fade-in font-sans">
-        <img
-          src={LOGO_URL}
-          alt="Shepherdess"
-          className="w-24 h-24 rounded-full shadow-xl mb-6 object-cover border-2 border-white"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.nextSibling.style.display = "flex";
-          }}
-        />
-        <div className="hidden w-24 h-24 bg-purple-600 rounded-full items-center justify-center text-white font-serif text-3xl shadow-lg mb-6">
-          S
+      <div className="min-h-screen relative flex flex-col items-center justify-center bg-[#FDFBF7] p-4 font-sans overflow-hidden">
+        {/* Custom Animation Styles just for the loading screen */}
+        <style>{`
+        @keyframes fade-in-up {
+          0% { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+        {/* Subtle background glow behind everything */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-50 via-[#FDFBF7] to-[#FDFBF7] opacity-60 pointer-events-none"></div>
+
+        {/* Centered Content Container */}
+        <div className="relative z-10 flex flex-col items-center text-center">
+
+          {/* Logo with pulsing shadow (Animates in immediately) */}
+          <div className="relative mb-8 animate-[fade-in-up_0.8s_ease-out_forwards]">
+            <div className="absolute inset-0 bg-purple-200 rounded-full blur-xl animate-pulse opacity-40"></div>
+            <img
+              src={LOGO_URL}
+              alt="Shepherdess"
+              className="relative w-28 h-28 md:w-32 md:h-32 rounded-full shadow-2xl object-cover border-4 border-white transition-transform hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextSibling.style.display = "flex";
+              }}
+            />
+            <div className="hidden relative w-28 h-28 md:w-32 md:h-32 bg-purple-600 rounded-full items-center justify-center text-white font-serif text-4xl shadow-2xl border-4 border-white">
+              S
+            </div>
+          </div>
+
+          {/* Typography (Animates in with a slight delay) */}
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 tracking-tight mb-3 opacity-0 animate-[fade-in-up_0.8s_ease-out_0.2s_forwards]">
+            Welcome to Shepherdess
+          </h1>
+          <p className="text-xs md:text-sm text-purple-600 font-bold tracking-[0.4em] uppercase mb-12 opacity-0 animate-[fade-in-up_0.8s_ease-out_0.4s_forwards]">
+            K-Beauty Store
+          </p>
+
+          {/* Elegant Loading Buffer (Animates in last) */}
+          <div className="flex flex-col items-center gap-4 opacity-0 animate-[fade-in-up_0.8s_ease-out_0.6s_forwards]">
+            <div className="relative flex items-center justify-center w-12 h-12">
+              {/* Spinning outer ring */}
+              <div className="absolute inset-0 border-2 border-purple-100 border-t-purple-500 rounded-full animate-spin"></div>
+              {/* Inner pulsing dot */}
+              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+            </div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Loading Collection...</span>
+          </div>
         </div>
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 tracking-tight mb-2">
-          Welcome to Shepherdess
-        </h1>
-        <p className="text-sm text-purple-600 font-bold tracking-[0.3em] uppercase mb-12">
-          K-Beauty Store
-        </p>
+
+        {/* ✨ HIDDEN LOGIN KEY (Moved to absolute bottom center) */}
         <button
           onClick={() => setShowAdminLogin(true)}
-          className="text-gray-300 hover:text-purple-400 transition-colors p-2"
+          className="absolute bottom-8 text-gray-200 hover:text-purple-300 transition-colors p-3 opacity-50 hover:opacity-100 z-20"
           title="Owner Access"
         >
-          <Key size={20} />
+          <Key size={14} />
         </button>
+
+        {/* Refined Admin Login Modal */}
         {showAdminLogin && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in">
+            <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center transform transition-all animate-bounce-in mx-4">
+              <div className="bg-purple-50 w-16 h-16 mx-auto rounded-full flex items-center justify-center text-purple-600 mb-4 border border-purple-100">
+                <Lock size={24} />
+              </div>
+              <h3 className="text-xl font-serif font-bold text-gray-900 mb-6">Owner Access</h3>
               <input
                 type="password"
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
                 placeholder="Enter PIN"
-                className="w-full text-center text-xl p-3 border rounded-lg mb-4"
+                className="w-full text-center text-2xl tracking-[0.5em] font-mono p-4 border border-gray-100 bg-gray-50 rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                autoFocus
               />
-              <button
-                onClick={toggleAdmin}
-                className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold"
-              >
-                Enter
-              </button>
-              <button
-                onClick={() => setShowAdminLogin(false)}
-                className="mt-2 text-sm text-gray-400 underline"
-              >
-                Cancel
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowAdminLogin(false)}
+                  className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={toggleAdmin}
+                  className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-purple-600 transition-colors shadow-lg"
+                >
+                  Enter
+                </button>
+              </div>
             </div>
           </div>
         )}
