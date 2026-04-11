@@ -1934,13 +1934,20 @@ const AdminDashboard = ({
       {/* ACCOUNTING TAB */}
       {tab === "accounting" && (() => {
         // --- 1. CALCULATIONS ---
-        // Only count orders that actually made money (Delivered)
         const completedOrders = orders.filter(o => o.status === "delivered");
 
         const totalGrossSales = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
         const totalCOGS = completedOrders.reduce((sum, o) => sum + (o.totalCOGS || 0), 0);
         const netProfit = totalGrossSales - totalCOGS;
         const profitMargin = totalGrossSales > 0 ? (netProfit / totalGrossSales) * 100 : 0;
+
+        // ✨ NEW: Total Capital & Break-Even Math
+        // Calculates the cost of ALL unsold stock currently in your inventory
+        const currentInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.cost || 0)), 0);
+        // Total Investment = Cost of things you sold + Cost of things still on the shelf
+        const totalCapitalInvested = totalCOGS + currentInventoryValue;
+        const breakEvenPercentage = totalCapitalInvested > 0 ? (totalGrossSales / totalCapitalInvested) * 100 : 0;
+        const isPureProfit = totalGrossSales >= totalCapitalInvested;
 
         // Find how many orders are missing cost data
         const ordersMissingCosts = orders.filter(o => o.totalCOGS === undefined).length;
@@ -1955,10 +1962,8 @@ const AdminDashboard = ({
               let orderCOGS = 0;
               const updatedItems = { ...order.items };
 
-              // Loop through items in the old order
               for (const key in updatedItems) {
                 const item = updatedItems[key];
-                // Try to find the product in our CURRENT inventory to get its cost
                 const liveProduct = products.find(p => p.id === item.id);
                 const itemCost = liveProduct ? (liveProduct.cost || 0) : 0;
 
@@ -1966,7 +1971,6 @@ const AdminDashboard = ({
                 orderCOGS += (itemCost * item.qty);
               }
 
-              // Save it permanently to the order
               await updateDoc(doc(db, "orders", order.id), {
                 items: updatedItems,
                 totalCOGS: orderCOGS
@@ -1978,14 +1982,13 @@ const AdminDashboard = ({
         };
 
         return (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-fade-in pb-8">
             <div className="flex justify-between items-end mb-4">
               <div>
                 <h3 className="font-bold text-2xl text-gray-900 font-serif">Financial Overview</h3>
                 <p className="text-sm text-gray-500">Based on {completedOrders.length} delivered orders.</p>
               </div>
 
-              {/* THE SYNC BUTTON */}
               {ordersMissingCosts > 0 && (
                 <button
                   onClick={handleRetroactiveSync}
@@ -1996,30 +1999,26 @@ const AdminDashboard = ({
               )}
             </div>
 
-            {/* THE METRICS GRID */}
+            {/* THE 4 MAIN METRIC CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Gross Sales */}
               <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gross Sales</p>
                 <h4 className="text-3xl font-serif font-bold text-gray-900">{totalGrossSales.toFixed(3)}</h4>
                 <p className="text-[10px] text-gray-400 mt-1">Total revenue collected</p>
               </div>
 
-              {/* COGS */}
               <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cost of Goods (COGS)</p>
                 <h4 className="text-3xl font-serif font-bold text-gray-900">{totalCOGS.toFixed(3)}</h4>
-                <p className="text-[10px] text-gray-400 mt-1">Total inventory expense</p>
+                <p className="text-[10px] text-gray-400 mt-1">Cost of items already sold</p>
               </div>
 
-              {/* Net Profit */}
               <div className="bg-purple-600 p-6 rounded-xl shadow-lg transform transition-transform hover:scale-105">
                 <p className="text-xs font-bold text-purple-200 uppercase tracking-widest mb-2">Net Profit</p>
                 <h4 className="text-3xl font-serif font-bold text-white">{netProfit.toFixed(3)}</h4>
-                <p className="text-[10px] text-purple-300 mt-1">Pure profit after costs</p>
+                <p className="text-[10px] text-purple-300 mt-1">Profit on sold items</p>
               </div>
 
-              {/* Profit Margin */}
               <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
                 <div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Profit Margin</p>
@@ -2033,6 +2032,49 @@ const AdminDashboard = ({
                     style={{ width: `${Math.min(profitMargin, 100)}%` }}
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* ✨ NEW: BREAK-EVEN TRACKER */}
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mt-4">
+              <div className="flex flex-col md:flex-row justify-between md:items-end mb-5 gap-4 border-b border-gray-50 pb-4">
+                <div>
+                  <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                    Total Business Break-Even {isPureProfit && <Sparkles size={18} className="text-amber-400" />}
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-1">Tracking Gross Sales against Total Capital Invested (Sold Cost + Unsold Inventory Cost).</p>
+                </div>
+                <div className="text-left md:text-right">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Capital Invested</p>
+                  <p className="text-2xl font-mono font-bold text-gray-900">{totalCapitalInvested.toFixed(3)} BHD</p>
+                </div>
+              </div>
+
+              {/* The Progress Bar */}
+              <div className="relative w-full bg-gray-100 h-6 rounded-full overflow-hidden mb-3 shadow-inner">
+                <div
+                  className={`absolute top-0 left-0 h-full flex items-center justify-end pr-2 rounded-full transition-all duration-1000 ${isPureProfit ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${Math.max(10, Math.min(breakEvenPercentage, 100))}%` }}
+                >
+                  <span className="text-[10px] font-bold text-white shadow-sm">{breakEvenPercentage.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {/* Dynamic Status Text */}
+              <div className="flex flex-col sm:flex-row justify-between items-center text-xs font-bold gap-2">
+                <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                  Gross Sales: {totalGrossSales.toFixed(3)} BHD
+                </span>
+
+                {isPureProfit ? (
+                  <span className="text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200 flex items-center gap-1 shadow-sm">
+                    <CheckCircle size={14} /> 100% Paid Off! All remaining inventory is pure profit.
+                  </span>
+                ) : (
+                  <span className="text-gray-500">
+                    Need <span className="text-gray-900">{(totalCapitalInvested - totalGrossSales).toFixed(3)} BHD</span> more in sales to break even on all inventory.
+                  </span>
+                )}
               </div>
             </div>
 
