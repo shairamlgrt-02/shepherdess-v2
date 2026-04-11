@@ -3469,10 +3469,46 @@ export default function App() {
       ) : (
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="text-center mb-6 md:mb-8">
-            {/* Scaled down tag */}
-            <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">
-              {shopContent.heroTag}
-            </span>
+
+            {/* ✨ NEW: Dynamic Popping Hero Tag with Sparkles */}
+            <div className="relative inline-block mb-2">
+              <style>{`
+                @keyframes pop-in {
+                  0% { transform: scale(0.5); opacity: 0; }
+                  60% { transform: scale(1.15); opacity: 1; }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes sparkle-burst {
+                  0% { transform: scale(0) rotate(0deg); opacity: 0; }
+                  50% { transform: scale(1.2) rotate(45deg); opacity: 1; }
+                  100% { transform: scale(0.5) rotate(90deg); opacity: 0; }
+                }
+                .animate-pop-once {
+                  animation: pop-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                }
+                .animate-sparkle-1 {
+                  animation: sparkle-burst 0.8s ease-in-out forwards;
+                  animation-delay: 0.1s;
+                }
+                .animate-sparkle-2 {
+                  animation: sparkle-burst 0.8s ease-in-out forwards;
+                  animation-delay: 0.25s;
+                }
+              `}</style>
+
+              {/* The Sparkles (Absolutely positioned around the tag) */}
+              <div className="absolute -top-3 -left-4 text-red-400 opacity-0 animate-sparkle-1 pointer-events-none">
+                <Sparkles size={16} />
+              </div>
+              <div className="absolute -bottom-2 -right-4 text-red-400 opacity-0 animate-sparkle-2 pointer-events-none">
+                <Sparkles size={14} />
+              </div>
+
+              {/* The Tag Itself */}
+              <span className="relative z-10 inline-block bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm animate-pop-once">
+                {shopContent.heroTag}
+              </span>
+            </div>
 
             {/* Smaller, tighter title */}
             <h2 className="text-2xl md:text-3xl font-serif mt-2 mb-2 text-gray-900">
@@ -3855,7 +3891,7 @@ export default function App() {
                 </button>
               </div>
             )}
-          </div>  
+          </div>
         </main>
       )}
 
