@@ -3374,8 +3374,8 @@ export default function App() {
         <Notification {...notification} onClose={() => setNotification(null)} />
       )}
 
-{/* HEADER */}
-<header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
+      {/* HEADER */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-20">
           <div
             className="flex items-center gap-3 cursor-pointer"
@@ -3468,355 +3468,394 @@ export default function App() {
         />
       ) : (
         <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center mb-12">
-            <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+          <div className="text-center mb-6 md:mb-8">
+            {/* Scaled down tag */}
+            <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">
               {shopContent.heroTag}
             </span>
-            <h2 className="text-4xl font-serif mt-2 mb-4 text-gray-900">
+
+            {/* Smaller, tighter title */}
+            <h2 className="text-2xl md:text-3xl font-serif mt-2 mb-2 text-gray-900">
               {shopContent.heroTitle}
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed">
+
+            {/* Smaller description */}
+            <p className="text-gray-500 max-w-xl mx-auto text-sm leading-relaxed px-4">
               {shopContent.heroDescription}
             </p>
-            <div className="mt-4">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-100">
-                <Clock size={12} /> {shopContent.heroNote}
-              </span>
+
+            {/* ✨ NEW: Seamless Scrolling Marquee Note */}
+            <div className="mt-5 max-w-md mx-auto relative bg-purple-50 border border-purple-100 rounded-full py-1.5 flex items-center shadow-sm overflow-hidden">
+              <style>{`
+                @keyframes marquee {
+                  0% { transform: translateX(0%); }
+                  100% { transform: translateX(-50%); }
+                }
+                .animate-scroll {
+                  display: flex;
+                  width: max-content;
+                  /* Lower the 10s to make it faster, raise it to make it slower */
+                  animation: marquee 10s linear infinite; 
+                }
+              `}</style>
+
+              {/* Static Icon on the left */}
+              <div className="pl-3 pr-2 z-10 bg-purple-50 flex items-center text-purple-600 shadow-[4px_0_8px_-2px_rgba(250,245,255,1)]">
+                <Clock size={14} />
+              </div>
+
+              {/* Scrolling Text Container */}
+              <div className="flex-1 overflow-hidden relative w-full">
+                <div className="animate-scroll text-[10px] md:text-xs font-bold text-purple-600 tracking-wide uppercase flex items-center gap-6 pr-6">
+                  {/* Duplicating the text 4 times creates the infinite seamless loop */}
+                  <span>{shopContent.heroNote}</span>
+                  <span className="text-purple-300">✧</span>
+                  <span>{shopContent.heroNote}</span>
+                  <span className="text-purple-300">✧</span>
+                  <span>{shopContent.heroNote}</span>
+                  <span className="text-purple-300">✧</span>
+                  <span>{shopContent.heroNote}</span>
+                  <span className="text-purple-300">✧</span>
+                </div>
+              </div>
+
+              {/* Fading edge on the right for a smooth disappear effect */}
+              <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-purple-50 to-transparent pointer-events-none z-10"></div>
             </div>
-          </div>
 
-          {/* 1. TOP FILTERS */}
-          <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            {/* 1. TOP FILTERS */}
+            <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
 
-            {/* Search Bar */}
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search for product, or a keyword..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
-              />
-              <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-            </div>
+              {/* Search Bar */}
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Search for product, or a keyword..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm focus:outline-none border border-gray-100 focus:ring-2 focus:ring-purple-200 transition-all"
+                />
+                <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
+              </div>
 
-            {/* Main Category Buttons */}
-            <div className="flex flex-wrap gap-2 justify-center">
-              <button
-                onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-              >
-                All
-              </button>
-
-              {/* Promotions/Sales Tabs */}
-              {promotions.filter(p => p.showInMenu !== false && p.active !== false && isPromoActive(p)).map((p) => (
+              {/* Main Category Buttons */}
+              <div className="flex flex-wrap gap-2 justify-center">
                 <button
-                  key={p.id}
-                  onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                  onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
-                  <Tag size={12} /> {p.title}
+                  All
                 </button>
-              ))}
 
-              {/* Dynamic Main Categories */}
-              {availableCategories.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            {/* NEW: Subcategory Filter Strip (Only shows when a Main Category is active) */}
-            {displaySubcategories.length > 0 && (
-              <div className="flex flex-wrap gap-2 justify-center pt-3 border-t border-gray-50 animate-fade-in">
-                <span className="w-full text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                  Filter {currentMainCategory}:
-                </span>
-                {displaySubcategories.map((sub) => (
+                {/* Promotions/Sales Tabs */}
+                {promotions.filter(p => p.showInMenu !== false && p.active !== false && isPromoActive(p)).map((p) => (
                   <button
-                    key={sub}
-                    onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
-                      ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
-                      : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
-                      }`}
+                    key={p.id}
+                    onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
+                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                   >
-                    {sub}
+                    <Tag size={12} /> {p.title}
+                  </button>
+                ))}
+
+                {/* Dynamic Main Categories */}
+                {availableCategories.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
+                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
+                  >
+                    {c}
                   </button>
                 ))}
               </div>
-            )}
-          </div>
 
-          {/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
-          {(() => {
-            // Find active flash sale
-            const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
-
-            // Only show if a flash sale exists AND we are on the main "All" homepage
-            if (!flashPromo || selectedCategory !== "All") return null;
-
-            // Get exactly 4 products for the preview
-            const flashProducts = products.filter(p =>
-              p.active && (
-                flashPromo.scope === 'all' ||
-                (flashPromo.scope === 'category' && (flashPromo.targetSelections?.includes(p.category) || flashPromo.targetSelections?.includes(p.subcategory))) ||
-                (flashPromo.scope === 'specific' && (flashPromo.targetSelections?.includes(p.id) || flashPromo.productIds?.includes(p.id)))
-              )
-            ).slice(0, 4);
-
-            if (flashProducts.length === 0) return null;
-
-            return (
-              <div className="mb-8 md:mb-10 animate-fade-in">
-                {/* Header Section */}
-                <div className="flex justify-between items-end mb-2 px-1">
-                  <div>
-                    <div className="flex items-center gap-1 mb-1">
-                      <Sparkles size={14} className="text-purple-600" />
-                      <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-purple-600">Limited Time Offer</span>
-                    </div>
-                    <h3 className="text-xl md:text-2xl font-serif font-bold text-gray-900 uppercase italic">
-                      {flashPromo.title}
-                    </h3>
-                  </div>
-
-                  {/* Minimalist See All Button */}
-                  <button
-                    onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    className="text-[10px] md:text-xs font-semibold text-gray-500 hover:text-purple-700 transition-colors border border-gray-200 px-3 py-1 bg-white hover:bg-gray-50 uppercase tracking-wider"
-                  >
-                    See All
-                  </button>
-                </div>
-
-                {/* Single Row Timer */}
-                <div className="mb-4">
-                  <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
-                </div>
-
-                {/* 4 Item Preview Grid (2x2 on mobile) */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                  {flashProducts.map(p => (
-                    <div
-                      key={p.id}
-                      onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      className="bg-white rounded-xl p-2.5 md:p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-purple-200 transition-all group flex flex-col"
+              {/* NEW: Subcategory Filter Strip (Only shows when a Main Category is active) */}
+              {displaySubcategories.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-center pt-3 border-t border-gray-50 animate-fade-in">
+                  <span className="w-full text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    Filter {currentMainCategory}:
+                  </span>
+                  {displaySubcategories.map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
+                        ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
+                        : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
+                        }`}
                     >
-                      <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
-                        <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                        <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 md:py-1 rounded-full shadow-sm">
-                          FLASH DEAL
-                        </div>
-                      </div>
-                      <h4 className="font-serif font-bold text-xs md:text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
-                      <div className="mt-auto flex flex-wrap items-center gap-1.5 md:gap-2">
-                        {p.originalPrice && <span className="text-[9px] md:text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
-                        <span className="text-xs md:text-sm font-bold text-purple-600">{p.price.toFixed(3)} BHD</span>
-                      </div>
-                    </div>
+                      {sub}
+                    </button>
                   ))}
                 </div>
-              </div>
-            );
-          })()}
-
-{/* 2. THE STICKY CONTROL BAR */}
-<div className="sticky top-20 z-40 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-
-              {/* Sort Option */}
-              <div className="relative flex-1 max-w-[180px]">
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  className="appearance-none bg-gray-50 pl-9 pr-4 py-2 rounded-xl text-xs font-bold cursor-pointer focus:outline-none border border-gray-200 w-full"
-                >
-                  <option value="default">Sort: Default</option>
-                  <option value="price-asc">Price: Low</option>
-                  <option value="price-desc">Price: High</option>
-                  <option value="newest">New Arrivals</option>
-                </select>
-                <ArrowUpDown size={14} className="absolute left-3 top-2.5 text-gray-400" />
-              </div>
-
-              {/* Toggle Switch */}
-              <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
-                <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
-                  Hide Sold Out
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}
-                >
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hideOutOfStock ? 'translate-x-5' : 'translate-x-1'}`} />
-                </button>
-              </div>
+              )}
             </div>
-          </div>
 
-          {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
-            {displayedProducts.map((p) => {
-              const activePromosForProduct = promotions.filter(promo =>
-                promo.active !== false &&
-                isPromoActive(promo) &&
-                promo.showTag !== false &&
-                (
-                  promo.scope === 'all' ||
-                  (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
-                  (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id)))
+            {/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
+            {(() => {
+              // Find active flash sale
+              const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
+
+              // Only show if a flash sale exists AND we are on the main "All" homepage
+              if (!flashPromo || selectedCategory !== "All") return null;
+
+              // Get exactly 4 products for the preview
+              const flashProducts = products.filter(p =>
+                p.active && (
+                  flashPromo.scope === 'all' ||
+                  (flashPromo.scope === 'category' && (flashPromo.targetSelections?.includes(p.category) || flashPromo.targetSelections?.includes(p.subcategory))) ||
+                  (flashPromo.scope === 'specific' && (flashPromo.targetSelections?.includes(p.id) || flashPromo.productIds?.includes(p.id)))
                 )
-              );
+              ).slice(0, 4);
+
+              if (flashProducts.length === 0) return null;
 
               return (
-                <div
-                  key={p.id}
-                  className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
-                >
-                  {/* --- ⚡ UNIVERSAL FLASH SALE BADGE --- */}
-                  {(() => {
-                    const activeFlash = promotions.find(promo =>
-                      promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
-                      (promo.scope === 'all' ||
-                        (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
-                        (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
-                    );
-
-                    if (!activeFlash) return null;
-
-                    const [y, m, d] = (activeFlash.endDate || "").split('-');
-                    const shortDate = d && m ? `${d}/${m}` : '';
-                    const shortTime = activeFlash.endTime || "23:59";
-
-                    return (
-                      <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none">
-                        <div className="bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
-                          <Sparkles size={10} className="text-purple-200" />
-                          FLASH DEAL
-                        </div>
-                        <div className="text-[8px] md:text-[9px] font-bold text-white bg-gray-900/80 px-1.5 py-0.5 rounded mt-1 shadow-sm tracking-wide">
-                          Ends {shortDate} {shortTime}
-                        </div>
+                <div className="mb-8 md:mb-10 animate-fade-in">
+                  {/* Header Section */}
+                  <div className="flex justify-between items-end mb-2 px-1">
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <Sparkles size={14} className="text-purple-600" />
+                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-purple-600">Limited Time Offer</span>
                       </div>
-                    );
-                  })()}
-
-                  <ProductImage
-                    src={p.image}
-                    alt={p.name}
-                    stock={p.stock}
-                    isNew={isNewArrival(p.createdAt)}
-                    discount={
-                      p.originalPrice
-                        ? Math.round(
-                          ((p.originalPrice - p.price) / p.originalPrice) * 100
-                        )
-                        : 0
-                    }
-                    activePromos={activePromosForProduct}
-                  />
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                        {p.category}
-                      </span>
-                      {p.subcategory && (
-                        <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-                          {p.subcategory}
-                        </span>
-                      )}
+                      <h3 className="text-xl md:text-2xl font-serif font-bold text-gray-900 uppercase italic">
+                        {flashPromo.title}
+                      </h3>
                     </div>
 
-                    {/* Responsive Title */}
-                    <h3 className="font-serif font-bold text-xs md:text-lg leading-tight mb-1 text-gray-900 line-clamp-2 md:line-clamp-none">
-                      {p.name}
-                    </h3>
+                    {/* Minimalist See All Button */}
+                    <button
+                      onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      className="text-[10px] md:text-xs font-semibold text-gray-500 hover:text-purple-700 transition-colors border border-gray-200 px-3 py-1 bg-white hover:bg-gray-50 uppercase tracking-wider"
+                    >
+                      See All
+                    </button>
+                  </div>
 
-                    {p.expiryDate && (
-                      <p className="text-[9px] md:text-xs font-bold text-red-500 mb-1 md:mb-2 flex items-center gap-1">
-                        <Clock size={10} className="md:w-3 md:h-3" /> Expiry: {p.expiryDate}
-                      </p>
-                    )}
+                  {/* Single Row Timer */}
+                  <div className="mb-4">
+                    <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                  </div>
 
-                    {/* NEW: Expandable Description */}
-                    <ExpandableDescription text={p.description} />
+                  {/* 4 Item Preview Grid (2x2 on mobile) */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                    {flashProducts.map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        className="bg-white rounded-xl p-2.5 md:p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-purple-200 transition-all group flex flex-col"
+                      >
+                        <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
+                          <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                          <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 md:py-1 rounded-full shadow-sm">
+                            FLASH DEAL
+                          </div>
+                        </div>
+                        <h4 className="font-serif font-bold text-xs md:text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
+                        <div className="mt-auto flex flex-wrap items-center gap-1.5 md:gap-2">
+                          {p.originalPrice && <span className="text-[9px] md:text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
+                          <span className="text-xs md:text-sm font-bold text-purple-600">{p.price.toFixed(3)} BHD</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
-                    {/* UPDATED PRICE & TAGS CONTAINER */}
-                    <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
+            {/* 2. THE STICKY CONTROL BAR */}
+            <div className="sticky top-20 z-40 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
+              <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
 
-                      {/* Top Row: Price, Discount Badge, and Cart Button */}
-                      <div className="flex justify-between items-end">
-                        <div className="flex flex-col">
-                          {p.originalPrice && (
-                            <span className="text-[9px] md:text-[10px] text-gray-400 line-through font-medium leading-none mb-1">
-                              {p.originalPrice.toFixed(3)} BHD
-                            </span>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm md:text-lg font-bold text-red-600 leading-none">
-                              {p.price.toFixed(3)} BHD
-                            </span>
-                            {/* Save % Badge next to price */}
-                            {p.originalPrice && p.originalPrice > p.price && (
-                              <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-tight">
-                                Save {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}%
+                {/* Sort Option */}
+                <div className="relative flex-1 max-w-[180px]">
+                  <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value)}
+                    className="appearance-none bg-gray-50 pl-9 pr-4 py-2 rounded-xl text-xs font-bold cursor-pointer focus:outline-none border border-gray-200 w-full"
+                  >
+                    <option value="default">Sort: Default</option>
+                    <option value="price-asc">Price: Low</option>
+                    <option value="price-desc">Price: High</option>
+                    <option value="newest">New Arrivals</option>
+                  </select>
+                  <ArrowUpDown size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                </div>
+
+                {/* Toggle Switch */}
+                <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+                  <span className={`text-[10px] font-bold uppercase tracking-tight ${hideOutOfStock ? 'text-purple-600' : 'text-gray-400'}`}>
+                    Hide Sold Out
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHideOutOfStock(!hideOutOfStock)}
+                    className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hideOutOfStock ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
+              {displayedProducts.map((p) => {
+                const activePromosForProduct = promotions.filter(promo =>
+                  promo.active !== false &&
+                  isPromoActive(promo) &&
+                  promo.showTag !== false &&
+                  (
+                    promo.scope === 'all' ||
+                    (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
+                    (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id)))
+                  )
+                );
+
+                return (
+                  <div
+                    key={p.id}
+                    className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+                  >
+                    {/* --- ⚡ UNIVERSAL FLASH SALE BADGE --- */}
+                    {(() => {
+                      const activeFlash = promotions.find(promo =>
+                        promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
+                        (promo.scope === 'all' ||
+                          (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
+                          (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
+                      );
+
+                      if (!activeFlash) return null;
+
+                      const [y, m, d] = (activeFlash.endDate || "").split('-');
+                      const shortDate = d && m ? `${d}/${m}` : '';
+                      const shortTime = activeFlash.endTime || "23:59";
+
+                      return (
+                        <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none">
+                          <div className="bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                            <Sparkles size={10} className="text-purple-200" />
+                            FLASH DEAL
+                          </div>
+                          <div className="text-[8px] md:text-[9px] font-bold text-white bg-gray-900/80 px-1.5 py-0.5 rounded mt-1 shadow-sm tracking-wide">
+                            Ends {shortDate} {shortTime}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <ProductImage
+                      src={p.image}
+                      alt={p.name}
+                      stock={p.stock}
+                      isNew={isNewArrival(p.createdAt)}
+                      discount={
+                        p.originalPrice
+                          ? Math.round(
+                            ((p.originalPrice - p.price) / p.originalPrice) * 100
+                          )
+                          : 0
+                      }
+                      activePromos={activePromosForProduct}
+                    />
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          {p.category}
+                        </span>
+                        {p.subcategory && (
+                          <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
+                            {p.subcategory}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Responsive Title */}
+                      <h3 className="font-serif font-bold text-xs md:text-lg leading-tight mb-1 text-gray-900 line-clamp-2 md:line-clamp-none">
+                        {p.name}
+                      </h3>
+
+                      {p.expiryDate && (
+                        <p className="text-[9px] md:text-xs font-bold text-red-500 mb-1 md:mb-2 flex items-center gap-1">
+                          <Clock size={10} className="md:w-3 md:h-3" /> Expiry: {p.expiryDate}
+                        </p>
+                      )}
+
+                      {/* NEW: Expandable Description */}
+                      <ExpandableDescription text={p.description} />
+
+                      {/* UPDATED PRICE & TAGS CONTAINER */}
+                      <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
+
+                        {/* Top Row: Price, Discount Badge, and Cart Button */}
+                        <div className="flex justify-between items-end">
+                          <div className="flex flex-col">
+                            {p.originalPrice && (
+                              <span className="text-[9px] md:text-[10px] text-gray-400 line-through font-medium leading-none mb-1">
+                                {p.originalPrice.toFixed(3)} BHD
+                              </span>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm md:text-lg font-bold text-red-600 leading-none">
+                                {p.price.toFixed(3)} BHD
+                              </span>
+                              {/* Save % Badge next to price */}
+                              {p.originalPrice && p.originalPrice > p.price && (
+                                <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-tight">
+                                  Save {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Responsive Add to Cart Button */}
+                          <button
+                            onClick={() => addToCart(p)}
+                            disabled={p.stock === 0}
+                            className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                              }`}
+                          >
+                            <Plus size={16} className="md:w-5 md:h-5" />
+                          </button>
+                        </div>
+
+                        {/* Bottom Row: NEW ARRIVAL & LOW STOCK TAGS */}
+                        {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {isNewArrival(p.createdAt) && (
+                              <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
+                                <Sparkles size={10} /> NEW
+                              </span>
+                            )}
+                            {p.stock < 3 && p.stock > 0 && (
+                              <span className="text-[9px] md:text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-tight">
+                                Low Stock
                               </span>
                             )}
                           </div>
-                        </div>
-
-                        {/* Responsive Add to Cart Button */}
-                        <button
-                          onClick={() => addToCart(p)}
-                          disabled={p.stock === 0}
-                          className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
-                            }`}
-                        >
-                          <Plus size={16} className="md:w-5 md:h-5" />
-                        </button>
+                        )}
                       </div>
-
-                      {/* Bottom Row: NEW ARRIVAL & LOW STOCK TAGS */}
-                      {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {isNewArrival(p.createdAt) && (
-                            <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
-                              <Sparkles size={10} /> NEW
-                            </span>
-                          )}
-                          {p.stock < 3 && p.stock > 0 && (
-                            <span className="text-[9px] md:text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-tight">
-                              Low Stock
-                            </span>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          {displayedProducts.length < filteredProducts.length && (
-            <div className="text-center mt-12 pb-12">
-              <button
-                onClick={() => setVisibleCount((c) => c + 12)}
-                className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
-              >
-                <ChevronDown size={20} /> Show More Products
-              </button>
+                );
+              })}
             </div>
-          )}
+            {displayedProducts.length < filteredProducts.length && (
+              <div className="text-center mt-12 pb-12">
+                <button
+                  onClick={() => setVisibleCount((c) => c + 12)}
+                  className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-full font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm flex items-center gap-2 mx-auto"
+                >
+                  <ChevronDown size={20} /> Show More Products
+                </button>
+              </div>
+            )}
+          </div>  
         </main>
       )}
 
