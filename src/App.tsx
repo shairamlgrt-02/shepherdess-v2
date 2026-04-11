@@ -268,19 +268,19 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
 
       {/* Tags have been moved below the product description */}
 
-      {/* --- 🌸 MULTIPLE PROMO TAGS (Bottom Left) --- */}
+      {/* --- 🌸 MULTIPLE PROMO TAGS (Moved to Top-Left, Tighter Padding, Smaller) --- */}
       {activePromos && activePromos.length > 0 && (
-        <div className="absolute bottom-2 left-2 right-2 z-20 flex flex-wrap gap-1 items-end pointer-events-none">
+        <div className="absolute top-1 left-1 z-20 flex flex-col gap-1 items-start pointer-events-none">
           {activePromos.map((promo, idx) => (
             promo.tagImage ? (
               <img
                 key={promo.id || idx}
                 src={promo.tagImage}
                 alt="Promo Tag"
-                className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg"
+                className="w-10 h-10 md:w-12 md:h-12 object-contain drop-shadow-lg"
               />
             ) : (
-              <span key={promo.id || idx} className="bg-[#1C1C1C] block text-white text-[10px] md:text-xs font-semibold tracking-widest uppercase px-2 py-1 shadow-md">
+              <span key={promo.id || idx} className="bg-[#1C1C1C] block text-white text-[9px] md:text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded-sm shadow-md">
                 {promo.title}
               </span>
             )
