@@ -3575,10 +3575,10 @@ export default function App() {
               </div>
 
               {/* Main Category Buttons */}
-              <div className="flex flex-wrap gap-2 justify-center">
+              <div className="flex flex-wrap gap-1.5 md:gap-2 justify-center">
                 <button
                   onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
-                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
                   All
                 </button>
@@ -3588,9 +3588,9 @@ export default function App() {
                   <button
                     key={p.id}
                     onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                   >
-                    <Tag size={12} /> {p.title}
+                    <Tag size={10} /> {p.title}
                   </button>
                 ))}
 
@@ -3599,7 +3599,7 @@ export default function App() {
                   <button
                     key={c}
                     onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
                   >
                     {c}
                   </button>
