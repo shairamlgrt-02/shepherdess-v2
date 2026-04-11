@@ -3374,8 +3374,8 @@ export default function App() {
         <Notification {...notification} onClose={() => setNotification(null)} />
       )}
 
-      {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
+{/* HEADER */}
+<header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-20">
           <div
             className="flex items-center gap-3 cursor-pointer"
@@ -3627,8 +3627,8 @@ export default function App() {
             );
           })()}
 
-          {/* 2. THE STICKY CONTROL BAR */}
-          <div className="sticky top-20 z-20 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
+{/* 2. THE STICKY CONTROL BAR */}
+<div className="sticky top-20 z-40 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
 
               {/* Sort Option */}
