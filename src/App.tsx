@@ -751,6 +751,7 @@ const AdminDashboard = ({
     name: "",
     category: "",
     subcategory: "",
+    cost: "", // ✨ NEW: Cost field
     price: "",
     originalPrice: "",
     stock: "",
@@ -773,13 +774,12 @@ const AdminDashboard = ({
 
   // 1. Export Current Inventory Backup
   const handleExportCSV = () => {
-    const headers = ["name", "category", "subcategory", "price", "originalPrice", "stock", "expiryDate", "description", "image", "active"];
+    const headers = ["name", "category", "subcategory", "cost", "price", "originalPrice", "stock", "expiryDate", "description", "image", "active"];
     let csvContent = headers.join(",") + "\n";
 
     products.forEach(p => {
       const row = headers.map(header => {
         let val = p[header] === undefined || p[header] === null ? "" : p[header];
-        // Wrap in quotes to safely handle descriptions with commas inside them
         if (typeof val === "string") val = `"${val.replace(/"/g, '""')}"`;
         return val;
       });
@@ -797,8 +797,8 @@ const AdminDashboard = ({
 
   // 2. Download Blank Template
   const handleDownloadTemplate = () => {
-    const headers = "name,category,subcategory,price,originalPrice,stock,expiryDate,description,image\n";
-    const sample = 'Glass Skin Serum,Skincare,Serum,12.500,,50,2027-12-31,"Amazing glowing serum",https://example.com/image.jpg\n';
+    const headers = "name,category,subcategory,cost,price,originalPrice,stock,expiryDate,description,image\n";
+    const sample = 'Glass Skin Serum,Skincare,Serum,5.000,12.500,,50,2027-12-31,"Amazing glowing serum",https://example.com/image.jpg\n';
     const blob = new Blob([headers + sample], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -808,12 +808,12 @@ const AdminDashboard = ({
     document.body.removeChild(link);
   };
 
-  // 3. Process & Import Uploaded CSV
+  // 3. Process & Import Uploaded CSV (SMART UPSERT ENGINE)
   const handleImportCSV = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!window.confirm("Import these products? They will be added to your current inventory.")) return;
+    if (!window.confirm("Import products? Existing products with the exact same name will have their stock, cost, and price updated. New products will be added.")) return;
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -821,67 +821,77 @@ const AdminDashboard = ({
     reader.onload = async (event) => {
       try {
         const text = event.target.result;
-
-        // Smart Regex to split by commas, but IGNORE commas inside double quotes
         const regex = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\s\S][^'\\]*)*)'|"([^"\\]*(?:\\[\s\S][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
-
         const rows = text.split('\n').filter(row => row.trim() !== '');
 
-        // Extract Headers
         const headers = [];
         let headerMatch;
         const headerLine = rows[0];
         while ((headerMatch = regex.exec(headerLine)) !== null) {
           if (headerMatch.index === regex.lastIndex) regex.lastIndex++;
-          headers.push((headerMatch[1] || headerMatch[2] || headerMatch[3] || '').trim());
+          headers.push((headerMatch[1] || headerMatch[2] || headerMatch[3] || '').trim().toLowerCase());
         }
 
         let addedCount = 0;
+        let updatedCount = 0;
 
-        // Loop through rows and send to Firebase
         for (let i = 1; i < rows.length; i++) {
           const values = [];
           let valMatch;
-          regex.lastIndex = 0; // Reset regex
+          regex.lastIndex = 0;
           while ((valMatch = regex.exec(rows[i])) !== null) {
             if (valMatch.index === regex.lastIndex) regex.lastIndex++;
             let val = valMatch[1] || valMatch[2] || valMatch[3] || '';
-            val = val.replace(/""/g, '"'); // Fix Excel double quotes
+            val = val.replace(/""/g, '"');
             values.push(val.trim());
           }
 
           const item = {};
           headers.forEach((h, index) => { item[h] = values[index]; });
 
-          // Skip empty or invalid rows
           if (!item.name || !item.category) continue;
+
+          // Look for existing product
+          const existingProduct = products.find(p => (p.name || "").toLowerCase().trim() === item.name.toLowerCase().trim());
 
           const formattedData = {
             name: item.name,
             category: item.category,
             subcategory: item.subcategory || "",
+            cost: parseFloat(item.cost) || 0,
             price: parseFloat(item.price) || 0,
-            originalPrice: item.originalPrice ? parseFloat(item.originalPrice) : null,
-            stock: parseInt(item.stock) || 0,
-            expiryDate: item.expiryDate || "",
+            originalPrice: item.originalprice ? parseFloat(item.originalprice) : null,
+            stock: parseInt(item.stock) || 0, // This overwrites the stock with the CSV value
+            expiryDate: item.expirydate || item.expiryDate || "",
             description: item.description || "",
             image: item.image || "",
-            active: true,
-            archived: false,
-            createdAt: serverTimestamp() // Time tag
           };
 
-          // Bulk Add straight to Firebase
-          await addDoc(collection(db, "products"), formattedData);
-          addedCount++;
+          if (existingProduct) {
+            // ✨ UPDATE EXISTING
+            await updateDoc(doc(db, "products", existingProduct.id), {
+              ...formattedData,
+              updatedAt: serverTimestamp()
+            });
+            updatedCount++;
+          } else {
+            // ✨ ADD BRAND NEW
+            await addDoc(collection(db, "products"), {
+              ...formattedData,
+              active: true,
+              archived: false,
+              createdAt: serverTimestamp()
+            });
+            addedCount++;
+          }
         }
-        alert(`Success! 🎉 ${addedCount} products have been added to your shop.`);
+        alert(`Success! 🎉 ${addedCount} new items added, ${updatedCount} items updated.`);
       } catch (error) {
         console.error("Import failed:", error);
         alert("Oops! The file format was incorrect. Please use the exact template.");
       } finally {
         setIsImporting(false);
-        e.target.value = ''; // Reset input so you can upload the same file again if needed
+        e.target.value = '';
       }
     };
     reader.readAsText(file);
@@ -959,6 +969,7 @@ const AdminDashboard = ({
     e.preventDefault();
     const formattedData = {
       ...productForm,
+      cost: parseFloat(productForm.cost) || 0, // ✨ NEW
       price: parseFloat(productForm.price),
       originalPrice: productForm.originalPrice
         ? parseFloat(productForm.originalPrice)
@@ -969,15 +980,7 @@ const AdminDashboard = ({
     if (editingId) onUpdateProduct(editingId, formattedData);
     else onAddProduct(formattedData);
     setProductForm({
-      name: "",
-      category: "",
-      subcategory: "",
-      price: "",
-      originalPrice: "",
-      stock: "",
-      expiryDate: "",
-      description: "",
-      image: "",
+      name: "", category: "", subcategory: "", cost: "", price: "", originalPrice: "", stock: "", expiryDate: "", description: "", image: "",
     });
     setEditingId(null);
     setShowProductForm(false);
@@ -988,6 +991,7 @@ const AdminDashboard = ({
       name: product.name,
       category: product.category,
       subcategory: product.subcategory || "",
+      cost: product.cost || "", // ✨ NEW
       price: product.price,
       originalPrice: product.originalPrice || "",
       stock: product.stock,
@@ -1236,6 +1240,7 @@ const AdminDashboard = ({
           { id: "inventory", icon: Package, label: "Inventory" },
           { id: "categories", icon: ListFilter, label: "Categories" },
           { id: "promos", icon: Tag, label: "Promotions" },
+          { id: "marketing", icon: Sparkles, label: "Marketing" }, // ✨ NEW TAB
           { id: "content", icon: Settings, label: "Content" },
           { id: "wa-templates", icon: MessageCircle, label: "WA Templates" },
         ].map((t) => (
@@ -1764,8 +1769,9 @@ const AdminDashboard = ({
                   {(categories[productForm.category] || []).map((s) => (<option key={s} value={s}>{s}</option>))}
                 </select>
                 <div className="flex gap-2">
-                  <input required type="number" step="0.001" placeholder="Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
-                  <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/2" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
+                  <input type="number" step="0.001" placeholder="Cost" className="p-3 border border-purple-200 bg-purple-50 rounded-lg text-sm w-1/3 text-purple-700 font-bold" value={productForm.cost} onChange={(e) => setProductForm({ ...productForm, cost: e.target.value })} />
+                  <input required type="number" step="0.001" placeholder="Selling Price" className="p-3 border rounded-lg text-sm w-1/3" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+                  <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/3" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
                 </div>
                 <input required type="number" placeholder="Stock" className="p-3 border rounded-lg text-sm" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
                 <input placeholder="Expiry (YYYY-MM-DD)" className="p-3 border rounded-lg text-sm" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
@@ -2353,6 +2359,79 @@ const AdminDashboard = ({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* MARKETING & BROADCAST TAB */}
+      {tab === "marketing" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm">
+            <h3 className="font-bold text-xl text-gray-900 flex items-center gap-2 mb-2">
+              <Sparkles className="text-purple-600" /> Push Notifications
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Write an announcement here. To securely send it to all subscribed customers, copy your message and use the Firebase Console.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Left Side: Composer */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Notification Title</label>
+                  <input
+                    id="notif-title"
+                    type="text"
+                    placeholder="e.g. FLASH SALE! 🌸"
+                    className="w-full p-3 mt-1 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Message Body</label>
+                  <textarea
+                    id="notif-body"
+                    rows="3"
+                    placeholder="e.g. 50% off all PDRN sets until midnight tonight. Tap to shop!"
+                    className="w-full p-3 mt-1 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                  <h4 className="font-bold text-purple-900 text-sm mb-2">How to Broadcast:</h4>
+                  <ol className="text-xs text-purple-800 space-y-2 list-decimal list-inside font-medium">
+                    <li>Log into your <b>Firebase Console</b></li>
+                    <li>Go to <b>Engage</b> {'>'} <b>Cloud Messaging</b></li>
+                    <li>Click <b>New Campaign</b> {'>'} <b>Notifications</b></li>
+                    <li>Copy & paste your Title and Body from above</li>
+                    <li>Hit <b>Send</b> to blast it to all subscribers!</li>
+                  </ol>
+                  <a href="https://console.firebase.google.com/project/shepherdess-shop/notification" target="_blank" rel="noreferrer" className="mt-4 block w-full text-center bg-purple-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-purple-700 transition-colors">
+                    Open Firebase Console
+                  </a>
+                </div>
+              </div>
+
+              {/* Right Side: Live Phone Preview */}
+              <div className="flex justify-center items-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 p-6">
+                <div className="w-64 h-[400px] bg-white rounded-[2rem] border-8 border-gray-900 shadow-2xl relative overflow-hidden flex flex-col pt-12 px-4">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-900 rounded-b-xl"></div>
+
+                  {/* Mock Notification Bubble */}
+                  <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-gray-100 mt-4 animate-bounce-in">
+                    <div className="flex items-center gap-2 mb-2">
+                      <img src={LOGO_URL} className="w-5 h-5 rounded-md" />
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Shepherdess</span>
+                      <span className="text-[9px] text-gray-400 ml-auto">Now</span>
+                    </div>
+                    <p className="font-bold text-sm text-gray-900" id="preview-title">FLASH SALE! 🌸</p>
+                    <p className="text-xs text-gray-600 mt-0.5 leading-tight" id="preview-body">50% off all PDRN sets until midnight tonight. Tap to shop!</p>
+                  </div>
+
+                  {/* Add simple JS to link the inputs to the preview */}
+                  <img src="https://i.ibb.co/cck7F7yq/shepherdess-logo-small.png" className="absolute bottom-1/2 left-1/2 -translate-x-1/2 translate-y-1/2 w-16 opacity-10 grayscale" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
