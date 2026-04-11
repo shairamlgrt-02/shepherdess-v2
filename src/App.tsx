@@ -213,6 +213,34 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
+// --- 📝 NEW EXPANDABLE DESCRIPTION COMPONENT ---
+const ExpandableDescription = ({ text }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  if (!text) return null;
+
+  // Roughly 60 characters is a good threshold for 2 lines on mobile
+  const isLong = text.length > 60;
+
+  return (
+    <div className="mb-2 md:mb-4">
+      <p className={`text-[10px] md:text-sm text-gray-500 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
+        {text}
+      </p>
+      {isLong && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+          className="text-[10px] md:text-xs font-bold text-purple-600 mt-1 hover:underline focus:outline-none"
+        >
+          {isExpanded ? "See Less" : "See More"}
+        </button>
+      )}
+    </div>
+  );
+};
+
 // --- Updated ProductImage Component (Now supports Custom Tag Images) ---
 const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
   const [loaded, setLoaded] = useState(false);
@@ -3651,13 +3679,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
             {displayedProducts.map((p) => {
-              // We added this check to see ALL active promos for the product
               const activePromosForProduct = promotions.filter(promo =>
                 promo.active !== false &&
                 isPromoActive(promo) &&
-                promo.showTag !== false && // Hide if showTag is toggled off
+                promo.showTag !== false &&
                 (
                   promo.scope === 'all' ||
                   (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
@@ -3668,9 +3696,9 @@ export default function App() {
               return (
                 <div
                   key={p.id}
-                  className="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+                  className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
                 >
-                  {/* --- ⚡ UNIVERSAL FLASH SALE BADGE (STEP 3) --- */}
+                  {/* --- ⚡ UNIVERSAL FLASH SALE BADGE --- */}
                   {(() => {
                     const activeFlash = promotions.find(promo =>
                       promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
@@ -3681,7 +3709,6 @@ export default function App() {
 
                     if (!activeFlash) return null;
 
-                    // Format date to dd/mm and time to hh:mm
                     const [y, m, d] = (activeFlash.endDate || "").split('-');
                     const shortDate = d && m ? `${d}/${m}` : '';
                     const shortTime = activeFlash.endTime || "23:59";
@@ -3692,7 +3719,6 @@ export default function App() {
                           <Sparkles size={10} className="text-purple-200" />
                           FLASH DEAL
                         </div>
-                        {/* Smaller date attached below the tag */}
                         <div className="text-[8px] md:text-[9px] font-bold text-white bg-gray-900/80 px-1.5 py-0.5 rounded mt-1 shadow-sm tracking-wide">
                           Ends {shortDate} {shortTime}
                         </div>
@@ -3715,49 +3741,53 @@ export default function App() {
                     activePromos={activePromosForProduct}
                   />
                   <div className="flex-1 flex flex-col">
-                    <div className="flex gap-1 mb-1">
-                      <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                         {p.category}
                       </span>
                       {p.subcategory && (
-                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                        <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
                           {p.subcategory}
                         </span>
                       )}
                     </div>
-                    <h3 className="font-serif font-bold text-lg leading-tight mb-1 text-gray-900">
+
+                    {/* Responsive Title */}
+                    <h3 className="font-serif font-bold text-xs md:text-lg leading-tight mb-1 text-gray-900 line-clamp-2 md:line-clamp-none">
                       {p.name}
                     </h3>
 
                     {p.expiryDate && (
-                      <p className="text-xs font-bold text-red-500 mb-2 flex items-center gap-1">
-                        <Clock size={12} /> Expiry: {p.expiryDate}
+                      <p className="text-[9px] md:text-xs font-bold text-red-500 mb-1 md:mb-2 flex items-center gap-1">
+                        <Clock size={10} className="md:w-3 md:h-3" /> Expiry: {p.expiryDate}
                       </p>
                     )}
 
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
-                      {p.description}
-                    </p>
-                    <div className="mt-auto flex justify-between items-center">
+                    {/* NEW: Expandable Description */}
+                    <ExpandableDescription text={p.description} />
+
+                    <div className="mt-auto flex justify-between items-center pt-2">
                       <div className="flex flex-col">
                         {p.originalPrice && (
-                          <span className="text-xs text-gray-400 line-through font-medium">
+                          <span className="text-[9px] md:text-xs text-gray-400 line-through font-medium">
                             {p.originalPrice.toFixed(3)} BHD
                           </span>
                         )}
-                        <span className="text-lg font-bold text-red-600">
+                        <span className="text-sm md:text-lg font-bold text-red-600">
                           {p.price.toFixed(3)} BHD
                         </span>
                       </div>
+
+                      {/* Responsive Add to Cart Button */}
                       <button
                         onClick={() => addToCart(p)}
                         disabled={p.stock === 0}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${p.stock === 0
+                        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                           : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
                           }`}
                       >
-                        <Plus size={20} />
+                        <Plus size={16} className="md:w-5 md:h-5" />
                       </button>
                     </div>
                   </div>
@@ -4134,8 +4164,8 @@ export default function App() {
                       }
                     }}
                     className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${Object.values(cart).some(item => (products.find(p => p.id === item.id)?.stock || 0) <= 0)
-                        ? "bg-red-100 text-red-400 cursor-not-allowed border border-red-200"
-                        : "bg-gray-900 text-white hover:bg-purple-600 shadow-lg"
+                      ? "bg-red-100 text-red-400 cursor-not-allowed border border-red-200"
+                      : "bg-gray-900 text-white hover:bg-purple-600 shadow-lg"
                       }`}
                   >
                     {Object.values(cart).some(item => (products.find(p => p.id === item.id)?.stock || 0) <= 0)
