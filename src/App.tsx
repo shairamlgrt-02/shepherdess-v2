@@ -266,24 +266,7 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
         }}
       />
 
-      {/* --- BADGE CONTAINER (Top Left) --- */}
-      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start z-10">
-        {isNew && (
-          <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-sm flex items-center gap-1">
-            <Sparkles size={10} /> NEW
-          </span>
-        )}
-        {discount > 0 && (
-          <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-sm">
-            Save {discount}%
-          </span>
-        )}
-        {stock < 3 && stock > 0 && (
-          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-200 uppercase tracking-wide">
-            Low Stock
-          </span>
-        )}
-      </div>
+      {/* Tags have been moved below the product description */}
 
       {/* --- 🌸 MULTIPLE PROMO TAGS (Bottom Left) --- */}
       {activePromos && activePromos.length > 0 && (
@@ -3766,29 +3749,58 @@ export default function App() {
                     {/* NEW: Expandable Description */}
                     <ExpandableDescription text={p.description} />
 
-                    <div className="mt-auto flex justify-between items-center pt-2">
-                      <div className="flex flex-col">
-                        {p.originalPrice && (
-                          <span className="text-[9px] md:text-xs text-gray-400 line-through font-medium">
-                            {p.originalPrice.toFixed(3)} BHD
-                          </span>
-                        )}
-                        <span className="text-sm md:text-lg font-bold text-red-600">
-                          {p.price.toFixed(3)} BHD
-                        </span>
+                    {/* UPDATED PRICE & TAGS CONTAINER */}
+                    <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
+
+                      {/* Top Row: Price, Discount Badge, and Cart Button */}
+                      <div className="flex justify-between items-end">
+                        <div className="flex flex-col">
+                          {p.originalPrice && (
+                            <span className="text-[9px] md:text-[10px] text-gray-400 line-through font-medium leading-none mb-1">
+                              {p.originalPrice.toFixed(3)} BHD
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm md:text-lg font-bold text-red-600 leading-none">
+                              {p.price.toFixed(3)} BHD
+                            </span>
+                            {/* Save % Badge next to price */}
+                            {p.originalPrice && p.originalPrice > p.price && (
+                              <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-tight">
+                                Save {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Responsive Add to Cart Button */}
+                        <button
+                          onClick={() => addToCart(p)}
+                          disabled={p.stock === 0}
+                          className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                            }`}
+                        >
+                          <Plus size={16} className="md:w-5 md:h-5" />
+                        </button>
                       </div>
 
-                      {/* Responsive Add to Cart Button */}
-                      <button
-                        onClick={() => addToCart(p)}
-                        disabled={p.stock === 0}
-                        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
-                          }`}
-                      >
-                        <Plus size={16} className="md:w-5 md:h-5" />
-                      </button>
+                      {/* Bottom Row: NEW ARRIVAL & LOW STOCK TAGS */}
+                      {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {isNewArrival(p.createdAt) && (
+                            <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
+                              <Sparkles size={10} /> NEW
+                            </span>
+                          )}
+                          {p.stock < 3 && p.stock > 0 && (
+                            <span className="text-[9px] md:text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-tight">
+                              Low Stock
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
