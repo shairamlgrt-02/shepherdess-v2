@@ -774,7 +774,8 @@ const AdminDashboard = ({
 
   // 1. Export Current Inventory Backup
   const handleExportCSV = () => {
-    const headers = ["name", "category", "subcategory", "cost", "price", "originalPrice", "stock", "expiryDate", "description", "image", "active"];
+    // ✨ NEW: "id" is now the very first column
+    const headers = ["id", "name", "category", "subcategory", "cost", "price", "originalPrice", "stock", "expiryDate", "description", "image", "active"];
     let csvContent = headers.join(",") + "\n";
 
     products.forEach(p => {
@@ -797,8 +798,9 @@ const AdminDashboard = ({
 
   // 2. Download Blank Template
   const handleDownloadTemplate = () => {
-    const headers = "name,category,subcategory,cost,price,originalPrice,stock,expiryDate,description,image\n";
-    const sample = 'Glass Skin Serum,Skincare,Serum,5.000,12.500,,50,2027-12-31,"Amazing glowing serum",https://example.com/image.jpg\n';
+    const headers = "id,name,category,subcategory,cost,price,originalPrice,stock,expiryDate,description,image\n";
+    // ✨ NEW: The first value is empty (starting with a comma) so the system knows it's a new product
+    const sample = ',Glass Skin Serum,Skincare,Serum,5.000,12.500,,50,2027-12-31,"Amazing glowing serum",https://example.com/image.jpg\n';
     const blob = new Blob([headers + sample], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -808,12 +810,12 @@ const AdminDashboard = ({
     document.body.removeChild(link);
   };
 
-  // 3. Process & Import Uploaded CSV (SMART UPSERT ENGINE)
+  // 3. Process & Import Uploaded CSV (SMART ID ENGINE)
   const handleImportCSV = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!window.confirm("Import products? Existing products with the exact same name will have their stock, cost, and price updated. New products will be added.")) return;
+    if (!window.confirm("Import products? Existing IDs will update their products. Rows with a blank ID will be added as new products.")) return;
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -849,33 +851,34 @@ const AdminDashboard = ({
           const item = {};
           headers.forEach((h, index) => { item[h] = values[index]; });
 
-          if (!item.name || !item.category) continue;
+          // Must have at least a name to process
+          if (!item.name) continue;
 
-          // Look for existing product
-          const existingProduct = products.find(p => (p.name || "").toLowerCase().trim() === item.name.toLowerCase().trim());
+          // ✨ NEW: Look up by ID instead of Name
+          const existingProduct = item.id ? products.find(p => p.id === item.id) : null;
 
           const formattedData = {
             name: item.name,
-            category: item.category,
+            category: item.category || "Uncategorized",
             subcategory: item.subcategory || "",
             cost: parseFloat(item.cost) || 0,
             price: parseFloat(item.price) || 0,
             originalPrice: item.originalprice ? parseFloat(item.originalprice) : null,
-            stock: parseInt(item.stock) || 0, // This overwrites the stock with the CSV value
+            stock: parseInt(item.stock) || 0,
             expiryDate: item.expirydate || item.expiryDate || "",
             description: item.description || "",
             image: item.image || "",
           };
 
           if (existingProduct) {
-            // ✨ UPDATE EXISTING
+            // UPDATE: Product exists, update its data
             await updateDoc(doc(db, "products", existingProduct.id), {
               ...formattedData,
               updatedAt: serverTimestamp()
             });
             updatedCount++;
           } else {
-            // ✨ ADD BRAND NEW
+            // ADD: No ID provided, create a brand new product
             await addDoc(collection(db, "products"), {
               ...formattedData,
               active: true,
@@ -888,7 +891,7 @@ const AdminDashboard = ({
         alert(`Success! 🎉 ${addedCount} new items added, ${updatedCount} items updated.`);
       } catch (error) {
         console.error("Import failed:", error);
-        alert("Oops! The file format was incorrect. Please use the exact template.");
+        alert("Oops! The file format was incorrect. Please ensure you didn't accidentally delete the 'id' column header.");
       } finally {
         setIsImporting(false);
         e.target.value = '';
@@ -1238,9 +1241,10 @@ const AdminDashboard = ({
         {[
           { id: "orders", icon: Users, label: "Orders" },
           { id: "inventory", icon: Package, label: "Inventory" },
+          { id: "accounting", icon: Database, label: "Accounting" }, // ✨ NEW TAB
           { id: "categories", icon: ListFilter, label: "Categories" },
           { id: "promos", icon: Tag, label: "Promotions" },
-          { id: "marketing", icon: Sparkles, label: "Marketing" }, // ✨ NEW TAB
+          { id: "marketing", icon: Sparkles, label: "Marketing" },
           { id: "content", icon: Settings, label: "Content" },
           { id: "wa-templates", icon: MessageCircle, label: "WA Templates" },
         ].map((t) => (
@@ -1926,6 +1930,123 @@ const AdminDashboard = ({
           </div>
         </div>
       )}
+
+      {/* ACCOUNTING TAB */}
+      {tab === "accounting" && (() => {
+        // --- 1. CALCULATIONS ---
+        // Only count orders that actually made money (Delivered)
+        const completedOrders = orders.filter(o => o.status === "delivered");
+
+        const totalGrossSales = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+        const totalCOGS = completedOrders.reduce((sum, o) => sum + (o.totalCOGS || 0), 0);
+        const netProfit = totalGrossSales - totalCOGS;
+        const profitMargin = totalGrossSales > 0 ? (netProfit / totalGrossSales) * 100 : 0;
+
+        // Find how many orders are missing cost data
+        const ordersMissingCosts = orders.filter(o => o.totalCOGS === undefined).length;
+
+        // --- 2. RETROACTIVE SYNC FUNCTION ---
+        const handleRetroactiveSync = async () => {
+          if (!window.confirm(`Scan and update ${ordersMissingCosts} old orders? This will apply your CURRENT product costs to calculate past profits.`)) return;
+
+          let updatedCount = 0;
+          for (const order of orders) {
+            if (order.totalCOGS === undefined) {
+              let orderCOGS = 0;
+              const updatedItems = { ...order.items };
+
+              // Loop through items in the old order
+              for (const key in updatedItems) {
+                const item = updatedItems[key];
+                // Try to find the product in our CURRENT inventory to get its cost
+                const liveProduct = products.find(p => p.id === item.id);
+                const itemCost = liveProduct ? (liveProduct.cost || 0) : 0;
+
+                updatedItems[key].cost = itemCost;
+                orderCOGS += (itemCost * item.qty);
+              }
+
+              // Save it permanently to the order
+              await updateDoc(doc(db, "orders", order.id), {
+                items: updatedItems,
+                totalCOGS: orderCOGS
+              });
+              updatedCount++;
+            }
+          }
+          alert(`Success! ${updatedCount} historical orders have been updated with cost data.`);
+        };
+
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-end mb-4">
+              <div>
+                <h3 className="font-bold text-2xl text-gray-900 font-serif">Financial Overview</h3>
+                <p className="text-sm text-gray-500">Based on {completedOrders.length} delivered orders.</p>
+              </div>
+
+              {/* THE SYNC BUTTON */}
+              {ordersMissingCosts > 0 && (
+                <button
+                  onClick={handleRetroactiveSync}
+                  className="bg-amber-100 text-amber-800 border border-amber-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-200 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <RefreshCw size={14} /> Sync {ordersMissingCosts} Old Orders
+                </button>
+              )}
+            </div>
+
+            {/* THE METRICS GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Gross Sales */}
+              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gross Sales</p>
+                <h4 className="text-3xl font-serif font-bold text-gray-900">{totalGrossSales.toFixed(3)}</h4>
+                <p className="text-[10px] text-gray-400 mt-1">Total revenue collected</p>
+              </div>
+
+              {/* COGS */}
+              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cost of Goods (COGS)</p>
+                <h4 className="text-3xl font-serif font-bold text-gray-900">{totalCOGS.toFixed(3)}</h4>
+                <p className="text-[10px] text-gray-400 mt-1">Total inventory expense</p>
+              </div>
+
+              {/* Net Profit */}
+              <div className="bg-purple-600 p-6 rounded-xl shadow-lg transform transition-transform hover:scale-105">
+                <p className="text-xs font-bold text-purple-200 uppercase tracking-widest mb-2">Net Profit</p>
+                <h4 className="text-3xl font-serif font-bold text-white">{netProfit.toFixed(3)}</h4>
+                <p className="text-[10px] text-purple-300 mt-1">Pure profit after costs</p>
+              </div>
+
+              {/* Profit Margin */}
+              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Profit Margin</p>
+                  <h4 className={`text-3xl font-serif font-bold ${profitMargin > 40 ? 'text-green-500' : profitMargin > 20 ? 'text-amber-500' : 'text-red-500'}`}>
+                    {profitMargin.toFixed(1)}%
+                  </h4>
+                </div>
+                <div className="w-full bg-gray-100 h-2 rounded-full mt-4 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${profitMargin > 40 ? 'bg-green-500' : profitMargin > 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${Math.min(profitMargin, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* INFO BOX */}
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mt-6">
+              <h4 className="text-blue-800 font-bold text-sm mb-1 flex items-center gap-2"><Database size={16} /> How this works</h4>
+              <p className="text-xs text-blue-600 leading-relaxed">
+                Profit calculations are locked to the exact cost of the product at the moment a customer checks out.
+                This means if your supplier raises their prices next month, your past profit reports remain perfectly accurate and won't be ruined!
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* CATEGORIES TAB */}
       {tab === "categories" && (
@@ -3162,7 +3283,7 @@ export default function App() {
     }
   };
 
-  // --- UPDATED: Checkout with Discount Support ---
+  // --- UPDATED: Checkout with Cost & Discount Support ---
   const handleCheckout = async (e) => {
     e.preventDefault();
 
@@ -3178,23 +3299,39 @@ export default function App() {
       const orderId = generateOrderId();
       const cartItems = Object.values(cart);
 
-      // Calculate Totals
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
       const discount = appliedCode ? appliedCode.discount : 0;
       const finalTotal = Math.max(0, subtotal + deliveryFee - discount);
 
       await runTransaction(db, async (transaction) => {
-        // 1. Stock Check
         const validatedItems = [];
+        let totalOrderCOGS = 0;      // ✨ NEW: Track total Cost Of Goods Sold
+        const finalOrderItems = {};  // ✨ NEW: The perfect snapshot of the cart
+
+        // 1. Stock & Cost Check
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
           const productSnap = await transaction.get(productRef);
           if (!productSnap.exists()) throw `Product ${item.name} no longer exists!`;
-          const currentStock = productSnap.data().stock || 0;
+
+          const productData = productSnap.data();
+          const currentStock = productData.stock || 0;
+          const currentCost = productData.cost || 0; // Grab the live cost from the DB!
+
           if (currentStock < item.qty) {
             throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
+
+          // Add to our total COGS calculation
+          totalOrderCOGS += (currentCost * item.qty);
+
+          // Build our perfect snapshot
+          finalOrderItems[item.id] = {
+            ...item,
+            cost: currentCost // ✨ LOCK IN THE COST FOREVER
+          };
+
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
@@ -3203,13 +3340,12 @@ export default function App() {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
-        // 3. Increment Promo Usage (If used)
+        // 3. Increment Promo
         if (appliedCode && appliedCode.id) {
           const promoRef = doc(db, "promotions", appliedCode.id);
           const promoSnap = await transaction.get(promoRef);
           if (promoSnap.exists()) {
-            const newCount = (promoSnap.data().usedCount || 0) + 1;
-            transaction.update(promoRef, { usedCount: newCount });
+            transaction.update(promoRef, { usedCount: (promoSnap.data().usedCount || 0) + 1 });
           }
         }
 
@@ -3225,11 +3361,12 @@ export default function App() {
             meetupNote: deliveryMethod !== 'delivery' ? meetupNote : '',
             proof: compressedProof
           },
-          items: cart,
+          items: finalOrderItems,      // ✨ NEW: Use our perfect snapshot
+          totalCOGS: totalOrderCOGS,   // ✨ NEW: Save the total order cost
           subtotal: subtotal,
           deliveryFee: deliveryFee,
-          discount: discount,          // <--- SAVED TO DB
-          promoCode: appliedCode ? appliedCode.code : null, // <--- SAVED TO DB
+          discount: discount,
+          promoCode: appliedCode ? appliedCode.code : null,
           total: finalTotal,
           journeyStatus: "pending",
           date: new Date().toISOString(),
@@ -3241,7 +3378,7 @@ export default function App() {
       setCheckoutStep("success");
       setCart({});
       setProofFile(null);
-      setAppliedCode(null); // Reset code
+      setAppliedCode(null);
       showNotification("Order placed successfully! ✧", "success");
 
     } catch (error) {
