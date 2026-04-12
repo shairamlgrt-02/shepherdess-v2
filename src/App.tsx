@@ -1642,22 +1642,23 @@ const AdminDashboard = ({
         </div>
       )}
 
-      {/* INVENTORY TAB */}
+      {/* INVENTORY TAB (COMPACT & OPTIMIZED) */}
       {tab === "inventory" && (
-        <div className="space-y-6">
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="space-y-4">
+          {/* Top Controls - Made much smaller */}
+          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
             <div className="flex flex-col md:flex-row gap-2 flex-1 w-full">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                <Search className="absolute left-2.5 top-2 text-gray-400" size={14} />
                 <input
-                  className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm bg-gray-50 focus:bg-white transition-colors"
+                  className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-xs bg-gray-50 focus:bg-white transition-colors"
                   placeholder="Search product name..."
                   value={invSearch}
                   onChange={(e) => setInvSearch(e.target.value)}
                 />
               </div>
               <select
-                className="border p-2 rounded-lg text-sm bg-white"
+                className="border py-1.5 px-2 rounded-lg text-xs bg-white"
                 value={invCategory}
                 onChange={(e) => {
                   setInvCategory(e.target.value);
@@ -1673,7 +1674,7 @@ const AdminDashboard = ({
               </select>
               {invCategory !== "All" && (
                 <select
-                  className="border p-2 rounded-lg text-sm bg-white animate-fade-in"
+                  className="border py-1.5 px-2 rounded-lg text-xs bg-white animate-fade-in"
                   value={invSubCategory}
                   onChange={(e) => setInvSubCategory(e.target.value)}
                 >
@@ -1688,40 +1689,35 @@ const AdminDashboard = ({
             </div>
 
             {/* --- TOOLBAR GROUP --- */}
-            <div className="flex flex-wrap items-center justify-start md:justify-end gap-3 w-full md:w-auto mt-3 md:mt-0">
-
-              {/* CLEAR ALL BUTTON */}
+            <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full md:w-auto mt-2 md:mt-0">
               <button
                 onClick={clearAllFilters}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-bold border border-gray-200 uppercase tracking-tighter hover:bg-red-50 hover:text-red-600 transition-colors"
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-[9px] font-bold border border-gray-200 uppercase tracking-tighter hover:bg-red-50 hover:text-red-600 transition-colors"
               >
-                <RefreshCw size={14} /> Clear All
+                <RefreshCw size={12} /> Clear
               </button>
 
-              {/* TOGGLE SWITCH */}
               <div
                 onClick={() => setHideOutOfStock(!hideOutOfStock)}
-                className="flex items-center gap-2 cursor-pointer group select-none bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100"
+                className="flex items-center gap-1.5 cursor-pointer group select-none bg-gray-50 px-2 py-1 rounded-lg border border-gray-100"
               >
-                <div className={`relative w-9 h-5 rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
-                  <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow transform transition-transform ${hideOutOfStock ? 'translate-x-4' : 'translate-x-0'}`} />
+                <div className={`relative w-7 h-4 rounded-full transition-colors ${hideOutOfStock ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full shadow transform transition-transform ${hideOutOfStock ? 'translate-x-3' : 'translate-x-0'}`} />
                 </div>
                 <span className="text-[9px] font-bold text-gray-500 uppercase">Hide 0</span>
               </div>
 
-              {/* 2. ARCHIVE BUTTON */}
               <button
                 onClick={() => setShowArchived(!showArchived)}
-                className={`p-2 rounded-lg transition-all border ${showArchived
+                className={`p-1.5 rounded-lg transition-all border ${showArchived
                   ? "bg-amber-100 text-amber-800 border-amber-200"
                   : "bg-white text-gray-400 border-gray-200 hover:text-gray-600"
                   }`}
                 title={showArchived ? "Back to Inventory" : "View Archived Items"}
               >
-                {showArchived ? <RefreshCw size={20} /> : <Archive size={20} />}
+                {showArchived ? <RefreshCw size={16} /> : <Archive size={16} />}
               </button>
 
-              {/* 3. ADD PRODUCT BUTTON */}
               {!showArchived && (
                 <button
                   onClick={() => {
@@ -1731,214 +1727,106 @@ const AdminDashboard = ({
                     });
                     setShowProductForm(!showProductForm);
                   }}
-                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-purple-700 transition-colors whitespace-nowrap"
                 >
-                  {showProductForm ? <X size={16} /> : <Plus size={16} />}{" "}
-                  {showProductForm ? "Cancel" : "Add Product"}
+                  {showProductForm ? <X size={14} /> : <Plus size={14} />}{" "}
+                  {showProductForm ? "Cancel" : "Add"}
                 </button>
               )}
 
-              {/* 4. CSV BULK ACTIONS ENGINE */}
-              <div className="flex gap-2 border-l border-gray-200 pl-3 ml-1">
-                <button
-                  onClick={handleDownloadTemplate}
-                  title="Download Blank Template"
-                  className="p-2 text-gray-400 hover:text-green-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-green-50 transition-colors"
-                >
-                  <FileText size={16} />
+              <div className="flex gap-1.5 border-l border-gray-200 pl-2 ml-1">
+                <button onClick={handleDownloadTemplate} title="Download Blank Template" className="p-1.5 text-gray-400 hover:text-green-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-green-50">
+                  <FileText size={14} />
                 </button>
-                <button
-                  onClick={handleExportCSV}
-                  title="Backup & Export Inventory"
-                  className="p-2 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
-                >
-                  <Download size={16} />
+                <button onClick={handleExportCSV} title="Backup & Export Inventory" className="p-1.5 text-gray-400 hover:text-blue-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50">
+                  <Download size={14} />
                 </button>
-                <label
-                  title="Import Products via CSV"
-                  className={`p-2 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors relative ${isImporting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                >
-                  <Upload size={16} />
+                <label className={`p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm relative ${isImporting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}>
+                  <Upload size={14} />
                   <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isImporting} />
-                  {isImporting && (
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
-                    </span>
-                  )}
                 </label>
               </div>
-
             </div>
           </div>
 
           {showProductForm && (
             <form
               onSubmit={handleProductSubmit}
-              className="bg-white border border-purple-200 rounded-xl p-6 shadow-sm space-y-4 animate-fade-in"
+              className="bg-white border border-purple-200 rounded-xl p-4 shadow-sm space-y-3 animate-fade-in"
             >
-              <h3 className="font-bold text-gray-900">
+              <h3 className="font-bold text-sm text-gray-900">
                 {editingId ? "Edit Product" : "Add New Product"}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input required placeholder="Name" className="p-3 border rounded-lg text-sm" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
-                <select className="p-3 border rounded-lg text-sm" value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value, subcategory: "" })}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input required placeholder="Name" className="p-2 border rounded-lg text-xs" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+                <select className="p-2 border rounded-lg text-xs" value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value, subcategory: "" })}>
                   <option value="">Select Category</option>
                   {Object.keys(categories).map((c) => (<option key={c} value={c}>{c}</option>))}
                 </select>
-                <select className="p-3 border rounded-lg text-sm" value={productForm.subcategory} onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value })}>
+                <select className="p-2 border rounded-lg text-xs" value={productForm.subcategory} onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value })}>
                   <option value="">Select Subcategory</option>
                   {(categories[productForm.category] || []).map((s) => (<option key={s} value={s}>{s}</option>))}
                 </select>
                 <div className="flex gap-2">
-                  <input type="number" step="0.001" placeholder="Cost" className="p-3 border border-purple-200 bg-purple-50 rounded-lg text-sm w-1/3 text-purple-700 font-bold" value={productForm.cost} onChange={(e) => setProductForm({ ...productForm, cost: e.target.value })} />
-                  <input required type="number" step="0.001" placeholder="Selling Price" className="p-3 border rounded-lg text-sm w-1/3" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
-                  <input type="number" step="0.001" placeholder="Old Price" className="p-3 border rounded-lg text-sm w-1/3" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
+                  <input type="number" step="0.001" placeholder="Cost" className="p-2 border border-purple-200 bg-purple-50 rounded-lg text-xs w-1/3 text-purple-700 font-bold" value={productForm.cost} onChange={(e) => setProductForm({ ...productForm, cost: e.target.value })} />
+                  <input required type="number" step="0.001" placeholder="Selling Price" className="p-2 border rounded-lg text-xs w-1/3" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+                  <input type="number" step="0.001" placeholder="Old Price" className="p-2 border rounded-lg text-xs w-1/3" value={productForm.originalPrice} onChange={(e) => setProductForm({ ...productForm, originalPrice: e.target.value })} />
                 </div>
-                <input required type="number" placeholder="Stock" className="p-3 border rounded-lg text-sm" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
-                <input placeholder="Expiry (YYYY-MM-DD)" className="p-3 border rounded-lg text-sm" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
-                <input placeholder="Image URL" className="p-3 border rounded-lg text-sm" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} />
-                <textarea placeholder="Description" className="p-3 border rounded-lg text-sm md:col-span-2" rows="2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
+                <input required type="number" placeholder="Stock" className="p-2 border rounded-lg text-xs" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} />
+                <input placeholder="Expiry (YYYY-MM-DD)" className="p-2 border rounded-lg text-xs" value={productForm.expiryDate} onChange={(e) => setProductForm({ ...productForm, expiryDate: e.target.value })} />
+                <input placeholder="Image URL" className="p-2 border rounded-lg text-xs" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} />
+                <textarea placeholder="Description" className="p-2 border rounded-lg text-xs md:col-span-2" rows="2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
               </div>
-              <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black">
+              <button type="submit" className="w-full bg-gray-900 text-white py-2 rounded-lg text-xs font-bold hover:bg-black">
                 {editingId ? "Update Product" : "Save Product"}
               </button>
             </form>
           )}
 
+          {/* TABLE - Made extremely compact */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-[10px]">
                   <tr>
-                    {/* PRODUCT HEADER */}
-                    <th className="p-4 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("name")}>
-                      <div className="flex items-center gap-1">
-                        Product
-                        {sortConfig.map((s, index) => s.key === "name" && (
-                          <span key="name-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* STOCK HEADER */}
-                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("stock")}>
-                      <div className="flex items-center justify-center gap-1">
-                        Stock
-                        {sortConfig.map((s, index) => s.key === "stock" && (
-                          <span key="stock-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* PRICE HEADER */}
-                    <th className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleHeaderSort("price")}>
-                      <div className="flex items-center justify-center gap-1">
-                        Price
-                        {sortConfig.map((s, index) => s.key === "price" && (
-                          <span key="price-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px]">{index + 1}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* --- EXPIRY HEADER --- */}
-                    <th
-                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                      onClick={() => handleHeaderSort("expiryDate")}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        Expiry
-                        {sortConfig.map((s, index) => s.key === "expiryDate" && (
-                          <span key="expiry-sort" className="text-purple-600 flex items-center">
-                            {s.direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            {sortConfig.length > 1 && (
-                              <span className="ml-1 bg-purple-100 px-1.5 rounded-full text-[9px] font-bold">
-                                {index + 1}
-                              </span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    </th>
-
-                    {/* --- VISIBLE HEADER (FILTER) --- */}
-                    <th
-                      className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                      onClick={cycleVisFilter}
-                      title="Click to toggle: All -> Visible -> Hidden"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        {visFilter === "all" && <span>Visible</span>}
-                        {visFilter === "visible" && <span className="text-green-600 flex items-center gap-1"><Eye size={14} /> Only</span>}
-                        {visFilter === "hidden" && <span className="text-gray-400 flex items-center gap-1"><EyeOff size={14} /> Only</span>}
-
-                        {/* The Filter Icon you requested */}
-                        <div className="text-gray-300">
-                          {visFilter === "all" ? <Filter size={12} /> : <Filter size={12} className="text-purple-500" />}
-                        </div>
-                      </div>
-                    </th>
-
-                    <th className="p-4 text-center">Actions</th>
+                    <th className="p-2.5 cursor-pointer hover:bg-gray-100" onClick={() => handleHeaderSort("name")}>Product</th>
+                    <th className="p-2.5 text-center cursor-pointer hover:bg-gray-100" onClick={() => handleHeaderSort("stock")}>Stock</th>
+                    <th className="p-2.5 text-center cursor-pointer hover:bg-gray-100" onClick={() => handleHeaderSort("price")}>Price</th>
+                    <th className="p-2.5 text-center cursor-pointer hover:bg-gray-100" onClick={() => handleHeaderSort("expiryDate")}>Expiry</th>
+                    <th className="p-2.5 text-center cursor-pointer hover:bg-gray-100" onClick={cycleVisFilter}>Vis</th>
+                    <th className="p-2.5 text-center">Actions</th>
                   </tr>
                 </thead>
-
                 <tbody className="divide-y divide-gray-100">
                   {filteredInventory.map((p) => (
                     <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-60 bg-gray-50" : ""}`}>
-                      <td className="p-4">
-                        <div className="font-bold text-gray-900">{p.name}</div>
-                        {p.expiryDate && (() => {
-                          const diff = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
-                          if (diff < 0) return <span className="inline-block mt-1 text-[10px] font-bold text-white bg-red-800 px-2 py-0.5 rounded animate-pulse">⚠️ EXPIRED</span>;
-                          if (diff <= 90) return <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">⏳ Expiring in {diff} days</span>;
-                          return null;
-                        })()}
-                        <div className="flex gap-2 mt-1">
-                          <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 font-bold">{p.category}</span>
-                          {p.subcategory && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{p.subcategory}</span>}
+                      <td className="p-2">
+                        <div className="font-bold text-gray-900 text-[11px] md:text-xs leading-tight line-clamp-1">{p.name}</div>
+                        <div className="flex gap-1 mt-1">
+                          <span className="text-[8px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full border border-purple-100 font-bold leading-none">{p.category}</span>
+                          {p.subcategory && <span className="text-[8px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full leading-none">{p.subcategory}</span>}
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <input type="number" className={`w-16 p-2 border rounded text-center font-bold ${p.stock < 3 ? "text-red-600 border-red-200 bg-red-50" : "border-gray-200"}`} value={p.stock} onChange={(e) => onUpdateStock(p.id, e.target.value)} />
+                      <td className="p-2 text-center">
+                        <input type="number" className={`w-12 p-1 text-[11px] border rounded text-center font-bold ${p.stock < 3 ? "text-red-600 border-red-200 bg-red-50" : "border-gray-200"}`} value={p.stock} onChange={(e) => onUpdateStock(p.id, e.target.value)} />
                       </td>
-                      <td className="p-4 text-center">
-                        <input type="number" step="0.001" className="w-20 p-2 border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
+                      <td className="p-2 text-center">
+                        <input type="number" step="0.001" className="w-16 p-1 text-[11px] border border-gray-200 rounded text-center text-purple-600 font-bold" value={p.price} onChange={(e) => onUpdatePrice(p.id, e.target.value)} />
                       </td>
-                      <td className="p-4 text-center text-[11px] font-mono text-gray-500">
+                      <td className="p-2 text-center text-[10px] font-mono text-gray-500">
                         {p.expiryDate ? p.expiryDate : "—"}
                       </td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-2 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
-                          {p.active ? <Eye size={18} /> : <EyeOff size={18} />}
+                      <td className="p-2 text-center">
+                        <button onClick={() => onToggleStatus(p.id, p.active)} className={`p-1.5 rounded-full ${p.active ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}>
+                          {p.active ? <Eye size={14} /> : <EyeOff size={14} />}
                         </button>
                       </td>
-                      <td className="p-4 text-center flex justify-center gap-2">
-                        <button onClick={() => startEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full" title="Edit">
-                          <Edit size={18} />
+                      <td className="p-2 text-center flex justify-center gap-1">
+                        <button onClick={() => startEditProduct(p)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-full"><Edit size={14} /></button>
+                        <button onClick={() => toggleArchiveStatus(p)} className={`p-1.5 rounded-full ${p.archived ? "text-green-500 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}>
+                          {p.archived ? <RefreshCw size={14} /> : <Archive size={14} />}
                         </button>
-
-                        {/* ARCHIVE BUTTON */}
-                        <button
-                          onClick={() => toggleArchiveStatus(p)}
-                          className={`p-2 rounded-full transition-colors ${p.archived ? "text-green-500 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
-                          title={p.archived ? "Restore" : "Archive"}
-                        >
-                          {p.archived ? <RefreshCw size={18} /> : <Archive size={18} />}
-                        </button>
-
-                        <button onClick={() => onDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full" title="Delete">
-                          <Trash2 size={18} />
-                        </button>
+                        <button onClick={() => onDeleteProduct(p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-full"><Trash2 size={14} /></button>
                       </td>
                     </tr>
                   ))}
@@ -2108,92 +1996,99 @@ const AdminDashboard = ({
         );
       })()}
 
-      {/* CATEGORIES TAB */}
+      {/* CATEGORIES TAB (MOBILE OPTIMIZED & COMPACT) */}
       {tab === "categories" && (
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold mb-4 text-lg">Main Categories</h3>
-            <div className="flex gap-2 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Main Categories Box */}
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <h3 className="font-bold mb-3 text-sm text-gray-900">Main Categories</h3>
+            <div className="flex gap-2 mb-3">
               <input
-                className="border p-2 rounded-lg flex-1 text-sm"
-                placeholder="New Category Name"
+                className="border p-1.5 rounded-lg flex-1 text-xs outline-none focus:border-purple-300"
+                placeholder="New Main Category"
                 value={newMainCat}
                 onChange={(e) => setNewMainCat(e.target.value)}
               />
               <button
                 onClick={addMainCategory}
-                className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
+                className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700"
               >
                 Add
               </button>
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5 max-h-[200px] md:max-h-full overflow-y-auto">
               {Object.keys(localCategories).map((cat) => (
                 <li
                   key={cat}
-                  className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100"
+                  className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100"
                 >
-                  <span className="font-medium">{cat}</span>
+                  <span className="font-medium text-xs text-gray-800">{cat}</span>
                   <button
                     onClick={() => deleteMainCategory(cat)}
-                    className="text-gray-400 hover:text-red-600"
+                    className="text-gray-400 hover:text-red-500 p-1"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                   </button>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold mb-4 text-lg">Subcategories</h3>
-            <div className="flex gap-2 mb-4">
+
+          {/* Subcategories Box */}
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <h3 className="font-bold mb-3 text-sm text-gray-900">Subcategories</h3>
+            <div className="flex flex-col md:flex-row gap-2 mb-3">
               <select
-                className="border p-2 rounded-lg text-sm bg-white"
+                className="border p-1.5 rounded-lg text-xs bg-white outline-none focus:border-purple-300 w-full md:w-1/3"
                 value={newSubCat.main}
                 onChange={(e) =>
                   setNewSubCat({ ...newSubCat, main: e.target.value })
                 }
               >
-                <option value="">Select Main</option>
+                <option value="">Select Main...</option>
                 {Object.keys(localCategories).map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
               </select>
-              <input
-                className="border p-2 rounded-lg flex-1 text-sm"
-                placeholder="Subcategory Name"
-                value={newSubCat.sub}
-                onChange={(e) =>
-                  setNewSubCat({ ...newSubCat, sub: e.target.value })
-                }
-              />
-              <button
-                onClick={addSubCategory}
-                className="bg-purple-600 text-white px-4 rounded-lg text-sm font-bold hover:bg-purple-700"
-              >
-                Add
-              </button>
+              <div className="flex gap-2 flex-1">
+                <input
+                  className="border p-1.5 rounded-lg flex-1 text-xs outline-none focus:border-purple-300"
+                  placeholder="New Subcategory"
+                  value={newSubCat.sub}
+                  onChange={(e) =>
+                    setNewSubCat({ ...newSubCat, sub: e.target.value })
+                  }
+                />
+                <button
+                  onClick={addSubCategory}
+                  className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700"
+                >
+                  Add
+                </button>
+              </div>
             </div>
-            <div className="space-y-4 h-[400px] overflow-y-auto pr-2">
+
+            {/* Subcategory List Display */}
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
               {Object.entries(localCategories).map(([main, subs]) => (
                 <div key={main}>
-                  <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-white py-1">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-1 sticky top-0 bg-white py-1">
                     {main}
                   </h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {subs.map((sub) => (
                       <span
                         key={sub}
-                        className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-purple-100"
+                        className="bg-purple-50 text-purple-700 px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 border border-purple-100"
                       >
                         {sub}
                         <button
                           onClick={() => deleteSubCategory(main, sub)}
                           className="text-purple-300 hover:text-red-500"
                         >
-                          <X size={12} />
+                          <X size={10} />
                         </button>
                       </span>
                     ))}
@@ -3789,8 +3684,8 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="text-center mb-6 md:mb-8">
 
-{/* ✨ UPDATED: Larger Dynamic Popping Hero Tag with Sparkles */}
-<div className="relative inline-block mb-2 mt-2">
+            {/* ✨ UPDATED: Larger Dynamic Popping Hero Tag with Sparkles */}
+            <div className="relative inline-block mb-2 mt-2">
               <style>{`
                 @keyframes pop-in {
                   0% { transform: scale(0.3); opacity: 0; }
