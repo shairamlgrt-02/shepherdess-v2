@@ -213,26 +213,44 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
-// --- 📝 NEW EXPANDABLE DESCRIPTION COMPONENT ---
-const ExpandableDescription = ({ text }) => {
+// --- 📝 UPGRADED EXPANDABLE TEXT GROUP (Left Aligned) ---
+const ExpandableTextGroup = ({ name, expiryDate, text }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  if (!text) return null;
 
-  // Roughly 60 characters is a good threshold for 2 lines on mobile
-  const isLong = text.length > 60;
+  const isNameLong = name && name.length > 45;
+  const isTextLong = text && text.length > 60;
+  const needsExpansion = isNameLong || isTextLong;
 
   return (
-    <div className="mb-2 md:mb-4">
-      <p className={`text-[10px] md:text-sm text-gray-500 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
-        {text}
-      </p>
-      {isLong && (
+    // ✨ NEW: Added items-start and text-left to force left alignment
+    <div className="flex flex-col items-start text-left mb-1 md:mb-3 w-full">
+      {/* 1. Expandable Title */}
+      <h3 className={`font-sans font-bold text-sm md:text-base leading-tight mb-1 text-gray-900 transition-all text-left ${!isExpanded ? 'line-clamp-2' : ''}`}>
+        {name}
+      </h3>
+
+      {/* 2. Expiry Date */}
+      {expiryDate && (
+        <p className="text-[9px] md:text-xs font-bold text-red-500 mb-1 md:mb-2 flex items-center justify-start gap-1 w-full text-left">
+          <Clock size={10} className="md:w-3 md:h-3" /> Expiry: {expiryDate}
+        </p>
+      )}
+
+      {/* 3. Expandable Description */}
+      {text && (
+        <p className={`text-[10px] md:text-sm text-gray-500 leading-relaxed transition-all text-left w-full ${!isExpanded ? 'line-clamp-2' : ''}`}>
+          {text}
+        </p>
+      )}
+
+      {/* Toggle Button */}
+      {needsExpansion && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             setIsExpanded(!isExpanded);
           }}
-          className="text-[10px] md:text-xs font-bold text-purple-600 mt-1 hover:underline focus:outline-none"
+          className="text-[10px] md:text-xs font-bold text-purple-600 mt-1 hover:underline focus:outline-none text-left"
         >
           {isExpanded ? "See Less" : "See More"}
         </button>
@@ -4098,8 +4116,10 @@ export default function App() {
                       }
                       activePromos={activePromosForProduct}
                     />
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex flex-wrap gap-1 mb-1">
+                    {/* ✨ NEW: Added items-start, text-left, and w-full */}
+                    <div className="flex-1 flex flex-col items-start text-left w-full">
+                      {/* ✨ NEW: Added justify-start to push tags to the left */}
+                      <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
                         <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                           {p.category}
                         </span>
@@ -4110,19 +4130,8 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Responsive Title */}
-                      <h3 className="font-serif font-bold text-xs md:text-lg leading-tight mb-1 text-gray-900 line-clamp-2 md:line-clamp-none">
-                        {p.name}
-                      </h3>
-
-                      {p.expiryDate && (
-                        <p className="text-[9px] md:text-xs font-bold text-red-500 mb-1 md:mb-2 flex items-center gap-1">
-                          <Clock size={10} className="md:w-3 md:h-3" /> Expiry: {p.expiryDate}
-                        </p>
-                      )}
-
-                      {/* NEW: Expandable Description */}
-                      <ExpandableDescription text={p.description} />
+                      {/* Integrated Expandable Title, Expiry & Description */}
+                      <ExpandableTextGroup name={p.name} expiryDate={p.expiryDate} text={p.description} />
 
                       {/* UPDATED PRICE & TAGS CONTAINER */}
                       <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
