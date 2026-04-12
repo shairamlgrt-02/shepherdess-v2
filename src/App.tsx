@@ -3849,8 +3849,8 @@ export default function App() {
                 .animate-scroll {
                   display: flex;
                   width: max-content;
-                  /* Lower the 10s to make it faster, raise it to make it slower */
-                  animation: marquee 10s linear infinite; 
+                  /* Increased from 10s to 25s for a smooth, readable, elegant scroll */
+                  animation: marquee 25s linear infinite; 
                 }
               `}</style>
 
