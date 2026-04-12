@@ -4170,17 +4170,18 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* Bottom Row: NEW ARRIVAL & LOW STOCK TAGS */}
+                        {/* Bottom Row: NEW ARRIVAL & EXACT STOCK TAGS */}
                         {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex flex-wrap gap-1.5 mt-1">
                             {isNewArrival(p.createdAt) && (
                               <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
                                 <Sparkles size={10} /> NEW
                               </span>
                             )}
+                            {/* ✨ UPDATED: Clean, subtle, italicized exact stock counter */}
                             {p.stock < 3 && p.stock > 0 && (
-                              <span className="text-[9px] md:text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-tight">
-                                Low Stock
+                              <span className="text-[9px] md:text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 italic tracking-tight">
+                                Only {p.stock} left!
                               </span>
                             )}
                           </div>
