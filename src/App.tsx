@@ -3789,42 +3789,45 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="text-center mb-6 md:mb-8">
 
-            {/* ✨ NEW: Dynamic Popping Hero Tag with Sparkles */}
-            <div className="relative inline-block mb-2">
+{/* ✨ UPDATED: Larger Dynamic Popping Hero Tag with Sparkles */}
+<div className="relative inline-block mb-2 mt-2">
               <style>{`
                 @keyframes pop-in {
-                  0% { transform: scale(0.5); opacity: 0; }
-                  60% { transform: scale(1.15); opacity: 1; }
+                  0% { transform: scale(0.3); opacity: 0; }
+                  /* ✨ INCREASED: The tag will now zoom to 140% of its size before settling */
+                  70% { transform: scale(1.4); opacity: 1; }
                   100% { transform: scale(1); opacity: 1; }
                 }
                 @keyframes sparkle-burst {
                   0% { transform: scale(0) rotate(0deg); opacity: 0; }
-                  50% { transform: scale(1.2) rotate(45deg); opacity: 1; }
+                  /* ✨ INCREASED: Sparkles will also get 40% bigger */
+                  50% { transform: scale(1.4) rotate(45deg); opacity: 1; }
                   100% { transform: scale(0.5) rotate(90deg); opacity: 0; }
                 }
                 .animate-pop-once {
-                  animation: pop-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                  /* Adjusted the cubic-bezier to make the bounce feel even punchier */
+                  animation: pop-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
                 }
                 .animate-sparkle-1 {
-                  animation: sparkle-burst 0.8s ease-in-out forwards;
-                  animation-delay: 0.1s;
+                  animation: sparkle-burst 0.9s ease-in-out forwards;
+                  animation-delay: 0.15s;
                 }
                 .animate-sparkle-2 {
-                  animation: sparkle-burst 0.8s ease-in-out forwards;
-                  animation-delay: 0.25s;
+                  animation: sparkle-burst 0.9s ease-in-out forwards;
+                  animation-delay: 0.3s;
                 }
               `}</style>
 
-              {/* The Sparkles (Absolutely positioned around the tag) */}
-              <div className="absolute -top-3 -left-4 text-red-400 opacity-0 animate-sparkle-1 pointer-events-none">
-                <Sparkles size={16} />
+              {/* The Sparkles (Pushed slightly further out to accommodate the bigger tag) */}
+              <div className="absolute -top-4 -left-6 text-red-400 opacity-0 animate-sparkle-1 pointer-events-none z-20">
+                <Sparkles size={20} />
               </div>
-              <div className="absolute -bottom-2 -right-4 text-red-400 opacity-0 animate-sparkle-2 pointer-events-none">
-                <Sparkles size={14} />
+              <div className="absolute -bottom-3 -right-6 text-red-400 opacity-0 animate-sparkle-2 pointer-events-none z-20">
+                <Sparkles size={18} />
               </div>
 
-              {/* The Tag Itself */}
-              <span className="relative z-10 inline-block bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm animate-pop-once">
+              {/* The Tag Itself (Increased padding, heavier font weight, bigger text) */}
+              <span className="relative z-10 inline-block bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-xs md:text-sm font-black uppercase tracking-widest shadow-md animate-pop-once">
                 {shopContent.heroTag}
               </span>
             </div>
