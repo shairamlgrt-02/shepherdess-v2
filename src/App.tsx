@@ -2346,21 +2346,76 @@ const AdminDashboard = ({
                         </div>
                       </label>
 
-                      {/* ✨ NEW: Manual Price Override Input */}
+                      {/* ✨ COMBINED: Custom Price & Per-Product Scheduling */}
                       {isSelected && (newPromo.type === 'flash' || newPromo.type === 'auto') && (
-                        <div className="mt-1 pl-6 animate-fade-in">
-                          <input
-                            type="number"
-                            step="0.001"
-                            placeholder="Custom Price (Optional)"
-                            className="w-full p-1.5 text-xs font-bold text-purple-700 border border-purple-200 rounded outline-none focus:ring-1 focus:ring-purple-400"
-                            value={newPromo.customPrices?.[p.id] || ''}
-                            onChange={(e) => setNewPromo({
-                              ...newPromo,
-                              customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
-                            })}
-                          />
-                          <p className="text-[9px] text-gray-400 mt-0.5">Leave blank to use the default rule</p>
+                        <div className="mt-1 pl-6 animate-fade-in space-y-2 pb-1">
+                          {/* 1. Custom Price Override */}
+                          <div>
+                            <input
+                              type="number"
+                              step="0.001"
+                              placeholder="Custom Price (Optional)"
+                              className="w-full p-1.5 text-xs font-bold text-purple-700 border border-purple-200 rounded outline-none focus:ring-1 focus:ring-purple-400"
+                              value={newPromo.customPrices?.[p.id] || ''}
+                              onChange={(e) => setNewPromo({
+                                ...newPromo,
+                                customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
+                              })}
+                            />
+                            <p className="text-[9px] text-gray-400 mt-0.5">Leave blank to use the default rule</p>
+                          </div>
+
+                          {/* 2. ✨ UPDATED: Individual Start & End Scheduling */}
+                          {newPromo.type === 'flash' && (
+                            <div className="border-t border-purple-100 pt-2 space-y-2">
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Schedule Start (Optional)</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="date"
+                                    className="flex-1 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400"
+                                    value={newPromo.scheduledProducts?.[p.id]?.startDate || ''}
+                                    onChange={(e) => setNewPromo({
+                                      ...newPromo,
+                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), startDate: e.target.value } }
+                                    })}
+                                  />
+                                  <input
+                                    type="time"
+                                    className="w-24 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400 font-mono"
+                                    value={newPromo.scheduledProducts?.[p.id]?.startTime || ''}
+                                    onChange={(e) => setNewPromo({
+                                      ...newPromo,
+                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), startTime: e.target.value } }
+                                    })}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Schedule End (Optional)</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="date"
+                                    className="flex-1 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400"
+                                    value={newPromo.scheduledProducts?.[p.id]?.endDate || ''}
+                                    onChange={(e) => setNewPromo({
+                                      ...newPromo,
+                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), endDate: e.target.value } }
+                                    })}
+                                  />
+                                  <input
+                                    type="time"
+                                    className="w-24 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400 font-mono"
+                                    value={newPromo.scheduledProducts?.[p.id]?.endTime || ''}
+                                    onChange={(e) => setNewPromo({
+                                      ...newPromo,
+                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), endTime: e.target.value } }
+                                    })}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3055,34 +3110,73 @@ export default function App() {
     return now >= start && now <= end;
   };
 
-  // B. Helper: Calculate "Auto-Sale" Price (Visual Discount)
+  // B. Helper: Calculate Sale Price & Handle "Coming Soon"
   const getProductPrice = (product) => {
-    // 1. Find an active 'auto' sale that applies to this product
-    const activeSale = promotions.find(p =>
-      p.type === 'auto' &&
-      isPromoActive(p) &&
+    // 1. Find an active or upcoming promo
+    const relevantPromo = promotions.find(promo =>
+      (promo.type === 'flash' || promo.type === 'auto') &&
+      promo.active !== false &&
       (
-        p.scope === 'all' ||
-        (p.scope === 'category' && (p.targetSelections.includes(product.category) || p.targetSelections.includes(product.subcategory))) ||
-        (p.scope === 'specific' && p.targetSelections.includes(product.id))
+        promo.scope === 'all' ||
+        (promo.scope === 'category' && (promo.targetSelections?.includes(product.category) || promo.targetSelections?.includes(product.subcategory))) ||
+        (promo.scope === 'specific' && (promo.targetSelections?.includes(product.id) || promo.productIds?.includes(product.id)))
       )
     );
 
-    if (!activeSale) return { final: product.price, original: product.originalPrice, isSale: false };
+    if (!relevantPromo) return { final: product.price, original: product.originalPrice, isSale: false };
 
-    // 2. Calculate Discount
-    let discounted = product.price;
-    if (activeSale.discountType === 'percentage') {
-      discounted = product.price * (1 - (activeSale.value / 100));
-    } else {
-      discounted = Math.max(0, product.price - activeSale.value);
+    // 🌟 2. CALCULATE THE ACTUAL DISCOUNT FIRST (Including Custom Prices!)
+    let discountedPrice = product.price;
+    if (relevantPromo.customPrices && relevantPromo.customPrices[product.id]) {
+      discountedPrice = parseFloat(relevantPromo.customPrices[product.id]);
+    } else if (relevantPromo.discountType === 'percentage') {
+      discountedPrice = product.price * (1 - (relevantPromo.value / 100));
+    } else if (relevantPromo.discountType === 'fixed') {
+      discountedPrice = Math.max(0, product.price - relevantPromo.value);
     }
 
+    const now = new Date();
+
+    // Check if the global promotion is in the future
+    if (!isPromoActive(relevantPromo)) {
+      const promoStartString = relevantPromo.startTime ? `${relevantPromo.startDate}T${relevantPromo.startTime}` : `${relevantPromo.startDate}T00:00:00`;
+      const promoStart = new Date(promoStartString);
+      if (now < promoStart) {
+        // Return the TEASED custom price for the Coming Soon preview!
+        return { ...product, final: discountedPrice, original: product.price, isSale: false, isComingSoon: true, comingSoonDate: promoStart };
+      }
+      return { final: product.price, original: product.originalPrice, isSale: false };
+    }
+
+    // Check if THIS SPECIFIC PRODUCT is scheduled for later
+    if (relevantPromo.scheduledProducts && relevantPromo.scheduledProducts[product.id]) {
+      const schedule = relevantPromo.scheduledProducts[product.id];
+
+      if (schedule.startDate) {
+        const productStartString = schedule.startTime ? `${schedule.startDate}T${schedule.startTime}` : `${schedule.startDate}T00:00:00`;
+        const productStart = new Date(productStartString);
+        if (now < productStart) {
+          // Return the TEASED custom price for the Coming Soon preview!
+          return { ...product, final: discountedPrice, original: product.price, isSale: false, isComingSoon: true, comingSoonDate: productStart };
+        }
+      }
+
+      if (schedule.endDate) {
+        const productEndString = schedule.endTime ? `${schedule.endDate}T${schedule.endTime}` : `${schedule.endDate}T23:59:59`;
+        const productEnd = new Date(productEndString);
+        if (now > productEnd) {
+          return { final: product.price, original: product.originalPrice, isSale: false }; // Sale ended early
+        }
+      }
+    }
+
+    // 3. If we made it here, the discount IS ACTIVE NOW!
     return {
-      final: discounted,
+      final: discountedPrice,
       original: product.price,
       isSale: true,
-      label: activeSale.title
+      label: relevantPromo.title,
+      isComingSoon: false
     };
   };
 
@@ -3489,43 +3583,22 @@ export default function App() {
 
       return matchesCategory && matchesSearch;
     });
-    // 🌟 NEW: INJECT LIVE SALE PRICES GLOBALLY
+    // 🌟 INJECT LIVE SALE PRICES GLOBALLY (SYNCED WITH MASTER HELPER)
     result = result.map(p => {
-      // Find if this product is part of an active Flash Sale or Auto Sale
-      const activeSale = promotions.find(promo =>
-        (promo.type === 'flash' || promo.type === 'auto') &&
-        promo.active !== false &&
-        isPromoActive(promo) &&
-        (
-          promo.scope === 'all' ||
-          (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
-          (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id)))
-        )
-      );
+      const priceState = getProductPrice(p);
 
-      if (activeSale) {
-        let salePrice = p.price;
-
-        // 1. Manual Override (Your new feature: exact price set per product)
-        if (activeSale.customPrices && activeSale.customPrices[p.id]) {
-          salePrice = parseFloat(activeSale.customPrices[p.id]);
-        }
-        // 2. Percentage Discount
-        else if (activeSale.discountType === 'percentage') {
-          salePrice = p.price * (1 - (activeSale.value / 100));
-        }
-        // 3. Fixed Amount Discount (e.g. subtracting 0.600 fils)
-        else if (activeSale.discountType === 'fixed') {
-          salePrice = Math.max(0, p.price - activeSale.value);
-        }
-
+      // Only apply the discount to the main grid if the sale is ACTIVELY running right now!
+      // If it is "Coming Soon", we intentionally ignore the discount here so they cannot buy it early.
+      if (priceState.isSale) {
         return {
           ...p,
-          originalPrice: p.originalPrice || p.price, // Save old price so the red "Save %" badge appears automatically
-          price: salePrice // Trick the entire app (including the cart) into using the Flash Sale price!
+          originalPrice: priceState.original, // Save old price so the red "Save %" badge appears
+          price: priceState.final             // Apply the live, clickable sale price
         };
       }
-      return p; // If no sale, return normal product
+
+      // If no active sale, or if it is currently "Coming Soon", return the normal product
+      return p;
     });
 
     // 2. Apply Sorting
@@ -3952,24 +4025,29 @@ export default function App() {
 
               if (flashProductsRaw.length === 0) return null;
 
-              // 🌟 NEW: Apply the exact same custom pricing logic to the preview items!
-              const flashProducts = flashProductsRaw.map(p => {
-                let salePrice = p.price;
-
-                if (flashPromo.customPrices && flashPromo.customPrices[p.id]) {
-                  salePrice = parseFloat(flashPromo.customPrices[p.id]); // Manual Price Override
-                } else if (flashPromo.discountType === 'percentage') {
-                  salePrice = p.price * (1 - (flashPromo.value / 100)); // Percentage
-                } else if (flashPromo.discountType === 'fixed') {
-                  salePrice = Math.max(0, p.price - flashPromo.value); // Fixed Minus
-                }
-
+              // 🌟 2. NEW: Identify & Group "Coming Soon" products using the global pricing engine
+              const allDeals = flashProductsRaw.map(p => {
+                // Use the helper we updated in Step 1! It handles custom prices AND coming soon dates automatically!
+                const priceState = getProductPrice(p);
                 return {
                   ...p,
-                  originalPrice: p.originalPrice || p.price, // Save old price for the strikethrough effect
-                  price: salePrice // Trick the preview into using the live sale price
+                  originalPrice: p.originalPrice || p.price,
+                  price: priceState.final, // Apply the discounted price to the preview
+                  priceInfo: priceState    // Save the state so we know if it's "Coming Soon"
                 };
               });
+
+              // ✨ UPDATED: Filter AND sort so active deals appear before coming soon deals
+              const visibleDeals = allDeals
+                .filter(d => d.priceInfo.isSale || d.priceInfo.isComingSoon)
+                .sort((a, b) => {
+                  if (a.priceInfo.isSale && b.priceInfo.isComingSoon) return -1; // Active comes first
+                  if (a.priceInfo.isComingSoon && b.priceInfo.isSale) return 1;  // Coming soon goes last
+                  return 0; // Keep standard order if they are the same type
+                })
+                .slice(0, 4);
+
+              if (visibleDeals.length === 0) return null;
 
               return (
                 <div className="mb-8 md:mb-10 animate-fade-in">
@@ -4001,7 +4079,7 @@ export default function App() {
 
                   {/* 4 Item Preview Grid (2x2 on mobile) */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                    {flashProducts.map(p => (
+                    {visibleDeals.map(p => (
                       <div
                         key={p.id}
                         onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }}
@@ -4009,9 +4087,31 @@ export default function App() {
                       >
                         <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
                           <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                          <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 md:py-1 rounded-full shadow-sm">
-                            FLASH DEAL
+
+                          {/* 🌟 NEW ARRIVAL TAG (MOBILE-READY) */}
+                          <div className={`absolute top-1.5 left-1.5 md:top-2 md:left-2 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1.5 ${p.priceInfo.isComingSoon ? 'bg-amber-600' : 'bg-purple-600'}`}>
+                            {p.priceInfo.isComingSoon ? (
+                              <>
+                                <Clock size={10} className="text-amber-200" />
+                                COMING SOON
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={10} className="text-purple-200" />
+                                FLASH DEAL
+                              </>
+                            )}
                           </div>
+
+                          {/* 🌟 CLEAN TEXT OVERLAY (COMING SOON) */}
+                          {p.priceInfo.isComingSoon && (
+                            <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-2 text-center">
+                              <p className="font-serif font-black text-sm md:text-base uppercase tracking-widest text-gray-900 drop-shadow-md">Coming Soon</p>
+                              <p className="text-[10px] md:text-xs font-bold mt-1 text-gray-800 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
+                                {p.priceInfo.comingSoonDate.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <h4 className="font-serif font-bold text-xs md:text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
                         <div className="mt-auto flex flex-wrap items-center gap-1.5 md:gap-2">
