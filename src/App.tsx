@@ -1061,7 +1061,8 @@ const AdminDashboard = ({
   const filteredPromoProducts = useMemo(
     () =>
       products.filter((p) =>
-        // The fix is here: we added (p.name || "")
+        // ✨ NEW: Only include products that are active AND not archived
+        p.active && !p.archived &&
         (p.name || "").toLowerCase().includes(promoSearchQuery.toLowerCase())
       ),
     [products, promoSearchQuery]
