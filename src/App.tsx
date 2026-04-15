@@ -2313,8 +2313,8 @@ const AdminDashboard = ({
               )}
             </div>
 
-{/* 5. SELECTION GRID */}
-{newPromo.scope === 'specific' && (
+            {/* 5. SELECTION GRID */}
+            {newPromo.scope === 'specific' && (
               <div className="h-64 overflow-y-auto border rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-gray-50 mb-4">
                 <div className="col-span-full flex gap-2 mb-2">
                   <button type="button" onClick={selectAllFiltered} className="text-xs font-bold text-purple-600 hover:underline">Select All Visible</button>
@@ -2323,44 +2323,44 @@ const AdminDashboard = ({
                 {filteredPromoProducts.map((p) => {
                   const isSelected = newPromo.targetSelections.includes(p.id);
                   return (
-                  <div
-                    key={p.id}
-                    className={`flex flex-col gap-2 bg-white p-3 rounded-lg border transition-all ${isSelected
-                      ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
-                      : "border-gray-200 hover:border-purple-300"
-                      }`}
-                  >
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleTarget(p.id)}
-                        className="accent-purple-600 w-4 h-4 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{p.name}</p>
-                        <p className="text-xs text-gray-500">{p.category}</p>
-                      </div>
-                    </label>
-                    
-                    {/* ✨ NEW: Manual Price Override Input */}
-                    {isSelected && (newPromo.type === 'flash' || newPromo.type === 'auto') && (
-                      <div className="mt-1 pl-6 animate-fade-in">
+                    <div
+                      key={p.id}
+                      className={`flex flex-col gap-2 bg-white p-3 rounded-lg border transition-all ${isSelected
+                        ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
+                        : "border-gray-200 hover:border-purple-300"
+                        }`}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
-                           type="number"
-                           step="0.001"
-                           placeholder="Custom Price (Optional)"
-                           className="w-full p-1.5 text-xs font-bold text-purple-700 border border-purple-200 rounded outline-none focus:ring-1 focus:ring-purple-400"
-                           value={newPromo.customPrices?.[p.id] || ''}
-                           onChange={(e) => setNewPromo({
-                             ...newPromo,
-                             customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
-                           })}
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleTarget(p.id)}
+                          className="accent-purple-600 w-4 h-4 flex-shrink-0"
                         />
-                        <p className="text-[9px] text-gray-400 mt-0.5">Leave blank to use the default rule</p>
-                      </div>
-                    )}
-                  </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-gray-500">{p.category}</p>
+                        </div>
+                      </label>
+
+                      {/* ✨ NEW: Manual Price Override Input */}
+                      {isSelected && (newPromo.type === 'flash' || newPromo.type === 'auto') && (
+                        <div className="mt-1 pl-6 animate-fade-in">
+                          <input
+                            type="number"
+                            step="0.001"
+                            placeholder="Custom Price (Optional)"
+                            className="w-full p-1.5 text-xs font-bold text-purple-700 border border-purple-200 rounded outline-none focus:ring-1 focus:ring-purple-400"
+                            value={newPromo.customPrices?.[p.id] || ''}
+                            onChange={(e) => setNewPromo({
+                              ...newPromo,
+                              customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
+                            })}
+                          />
+                          <p className="text-[9px] text-gray-400 mt-0.5">Leave blank to use the default rule</p>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -3423,7 +3423,7 @@ export default function App() {
     );
   }, [currentMainCategory, categories, products]);
 
-  // --- HELPER: CHECK IF NEW (30 DAYS) ---
+  // --- HELPER: CHECK IF NEW (14 DAYS) ---
   const isNewArrival = (createdAt) => {
     if (!createdAt) return false;
     const today = new Date();
@@ -3433,7 +3433,7 @@ export default function App() {
     );
     const diffTime = Math.abs(today - productDate);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 30; // 30 Day Limit
+    return diffDays <= 14; // ✨ UPDATED: 14 Day (2 Week) Limit
   };
 
   // --- FILTERED PRODUCTS LOGIC ---
@@ -3456,9 +3456,15 @@ export default function App() {
           else matchesCategory = (promo.targetSelections || promo.productIds || []).includes(p.id);
         }
       }
+
+      // ✨ NEW: Strict "New Arrivals" Filter
+      // If they selected "New Arrivals", strictly hide any product that doesn't have the "NEW" tag!
+      if (sortOption === "newest" && !isNewArrival(p.createdAt)) {
+        return false;
+      }
+
       return matchesCategory && matchesSearch;
     });
-
     // 🌟 NEW: INJECT LIVE SALE PRICES GLOBALLY
     result = result.map(p => {
       // Find if this product is part of an active Flash Sale or Auto Sale
@@ -3903,8 +3909,8 @@ export default function App() {
               )}
             </div>
 
-{/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
-{(() => {
+            {/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
+            {(() => {
               // Find active flash sale
               const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
 
@@ -3925,7 +3931,7 @@ export default function App() {
               // 🌟 NEW: Apply the exact same custom pricing logic to the preview items!
               const flashProducts = flashProductsRaw.map(p => {
                 let salePrice = p.price;
-                
+
                 if (flashPromo.customPrices && flashPromo.customPrices[p.id]) {
                   salePrice = parseFloat(flashPromo.customPrices[p.id]); // Manual Price Override
                 } else if (flashPromo.discountType === 'percentage') {
@@ -3933,7 +3939,7 @@ export default function App() {
                 } else if (flashPromo.discountType === 'fixed') {
                   salePrice = Math.max(0, p.price - flashPromo.value); // Fixed Minus
                 }
-                
+
                 return {
                   ...p,
                   originalPrice: p.originalPrice || p.price, // Save old price for the strikethrough effect
