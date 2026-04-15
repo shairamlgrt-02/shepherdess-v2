@@ -4330,8 +4330,8 @@ export default function App() {
                       </div>
                       {deliveryMethod === 'meetup' && (
                         <div className="ml-8 text-[11px] text-gray-600 space-y-1 mt-2 bg-white/50 p-2 rounded border border-purple-100 animate-fade-in">
-                          <p><strong>Manama Centre:</strong> Sun-Thu (9AM - 3PM)</p>
-                          <p><strong>Bahrain Tower:</strong> Mon/Tue/Thu (8PM-11PM) or Fri (11AM-2PM)</p>
+                          <p><strong>Seef Area:</strong> Sun-Thu (Message to coordinate time)</p>
+                          <p><strong>Manama:</strong> Fridays only</p>
                           <p className="italic text-purple-700 mt-1">"Or let's coordinate somewhere else!"</p>
                         </div>
                       )}
@@ -4386,7 +4386,7 @@ export default function App() {
                       <textarea
                         className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-purple-50 focus:bg-white transition-colors"
                         placeholder={deliveryMethod === 'delivery' ? "House, Road, Block, Area..." :
-                          deliveryMethod === 'meetup' ? "e.g. Friday at Bahrain Tower, 1 PM" : "e.g. Tonight, around 8 PM"}
+                          deliveryMethod === 'meetup' ? "e.g. Seef on Tuesday, or Manama on Friday" : "e.g. Tonight, around 8 PM"}
                         rows="2"
                         value={deliveryMethod === 'delivery' ? deliveryAddress : meetupNote}
                         onChange={(e) => deliveryMethod === 'delivery' ? setDeliveryAddress(e.target.value) : setMeetupNote(e.target.value)}
