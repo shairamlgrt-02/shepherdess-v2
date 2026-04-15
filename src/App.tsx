@@ -2225,17 +2225,20 @@ const AdminDashboard = ({
                     <div className="flex mt-1">
                       <input
                         type="number"
-                        className="w-full p-2 border rounded-l-lg text-sm"
+                        className={`w-full p-2 border rounded-l-lg text-sm ${newPromo.discountType === 'free_delivery' ? 'bg-gray-100 text-gray-400' : ''}`}
                         value={newPromo.value}
                         onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
+                        disabled={newPromo.discountType === 'free_delivery'}
                       />
                       <select
-                        className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold"
+                        className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold outline-none"
                         value={newPromo.discountType}
                         onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
                       >
                         <option value="percentage">% OFF</option>
                         <option value="fixed">BHD OFF</option>
+                        {/* ✨ NEW: Free Delivery Option */}
+                        {newPromo.type === 'coupon' && <option value="free_delivery">Free Delivery</option>}
                       </select>
                     </div>
                   </div>
@@ -2431,7 +2434,10 @@ const AdminDashboard = ({
                       </h4>
                       <p className="text-xs text-gray-500 mt-1">
                         {promo.scope === 'all' ? 'Entire Store' : `${promo.targetSelections?.length || 0} Items/Cats`}
-                        {promo.value > 0 && ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF`}
+                        {/* ✨ UPDATED: Shows Free Delivery or Standard Discount */}
+                        {promo.discountType === 'free_delivery'
+                          ? ` • Free Delivery`
+                          : (promo.value > 0 ? ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF` : '')}
                       </p>
                       {promo.expiryDate && <p className="text-[10px] text-red-400 mt-2 font-bold">Ends: {promo.expiryDate}</p>}
                     </div>
@@ -3108,16 +3114,20 @@ export default function App() {
 
     // Calculate Discount Amount
     let discountAmount = 0;
-    if (promo.discountType === 'percentage') {
+    if (promo.discountType === 'free_delivery') {
+      discountAmount = 1.000; // Represents the delivery fee
+    } else if (promo.discountType === 'percentage') {
       discountAmount = eligibleTotal * (promo.value / 100);
     } else {
       discountAmount = promo.value; // Fixed amount
     }
 
-    // Ensure we don't discount more than the total
-    discountAmount = Math.min(discountAmount, cartTotal);
+    // Ensure we don't discount more than the total (unless it's the delivery fee)
+    if (promo.discountType !== 'free_delivery') {
+      discountAmount = Math.min(discountAmount, cartTotal);
+    }
 
-    return { valid: true, discount: discountAmount, promoId: promo.id };
+    return { valid: true, discount: discountAmount, promoId: promo.id, type: promo.discountType };
   };
 
   // Sync Data (Live Listeners)
@@ -3266,9 +3276,13 @@ export default function App() {
     const result = validateCoupon(appliedCodeInput, cartTotal, cartItems);
 
     if (result.valid) {
-      setAppliedCode({ code: appliedCodeInput, discount: result.discount, id: result.promoId });
+      setAppliedCode({ code: appliedCodeInput, discount: result.discount, id: result.promoId, type: result.type });
       setPromoError("");
-      showNotification(`Code applied! saved ${result.discount.toFixed(3)} BHD`);
+
+      const successMsg = result.type === 'free_delivery'
+        ? "Free Delivery code applied! 🚚"
+        : `Code applied! Saved ${result.discount.toFixed(3)} BHD`;
+      showNotification(successMsg);
     } else {
       setAppliedCode(null);
       setPromoError(result.error);
@@ -3293,7 +3307,17 @@ export default function App() {
 
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
-      const discount = appliedCode ? appliedCode.discount : 0;
+
+      // Calculate actual discount at the moment of checkout
+      let discount = 0;
+      if (appliedCode) {
+        if (appliedCode.type === 'free_delivery') {
+          discount = deliveryMethod === 'delivery' ? 1.000 : 0;
+        } else {
+          discount = appliedCode.discount;
+        }
+      }
+
       const finalTotal = Math.max(0, subtotal + deliveryFee - discount);
 
       await runTransaction(db, async (transaction) => {
@@ -4439,7 +4463,11 @@ export default function App() {
                       {appliedCode && (
                         <div className="flex justify-between text-xs text-green-600 font-bold animate-pulse">
                           <span>Discount ({appliedCode.code}):</span>
-                          <span>- {appliedCode.discount.toFixed(3)} BHD</span>
+                          <span>
+                            {appliedCode.type === 'free_delivery'
+                              ? (deliveryMethod === 'delivery' ? '- 1.000 BHD (Free Delivery)' : '0.000 BHD (Delivery Not Selected)')
+                              : `- ${appliedCode.discount.toFixed(3)} BHD`}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -4468,11 +4496,19 @@ export default function App() {
                     <div className="flex justify-between items-end pt-2">
                       <span className="text-purple-700 font-bold text-lg">Total:</span>
                       <span className="font-mono text-2xl font-bold text-gray-900">
-                        {(
-                          Math.max(0, Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0) +
-                            (deliveryMethod === 'delivery' ? 1.000 : 0) -
-                            (appliedCode ? appliedCode.discount : 0))
-                        ).toFixed(3)} BHD
+                        {(() => {
+                          const cartSub = Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
+                          const fee = deliveryMethod === 'delivery' ? 1.000 : 0;
+                          let codeDeduct = 0;
+                          if (appliedCode) {
+                            if (appliedCode.type === 'free_delivery') {
+                              codeDeduct = deliveryMethod === 'delivery' ? 1.000 : 0;
+                            } else {
+                              codeDeduct = appliedCode.discount;
+                            }
+                          }
+                          return Math.max(0, cartSub + fee - codeDeduct).toFixed(3);
+                        })()} BHD
                       </span>
                     </div>
 
