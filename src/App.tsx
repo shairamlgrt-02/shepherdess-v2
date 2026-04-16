@@ -670,6 +670,10 @@ const AdminDashboard = ({
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [whatsappOrder, setWhatsappOrder] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [accView, setAccView] = useState("overview");
+  const [trendTimeframe, setTrendTimeframe] = useState('monthly');
+  const [trendStartDate, setTrendStartDate] = useState('');
+  const [trendEndDate, setTrendEndDate] = useState('');
 
   const updateOrderJourney = async (orderId, newJourney) => {
     await updateDoc(doc(db, "orders", orderId), { journeyStatus: newJourney });
@@ -1840,162 +1844,480 @@ const AdminDashboard = ({
 
       {/* ACCOUNTING TAB */}
       {tab === "accounting" && (() => {
-        // --- 1. CALCULATIONS ---
-        const completedOrders = orders.filter(o => o.status === "delivered");
+        // --- 1. BULLETPROOF DATA PARSERS ---
+        const parseDate = (order) => {
+          const dateData = order.date || order.createdAt || order.timestamp;
+          if (!dateData) return new Date();
+          if (dateData.toDate) return dateData.toDate();
+          if (dateData.seconds) return new Date(dateData.seconds * 1000);
+          return new Date(dateData);
+        };
 
-        const totalGrossSales = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-        const totalCOGS = completedOrders.reduce((sum, o) => sum + (o.totalCOGS || 0), 0);
+        const validOrders = Object.values(orders).filter(o =>
+          o.status?.toLowerCase() === "delivered"
+        );
+
+        // --- 2. CALCULATIONS ---
+        const totalGrossSales = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+        const totalCOGS = validOrders.reduce((sum, o) => sum + (o.totalCOGS || 0), 0);
         const netProfit = totalGrossSales - totalCOGS;
         const profitMargin = totalGrossSales > 0 ? (netProfit / totalGrossSales) * 100 : 0;
 
-        // ✨ NEW: Total Capital & Break-Even Math
-        // Calculates the cost of ALL unsold stock currently in your inventory
-        const currentInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.cost || 0)), 0);
-        // Total Investment = Cost of things you sold + Cost of things still on the shelf
+        const currentInventoryValue = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.cost || p.costPrice || 0)), 0);
         const totalCapitalInvested = totalCOGS + currentInventoryValue;
         const breakEvenPercentage = totalCapitalInvested > 0 ? (totalGrossSales / totalCapitalInvested) * 100 : 0;
         const isPureProfit = totalGrossSales >= totalCapitalInvested;
+        const ordersMissingCosts = validOrders.filter(o => o.totalCOGS === undefined).length;
 
-        // Find how many orders are missing cost data
-        const ordersMissingCosts = orders.filter(o => o.totalCOGS === undefined).length;
+        // --- 3. ✨ ADVANCED AXIS GRAPH ENGINE ---
+        let filteredOrdersForGraph = validOrders;
 
-        // --- 2. RETROACTIVE SYNC FUNCTION ---
+        if (trendStartDate) {
+          const sDate = new Date(trendStartDate + 'T00:00:00');
+          filteredOrdersForGraph = filteredOrdersForGraph.filter(o => parseDate(o) >= sDate);
+        }
+        if (trendEndDate) {
+          const eDate = new Date(trendEndDate + 'T23:59:59');
+          filteredOrdersForGraph = filteredOrdersForGraph.filter(o => parseDate(o) <= eDate);
+        }
+
+        const getGroupKey = (date) => {
+          const d = new Date(date);
+          const year = d.getFullYear();
+          const shortYear = year.toString().slice(-2);
+          const month = d.getMonth();
+
+          if (trendTimeframe === 'yearly') return `${year}`;
+          if (trendTimeframe === 'quarterly') return `Q${Math.floor(month / 3) + 1} '${shortYear}`;
+          if (trendTimeframe === 'weekly') {
+            const firstDay = new Date(year, 0, 1);
+            const days = Math.floor((d - firstDay) / (24 * 60 * 60 * 1000));
+            const week = Math.ceil((days + firstDay.getDay() + 1) / 7);
+            return `W${week} '${shortYear}`;
+          }
+          if (trendTimeframe === 'daily') return d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+
+          return d.toLocaleString('default', { month: 'short', year: '2-digit' });
+        };
+
+        const graphData = {};
+        const groupTimestamps = {};
+
+        filteredOrdersForGraph.forEach(order => {
+          const date = parseDate(order);
+          if (isNaN(date.getTime())) return;
+
+          const key = getGroupKey(date);
+          if (!graphData[key]) {
+            graphData[key] = 0;
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            if (trendTimeframe === 'monthly' || trendTimeframe === 'quarterly') d.setDate(1);
+            if (trendTimeframe === 'yearly') { d.setDate(1); d.setMonth(0); }
+            groupTimestamps[key] = d.getTime();
+          }
+          graphData[key] += (order.total || 0);
+        });
+
+        const existingTimestamps = Object.values(groupTimestamps);
+        if (existingTimestamps.length > 0) {
+          let minTime = Math.min(...existingTimestamps);
+          let maxTime = Math.max(...existingTimestamps);
+
+          if (trendStartDate) minTime = Math.min(minTime, new Date(trendStartDate + 'T00:00:00').getTime());
+          if (trendEndDate) maxTime = Math.max(maxTime, new Date(trendEndDate + 'T23:59:59').getTime());
+
+          let current = new Date(minTime);
+          let safeLoop = 0;
+
+          while (current.getTime() <= maxTime && safeLoop < 1000) {
+            safeLoop++;
+            const key = getGroupKey(current);
+
+            if (graphData[key] === undefined) {
+              graphData[key] = 0;
+              groupTimestamps[key] = current.getTime();
+            }
+
+            if (trendTimeframe === 'yearly') current.setFullYear(current.getFullYear() + 1);
+            else if (trendTimeframe === 'quarterly') current.setMonth(current.getMonth() + 3);
+            else if (trendTimeframe === 'monthly') current.setMonth(current.getMonth() + 1);
+            else if (trendTimeframe === 'weekly') current.setDate(current.getDate() + 7);
+            else current.setDate(current.getDate() + 1);
+          }
+        }
+
+        const sortedGraphKeys = Object.keys(graphData).sort((a, b) => groupTimestamps[a] - groupTimestamps[b]);
+
+        // ✨ Prepare Data for the X/Y Axis Render
+        const graphColumns = sortedGraphKeys.map(key => {
+          const total = graphData[key];
+          const date = new Date(groupTimestamps[key]);
+          const year = date.getFullYear();
+          let labelTop = '';
+          let groupLabel = '';
+
+          if (trendTimeframe === 'daily') {
+            labelTop = date.getDate().toString().padStart(2, '0');
+            groupLabel = date.toLocaleString('default', { month: 'short' });
+          } else if (trendTimeframe === 'weekly') {
+            const end = new Date(date);
+            end.setDate(end.getDate() + 6);
+            labelTop = `${date.getDate().toString().padStart(2, '0')}-${end.getDate().toString().padStart(2, '0')}`;
+            groupLabel = date.toLocaleString('default', { month: 'short' });
+          } else if (trendTimeframe === 'monthly') {
+            labelTop = date.toLocaleString('default', { month: 'short' });
+            groupLabel = year.toString();
+          } else if (trendTimeframe === 'quarterly') {
+            labelTop = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+            groupLabel = year.toString();
+          } else {
+            labelTop = year.toString();
+            groupLabel = 'YEARLY';
+          }
+
+          return { key, total, year, labelTop, groupLabel };
+        });
+
+        // Group columns by their bracket label (e.g. Month or Year)
+        const groupedColumns = [];
+        let currentGroup = null;
+        graphColumns.forEach(col => {
+          if (!currentGroup || currentGroup.label !== col.groupLabel || currentGroup.year !== col.year) {
+            currentGroup = { label: col.groupLabel, year: col.year, columns: [] };
+            groupedColumns.push(currentGroup);
+          }
+          currentGroup.columns.push(col);
+        });
+
+        // Calculate Y-Axis Scale
+        const maxRaw = Math.max(...graphColumns.map(c => c.total), 0);
+        const maxGraphValue = maxRaw > 0 ? maxRaw * 1.15 : 10; // Give 15% headroom above the tallest bar
+        const yTicks = [maxGraphValue, maxGraphValue * 0.75, maxGraphValue * 0.5, maxGraphValue * 0.25, 0];
+
+        // Find visible years for the top right badge
+        const visibleYears = Array.from(new Set(graphColumns.map(c => c.year))).join(' - ');
+
+        // --- 4. CSV EXPORT ---
+        const exportToCSV = () => {
+          if (validOrders.length === 0) {
+            alert("No valid orders found to export.");
+            return;
+          }
+
+          let csvContent = "Order ID,Date,Status,Customer,Method,Gross Sales (BHD),COGS (BHD),Net Profit (BHD),Items\n";
+          validOrders.forEach(o => {
+            const date = parseDate(o).toLocaleDateString();
+            const items = Object.values(o.items || {}).map(i => `${i.qty}x ${i.name}`).join(" + ");
+            const cogs = o.totalCOGS || 0;
+            const profit = (o.total || 0) - cogs;
+            const status = `"${(o.status || 'Pending').toUpperCase()}"`;
+            const cleanName = `"${(o.customer?.name || 'Guest').replace(/"/g, '""')}"`;
+            const cleanItems = `"${items.replace(/"/g, '""')}"`;
+            const method = `"${o.customer?.deliveryMethod || 'N/A'}"`;
+
+            csvContent += `${o.orderId},${date},${status},${cleanName},${method},${(o.total || 0).toFixed(3)},${cogs.toFixed(3)},${profit.toFixed(3)},${cleanItems}\n`;
+          });
+
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `Shepherdess_Ledger_${new Date().toLocaleDateString()}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        // --- 5. RETROACTIVE SYNC ---
         const handleRetroactiveSync = async () => {
-          if (!window.confirm(`Scan and update ${ordersMissingCosts} old orders? This will apply your CURRENT product costs to calculate past profits.`)) return;
-
+          if (!window.confirm(`Update ${ordersMissingCosts} old orders with CURRENT product costs?`)) return;
           let updatedCount = 0;
-          for (const order of orders) {
+          for (const order of validOrders) {
             if (order.totalCOGS === undefined) {
               let orderCOGS = 0;
               const updatedItems = { ...order.items };
-
               for (const key in updatedItems) {
                 const item = updatedItems[key];
                 const liveProduct = products.find(p => p.id === item.id);
-                const itemCost = liveProduct ? (liveProduct.cost || 0) : 0;
-
+                const itemCost = liveProduct ? (liveProduct.cost || liveProduct.costPrice || 0) : 0;
                 updatedItems[key].cost = itemCost;
                 orderCOGS += (itemCost * item.qty);
               }
-
-              await updateDoc(doc(db, "orders", order.id), {
-                items: updatedItems,
-                totalCOGS: orderCOGS
-              });
+              await updateDoc(doc(db, "orders", order.id), { items: updatedItems, totalCOGS: orderCOGS });
               updatedCount++;
             }
           }
-          alert(`Success! ${updatedCount} historical orders have been updated with cost data.`);
+          alert(`Success! ${updatedCount} historical orders have been updated.`);
         };
 
         return (
           <div className="space-y-6 animate-fade-in pb-8">
-            <div className="flex justify-between items-end mb-4">
+            <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mb-4">
               <div>
                 <h3 className="font-bold text-2xl text-gray-900 font-serif">Financial Overview</h3>
-                <p className="text-sm text-gray-500">Based on {completedOrders.length} delivered orders.</p>
+                <p className="text-sm text-gray-500">Based on {validOrders.length} delivered orders.</p>
               </div>
 
-              {ordersMissingCosts > 0 && (
-                <button
-                  onClick={handleRetroactiveSync}
-                  className="bg-amber-100 text-amber-800 border border-amber-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-200 transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  <RefreshCw size={14} /> Sync {ordersMissingCosts} Old Orders
-                </button>
-              )}
-            </div>
-
-            {/* THE 4 MAIN METRIC CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gross Sales</p>
-                <h4 className="text-3xl font-serif font-bold text-gray-900">{totalGrossSales.toFixed(3)}</h4>
-                <p className="text-[10px] text-gray-400 mt-1">Total revenue collected</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cost of Goods (COGS)</p>
-                <h4 className="text-3xl font-serif font-bold text-gray-900">{totalCOGS.toFixed(3)}</h4>
-                <p className="text-[10px] text-gray-400 mt-1">Cost of items already sold</p>
-              </div>
-
-              <div className="bg-purple-600 p-6 rounded-xl shadow-lg transform transition-transform hover:scale-105">
-                <p className="text-xs font-bold text-purple-200 uppercase tracking-widest mb-2">Net Profit</p>
-                <h4 className="text-3xl font-serif font-bold text-white">{netProfit.toFixed(3)}</h4>
-                <p className="text-[10px] text-purple-300 mt-1">Profit on sold items</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                <div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Profit Margin</p>
-                  <h4 className={`text-3xl font-serif font-bold ${profitMargin > 40 ? 'text-green-500' : profitMargin > 20 ? 'text-amber-500' : 'text-red-500'}`}>
-                    {profitMargin.toFixed(1)}%
-                  </h4>
-                </div>
-                <div className="w-full bg-gray-100 h-2 rounded-full mt-4 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${profitMargin > 40 ? 'bg-green-500' : profitMargin > 20 ? 'bg-amber-500' : 'bg-red-500'}`}
-                    style={{ width: `${Math.min(profitMargin, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ✨ NEW: BREAK-EVEN TRACKER */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mt-4">
-              <div className="flex flex-col md:flex-row justify-between md:items-end mb-5 gap-4 border-b border-gray-50 pb-4">
-                <div>
-                  <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                    Total Business Break-Even {isPureProfit && <Sparkles size={18} className="text-amber-400" />}
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-1">Tracking Gross Sales against Total Capital Invested (Sold Cost + Unsold Inventory Cost).</p>
-                </div>
-                <div className="text-left md:text-right">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Capital Invested</p>
-                  <p className="text-2xl font-mono font-bold text-gray-900">{totalCapitalInvested.toFixed(3)} BHD</p>
-                </div>
-              </div>
-
-              {/* The Progress Bar */}
-              <div className="relative w-full bg-gray-100 h-6 rounded-full overflow-hidden mb-3 shadow-inner">
-                <div
-                  className={`absolute top-0 left-0 h-full flex items-center justify-end pr-2 rounded-full transition-all duration-1000 ${isPureProfit ? 'bg-green-500' : 'bg-blue-500'}`}
-                  style={{ width: `${Math.max(10, Math.min(breakEvenPercentage, 100))}%` }}
-                >
-                  <span className="text-[10px] font-bold text-white shadow-sm">{breakEvenPercentage.toFixed(1)}%</span>
-                </div>
-              </div>
-
-              {/* Dynamic Status Text */}
-              <div className="flex flex-col sm:flex-row justify-between items-center text-xs font-bold gap-2">
-                <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                  Gross Sales: {totalGrossSales.toFixed(3)} BHD
-                </span>
-
-                {isPureProfit ? (
-                  <span className="text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200 flex items-center gap-1 shadow-sm">
-                    <CheckCircle size={14} /> 100% Paid Off! All remaining inventory is pure profit.
-                  </span>
-                ) : (
-                  <span className="text-gray-500">
-                    Need <span className="text-gray-900">{(totalCapitalInvested - totalGrossSales).toFixed(3)} BHD</span> more in sales to break even on all inventory.
-                  </span>
+              <div className="flex gap-2">
+                {ordersMissingCosts > 0 && (
+                  <button onClick={handleRetroactiveSync} className="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-xs font-bold hover:bg-amber-200 flex items-center gap-2">
+                    <RefreshCw size={14} /> Sync {ordersMissingCosts} Old Orders
+                  </button>
                 )}
+                <button onClick={exportToCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-700 flex items-center gap-2 shadow-sm">
+                  <Download size={14} /> Export CSV
+                </button>
               </div>
             </div>
 
-            {/* INFO BOX */}
-            <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mt-6">
-              <h4 className="text-blue-800 font-bold text-sm mb-1 flex items-center gap-2"><Database size={16} /> How this works</h4>
-              <p className="text-xs text-blue-600 leading-relaxed">
-                Profit calculations are locked to the exact cost of the product at the moment a customer checks out.
-                This means if your supplier raises their prices next month, your past profit reports remain perfectly accurate and won't be ruined!
-              </p>
+            <div className="flex bg-gray-100 p-1 rounded-xl w-full max-w-sm mb-6 shadow-inner">
+              <button onClick={() => setAccView('overview')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${accView === 'overview' ? 'bg-white shadow-sm text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}>
+                Dashboard
+              </button>
+              <button onClick={() => setAccView('ledger')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${accView === 'ledger' ? 'bg-white shadow-sm text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}>
+                Ledger Table
+              </button>
             </div>
+
+            {accView === 'overview' ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gross Sales</p>
+                    <h4 className="text-3xl font-serif font-bold text-gray-900">{totalGrossSales.toFixed(3)}</h4>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cost of Goods</p>
+                    <h4 className="text-3xl font-serif font-bold text-gray-900">{totalCOGS.toFixed(3)}</h4>
+                  </div>
+                  <div className="bg-purple-600 p-6 rounded-xl shadow-lg">
+                    <p className="text-xs font-bold text-purple-200 uppercase tracking-widest mb-2">Net Profit</p>
+                    <h4 className="text-3xl font-serif font-bold text-white">{netProfit.toFixed(3)}</h4>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Profit Margin</p>
+                    <h4 className={`text-3xl font-serif font-bold ${profitMargin > 40 ? 'text-green-500' : profitMargin > 20 ? 'text-amber-500' : 'text-red-500'}`}>
+                      {profitMargin.toFixed(1)}%
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 mt-4">
+
+                  {/* ✨ ADVANCED X/Y AXIS GRAPH */}
+                  <div className="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+                    <div className="flex flex-col xl:flex-row justify-between xl:items-end mb-6 gap-4 border-b border-gray-50 pb-4">
+                      <div>
+                        <h4 className="font-bold text-xl text-gray-900 font-serif">Sales Trends</h4>
+                        <p className="text-xs text-gray-500 mt-1">Visualize revenue over time by specific dates.</p>
+                      </div>
+
+                      {/* Controls & Year Tag */}
+                      <div className="flex flex-col items-end gap-3">
+                        {visibleYears && (
+                          <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100 uppercase tracking-widest">
+                            {visibleYears}
+                          </span>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
+                            <input type="date" className="text-xs bg-transparent outline-none text-gray-700 cursor-pointer w-24 sm:w-auto" value={trendStartDate} onChange={(e) => setTrendStartDate(e.target.value)} />
+                            <span className="text-gray-400 text-xs font-bold px-1">to</span>
+                            <input type="date" className="text-xs bg-transparent outline-none text-gray-700 cursor-pointer w-24 sm:w-auto" value={trendEndDate} onChange={(e) => setTrendEndDate(e.target.value)} />
+                            {(trendStartDate || trendEndDate) && (
+                              <button onClick={() => { setTrendStartDate(''); setTrendEndDate(''); }} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center bg-gray-50 p-1.5 rounded-lg border border-gray-200">
+                            <Filter size={14} className="text-gray-400 ml-1 mr-2" />
+                            <select className="text-xs font-bold bg-transparent text-gray-700 outline-none cursor-pointer" value={trendTimeframe} onChange={(e) => setTrendTimeframe(e.target.value)}>
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="quarterly">Quarterly</option>
+                              <option value="yearly">Yearly</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {sortedGraphKeys.length === 0 ? (
+                      <div className="w-full flex flex-col items-center justify-center text-gray-400 py-12 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                        <Calendar size={32} className="mb-2 text-gray-300" />
+                        <p className="text-sm font-medium">No sales data found for this period.</p>
+                      </div>
+                    ) : (
+                      <div className="flex w-full h-[320px]">
+                        {/* Y-AXIS (Left Side) */}
+                        <div className="flex flex-col justify-between pb-[60px] pr-3 w-12 border-r border-gray-200 text-[10px] text-gray-400 font-mono text-right shrink-0">
+                          <span>{yTicks[0].toFixed(0)}</span>
+                          <span>{yTicks[1].toFixed(0)}</span>
+                          <span>{yTicks[2].toFixed(0)}</span>
+                          <span>{yTicks[3].toFixed(0)}</span>
+                          <span>0</span>
+                        </div>
+
+                        {/* GRAPH & X-AXIS AREA (Right Side) */}
+                        <div className="flex-1 relative overflow-x-auto custom-scrollbar">
+
+                          {/* Horizontal Grid Lines */}
+                          <div className="absolute top-0 left-0 right-0 bottom-[60px] flex flex-col justify-between pointer-events-none z-0 px-2">
+                            <div className="border-t border-gray-100 w-full"></div>
+                            <div className="border-t border-gray-100 w-full"></div>
+                            <div className="border-t border-gray-100 w-full"></div>
+                            <div className="border-t border-gray-100 w-full"></div>
+                            <div className="border-t border-gray-300 w-full"></div> {/* Baseline */}
+                          </div>
+
+                          {/* Bars and Group Brackets */}
+                          <div className="absolute top-0 left-0 h-full flex px-4 gap-6 z-10 min-w-max">
+                            {groupedColumns.map((group, i) => (
+                              <div key={i} className="flex flex-col h-full">
+
+{/* Bars Area (Sits strictly above the X-Axis) */}
+<div className="flex-1 flex items-end gap-2 pb-[1px] justify-center">
+                                  {group.columns.map(col => {
+                                    const heightPercent = Math.max((col.total / maxGraphValue) * 100, 1);
+                                    return (
+                                      // ✨ Made columns slightly wider (w-8) to fit the text
+                                      <div key={col.key} className="flex flex-col items-center group relative w-8 sm:w-10 h-full justify-end">
+                                        
+                                        {/* Hover Tooltip (moved slightly higher to make room for the new text) */}
+                                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-5 bg-gray-900 text-white text-[10px] font-bold py-1 px-2 rounded z-20 whitespace-nowrap shadow-xl pointer-events-none transition-opacity duration-200">
+                                          {col.total.toFixed(3)} BHD
+                                        </div>
+
+                                        {/* ✨ NEW: Persistent Amount Label on top of the bar */}
+                                        {col.total > 0 && (
+                                          <span className="text-[8px] sm:text-[9px] font-bold text-purple-800 mb-1 text-center w-full truncate">
+                                            {col.total.toFixed(1)}
+                                          </span>
+                                        )}
+                                        
+                                        {/* The Purple Bar */}
+                                        <div 
+                                          className="w-full bg-purple-400 group-hover:bg-purple-600 rounded-t-sm transition-all duration-500 ease-out cursor-pointer shadow-sm"
+                                          style={{ height: `${heightPercent}%` }}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* X-Axis Area (Exactly 60px tall below the baseline) */}
+                                <div className="h-[60px] flex flex-col items-center pt-2 w-full">
+                                  
+                                  {/* Day / Week Labels directly under bars */}
+                                  <div className="flex justify-center gap-2 w-full">
+                                    {group.columns.map(col => (
+                                      // ✨ Made labels match the new bar width (w-8)
+                                      <span key={col.key} className="w-8 sm:w-10 text-center text-[9px] font-bold text-gray-500 truncate">
+                                        {col.labelTop}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  {/* Horizontal Bracket & Month Label */}
+                                  {group.label !== 'YEARLY' && (
+                                    <div className="w-full mt-1.5 px-0.5">
+                                      <div className="w-full border-t border-x border-gray-300 h-1.5 rounded-t-[2px]"></div>
+                                      <p className="text-center text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                                        {group.label}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BREAK-EVEN TRACKER */}
+                  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mt-2">
+                    <div className="flex justify-between items-end mb-4 border-b pb-4">
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-900">Total Break-Even</h4>
+                        <p className="text-xs text-gray-500">Gross Sales vs Total Inventory Costs</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Invested</p>
+                        <p className="text-xl font-mono font-bold text-gray-900">{totalCapitalInvested.toFixed(3)} BHD</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-100 h-6 rounded-full overflow-hidden mb-3 shadow-inner">
+                      <div className={`h-full flex items-center justify-end pr-2 rounded-full ${isPureProfit ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.max(10, Math.min(breakEvenPercentage, 100))}%` }}>
+                        <span className="text-[10px] font-bold text-white shadow-sm">{breakEvenPercentage.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-lg border">
+                      <div><p className="text-gray-500 uppercase text-[9px] mb-1">COGS (Sold)</p><p className="font-bold">{totalCOGS.toFixed(3)} BHD</p></div>
+                      <div><p className="text-gray-500 uppercase text-[9px] mb-1">Sunk Cost (Unsold)</p><p className="font-bold text-amber-600">{currentInventoryValue.toFixed(3)} BHD</p></div>
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
+                      <tr>
+                        <th className="p-4 font-bold">Order / Date</th>
+                        <th className="p-4 font-bold">Status</th>
+                        <th className="p-4 font-bold">Customer</th>
+                        <th className="p-4 font-bold text-right">Gross (BHD)</th>
+                        <th className="p-4 font-bold text-right text-red-500">COGS (BHD)</th>
+                        <th className="p-4 font-bold text-right text-green-600">Net Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {validOrders.length === 0 ? (
+                        <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">No valid orders to display.</td></tr>
+                      ) : (
+                        validOrders.map(o => {
+                          const cogs = o.totalCOGS || 0;
+                          const profit = (o.total || 0) - cogs;
+                          return (
+                            <tr key={o.id} className="hover:bg-purple-50 transition-colors">
+                              <td className="p-4">
+                                <p className="font-bold text-gray-900">{o.orderId}</p>
+                                <p className="text-[10px] text-gray-400">{parseDate(o).toLocaleDateString()}</p>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${o.status === 'delivered' || o.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                  {o.status || 'Pending'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <p className="font-medium text-gray-700">{o.customer?.name || "Guest"}</p>
+                                <p className="text-[10px] text-purple-600 uppercase tracking-widest">{o.customer?.deliveryMethod}</p>
+                              </td>
+                              <td className="p-4 text-right font-mono font-bold text-gray-900">{(o.total || 0).toFixed(3)}</td>
+                              <td className="p-4 text-right font-mono font-bold text-red-500">- {cogs.toFixed(3)}</td>
+                              <td className="p-4 text-right font-mono font-bold text-green-600">{profit.toFixed(3)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
+
 
       {/* CATEGORIES TAB (MOBILE OPTIMIZED & COMPACT) */}
       {tab === "categories" && (
@@ -4074,7 +4396,7 @@ export default function App() {
 
                   {/* Single Row Timer */}
                   <div className="mb-4">
-                    <FlashTimer endDate={flashPromo.endDate} endTime={flashPromo.endTime} />
+                    <FlashTimer endDate={flashPromo.enxdDate} endTime={flashPromo.endTime} />
                   </div>
 
                   {/* 4 Item Preview Grid (2x2 on mobile) */}
