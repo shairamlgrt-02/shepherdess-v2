@@ -2179,14 +2179,14 @@ const AdminDashboard = ({
                             {groupedColumns.map((group, i) => (
                               <div key={i} className="flex flex-col h-full">
 
-{/* Bars Area (Sits strictly above the X-Axis) */}
-<div className="flex-1 flex items-end gap-2 pb-[1px] justify-center">
+                                {/* Bars Area (Sits strictly above the X-Axis) */}
+                                <div className="flex-1 flex items-end gap-2 pb-[1px] justify-center">
                                   {group.columns.map(col => {
                                     const heightPercent = Math.max((col.total / maxGraphValue) * 100, 1);
                                     return (
                                       // ✨ Made columns slightly wider (w-8) to fit the text
                                       <div key={col.key} className="flex flex-col items-center group relative w-8 sm:w-10 h-full justify-end">
-                                        
+
                                         {/* Hover Tooltip (moved slightly higher to make room for the new text) */}
                                         <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-5 bg-gray-900 text-white text-[10px] font-bold py-1 px-2 rounded z-20 whitespace-nowrap shadow-xl pointer-events-none transition-opacity duration-200">
                                           {col.total.toFixed(3)} BHD
@@ -2198,9 +2198,9 @@ const AdminDashboard = ({
                                             {col.total.toFixed(1)}
                                           </span>
                                         )}
-                                        
+
                                         {/* The Purple Bar */}
-                                        <div 
+                                        <div
                                           className="w-full bg-purple-400 group-hover:bg-purple-600 rounded-t-sm transition-all duration-500 ease-out cursor-pointer shadow-sm"
                                           style={{ height: `${heightPercent}%` }}
                                         />
@@ -2211,7 +2211,7 @@ const AdminDashboard = ({
 
                                 {/* X-Axis Area (Exactly 60px tall below the baseline) */}
                                 <div className="h-[60px] flex flex-col items-center pt-2 w-full">
-                                  
+
                                   {/* Day / Week Labels directly under bars */}
                                   <div className="flex justify-center gap-2 w-full">
                                     {group.columns.map(col => (
@@ -3738,10 +3738,12 @@ export default function App() {
 
       await runTransaction(db, async (transaction) => {
         const validatedItems = [];
-        let totalOrderCOGS = 0;      // ✨ NEW: Track total Cost Of Goods Sold
-        const finalOrderItems = {};  // ✨ NEW: The perfect snapshot of the cart
+        let totalOrderCOGS = 0;
+        const finalOrderItems = {};
 
-        // 1. Stock & Cost Check
+        // --- STEP 1: EXECUTE ALL "READS" FIRST ---
+
+        // Read 1: Check all products and stock
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
           const productSnap = await transaction.get(productRef);
@@ -3749,39 +3751,43 @@ export default function App() {
 
           const productData = productSnap.data();
           const currentStock = productData.stock || 0;
-          const currentCost = productData.cost || 0; // Grab the live cost from the DB!
+          const currentCost = productData.cost || 0;
 
           if (currentStock < item.qty) {
             throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
 
-          // Add to our total COGS calculation
           totalOrderCOGS += (currentCost * item.qty);
 
-          // Build our perfect snapshot
           finalOrderItems[item.id] = {
             ...item,
-            cost: currentCost // ✨ LOCK IN THE COST FOREVER
+            cost: currentCost
           };
 
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
-        // 2. Update Stock
+        // Read 2: Check Promo usage (MOVED TO TOP TO PREVENT CRASH)
+        let promoRef = null;
+        let promoSnap = null;
+        if (appliedCode && appliedCode.id) {
+          promoRef = doc(db, "promotions", appliedCode.id);
+          promoSnap = await transaction.get(promoRef);
+        }
+
+        // --- STEP 2: EXECUTE ALL "WRITES" SECOND ---
+
+        // Write 1: Update Stock
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
-        // 3. Increment Promo
-        if (appliedCode && appliedCode.id) {
-          const promoRef = doc(db, "promotions", appliedCode.id);
-          const promoSnap = await transaction.get(promoRef);
-          if (promoSnap.exists()) {
-            transaction.update(promoRef, { usedCount: (promoSnap.data().usedCount || 0) + 1 });
-          }
+        // Write 2: Increment Promo
+        if (promoSnap && promoSnap.exists()) {
+          transaction.update(promoRef, { usedCount: (promoSnap.data().usedCount || 0) + 1 });
         }
 
-        // 4. Create Order
+        // Write 3: Create Order
         const newOrderRef = doc(collection(db, "orders"));
         const orderData = {
           orderId,
@@ -3793,8 +3799,8 @@ export default function App() {
             meetupNote: deliveryMethod !== 'delivery' ? meetupNote : '',
             proof: compressedProof
           },
-          items: finalOrderItems,      // ✨ NEW: Use our perfect snapshot
-          totalCOGS: totalOrderCOGS,   // ✨ NEW: Save the total order cost
+          items: finalOrderItems,
+          totalCOGS: totalOrderCOGS,
           subtotal: subtotal,
           deliveryFee: deliveryFee,
           discount: discount,
