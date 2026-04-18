@@ -323,11 +323,16 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
 const OrderReceiptModal = ({ order, onClose }) => {
   if (!order) return null;
 
-  const subtotal = order.items
-    ? Object.values(order.items).reduce((sum, item) => sum + (item.price * item.qty), 0)
-    : 0;
+  // ✨ SMART MATH
+  const subtotal = order.subtotal !== undefined
+    ? order.subtotal
+    : Object.values(order.items || {}).reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 1)), 0);
+
   const deliveryFee = order.deliveryFee || 0;
-  const total = subtotal + deliveryFee;
+  const discount = order.discount || 0;
+  const promoCode = order.promoCode || null;
+
+  const total = order.total !== undefined ? order.total : Math.max(0, subtotal + deliveryFee - discount);
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4">
@@ -389,20 +394,26 @@ const OrderReceiptModal = ({ order, onClose }) => {
 
           <div className="w-full border-t-2 border-gray-800 mb-6"></div>
 
-          {/* Totals */}
+          {/* ✨ UPGRADED TOTALS SECTION */}
           <div className="w-full space-y-2 mb-8">
             <div className="flex justify-between text-sm text-gray-500">
               <span>Subtotal</span>
               <span>{subtotal.toFixed(3)} BHD</span>
             </div>
-            <div className="flex justify-between border-t border-dashed pt-2 mt-2">
-              <span className="text-gray-400">Delivery Fee</span>
-              <span className="font-bold">{(order.deliveryFee || 0).toFixed(3)} BHD</span>
-            </div>
+
             <div className="flex justify-between text-sm text-gray-500">
-              <span>Delivery</span>
+              <span>Delivery Fee</span>
               <span>{deliveryFee.toFixed(3)} BHD</span>
             </div>
+
+            {/* 🔥 NEW: Explicit Discount Line */}
+            {discount > 0 && (
+              <div className="flex justify-between text-sm font-bold text-red-500 bg-red-50 p-1.5 rounded mt-1 border border-red-100">
+                <span>Discount {promoCode ? `(${promoCode})` : ''}</span>
+                <span>- {discount.toFixed(3)} BHD</span>
+              </div>
+            )}
+
             <div className="flex justify-between items-center text-xl font-bold text-[#7C3AED] mt-4 pt-4 border-t border-dashed border-gray-200">
               <span>TOTAL</span>
               <span>{total.toFixed(3)} BHD</span>
@@ -424,6 +435,7 @@ const OrderReceiptModal = ({ order, onClose }) => {
     </div>
   );
 };
+
 // --- 💬 SMART WHATSAPP HUB ---
 const WhatsAppModal = ({ order, templates, onClose }) => {
   if (!order) return null;
@@ -3170,9 +3182,11 @@ export default function App() {
     else noteText = order.customer?.meetupNote || "";
 
     const hasNote = noteText && noteText !== "N/A" && noteText.trim() !== "";
+    const discountValue = order.discount || 0;
 
-    // --- FIX: Increased Base (150) and per-item (10) for safe dynamic growth ---
-    const dynamicHeight = 150 + (itemCount * 10) + (hasNote ? 25 : 0);
+    // ✨ TIGHTENED: Reverted back to your exact base height of 150.
+    // It will ONLY add a tiny 5mm if a discount line is actually needed!
+    const dynamicHeight = 150 + (itemCount * 10) + (hasNote ? 25 : 0) + (discountValue > 0 ? 5 : 0);
 
     // 2. SETUP PDF WITH CALCULATED HEIGHT
     const doc = new jsPDF({
@@ -3184,7 +3198,7 @@ export default function App() {
     const centerX = 40;
     let y = 10;
 
-    // --- HELPER: Circular Image (Restored exactly from your old code) ---
+    // --- HELPER: Circular Image ---
     const loadCircularImage = (url) => {
       return new Promise((resolve) => {
         if (!url) return resolve(null);
@@ -3305,13 +3319,17 @@ export default function App() {
     doc.line(6, y, 74, y);
     y += 6;
 
-    // 7. 💰 TOTALS
+    // 7. 💰 TOTALS (✨ SMART MATH APPLIED)
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
 
-    const subtotal = order.items ? Object.values(order.items).reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
+    const subtotal = order.subtotal !== undefined
+      ? order.subtotal
+      : (order.items ? Object.values(order.items).reduce((sum, i) => sum + (i.price * i.qty), 0) : 0);
     const deliveryFee = order.deliveryFee || 0;
-    const total = subtotal + deliveryFee;
+    const discount = order.discount || 0;
+    const promoCode = order.promoCode || null;
+    const total = order.total !== undefined ? order.total : Math.max(0, subtotal + deliveryFee - discount);
 
     doc.text("Subtotal", 6, y);
     doc.text(`${subtotal.toFixed(3)} BHD`, 74, y, null, "right");
@@ -3319,6 +3337,16 @@ export default function App() {
 
     doc.text("Delivery", 6, y);
     doc.text(`${deliveryFee.toFixed(3)} BHD`, 74, y, null, "right");
+
+    // 🔥 NEW: Explicit Discount Line safely inserted
+    if (discount > 0) {
+      y += 5;
+      doc.setTextColor(239, 68, 68); // Red color
+      doc.text(`Discount ${promoCode ? `(${promoCode})` : ''}`, 6, y);
+      doc.text(`- ${discount.toFixed(3)} BHD`, 74, y, null, "right");
+      doc.setTextColor(0, 0, 0); // Reset to black
+    }
+
     y += 8;
 
     // GRAND TOTAL
@@ -3352,14 +3380,9 @@ export default function App() {
     doc.setFontSize(9);
     doc.text("THANK YOU FOR SHOPPING!", centerX, y, null, "center");
 
-    // --- NEW: TIGHT PADDING LOGIC ---
-    // Instead of relying on a pre-calculated height, we crop the page 
-    // to the current 'y' position plus a small bottom margin (e.g., 10mm).
-    const finalContentHeight = y + 10;
-
-    // This removes the extra white space seen in your current PDFs
     doc.save(`Receipt-${cleanId}.pdf`);
   };
+
   // --- 1. ALL DATA STATES ---
   const [user, setUser] = useState(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
