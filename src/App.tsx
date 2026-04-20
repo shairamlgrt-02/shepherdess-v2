@@ -156,39 +156,127 @@ const compressImage = (file) => {
 
 // --- Components ---
 
-// --- ⚡ NEW FLASH TIMER COMPONENT (SINGLE ROW) ---
-const FlashTimer = ({ endDate, endTime }) => {
-  const calculateTimeLeft = () => {
-    if (!endDate) return null;
-    const targetDate = new Date(`${endDate}T${endTime || "23:59:59"}`);
-    const difference = targetDate - new Date();
-
-    if (difference > 0) {
-      return {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-      };
-    }
-    return null; // Time is up!
-  };
-
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+// --- ✨ PHASE 2: THE FLASH DEAL SHOWCASE ENGINE ---
+const FlashDealShowcase = ({ promotions = [], products = [], selectedCategory, onViewProduct }) => {
+  const [now, setNow] = useState(new Date().getTime());
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
+    const timer = setInterval(() => setNow(new Date().getTime()), 1000);
     return () => clearInterval(timer);
-  }, [endDate, endTime]);
+  }, []);
 
-  if (!timeLeft) return null;
+  // Only show on the main homepage ("All" category)
+  if (selectedCategory !== "All") return null;
+
+  // 1. Find the active flash campaign
+  const campaign = promotions.find(p => p.type === 'flash' && p.active !== false);
+  if (!campaign || !campaign.endDate) return null;
+
+  // 2. Time Math
+  const startTime = campaign.startDate ? new Date(`${campaign.startDate}T${campaign.startTime || '00:00:00'}`).getTime() : 0;
+  const endTime = new Date(`${campaign.endDate}T${campaign.endTime || '23:59:59'}`).getTime();
+
+  // 3. Status checks
+  if (now > endTime) return null; // AUTO-DELETE: Event is over
+  const isLive = now >= startTime;
+
+  // 4. Countdown target
+  const targetTime = isLive ? endTime : startTime;
+  const diff = Math.max(0, targetTime - now);
+
+  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const m = Math.floor((diff / 1000 / 60) % 60);
+  const s = Math.floor((diff / 1000) % 60);
+
+  // 5. Get the products for this event
+  const campaignProducts = products.filter(p => (campaign.targetSelections || []).includes(p.id));
+  if (campaignProducts.length === 0) return null;
 
   return (
-    <div className="bg-purple-600 text-white text-sm md:text-base font-medium py-1.5 w-full flex items-center justify-center tracking-widest">
-      {timeLeft.days > 0 && <span>{timeLeft.days}day&nbsp;</span>}
-      <span>
-        {timeLeft.hours} : {String(timeLeft.minutes).padStart(2, '0')} : {String(timeLeft.seconds).padStart(2, '0')}
-      </span>
+    <div className="mb-10 bg-gradient-to-br from-gray-900 to-[#3B1A54] rounded-2xl overflow-hidden shadow-2xl animate-fade-in border border-purple-800/50">
+      {/* Header Area */}
+      <div className="px-5 py-5 md:px-8 md:py-6 border-b border-white/10 flex flex-col md:flex-row items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="bg-[#8B5CF6] text-white p-2.5 rounded-xl shadow-lg">
+            <Sparkles size={24} className={isLive ? "animate-pulse" : ""} />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-2xl font-serif font-bold text-white tracking-wide">
+              {campaign.title}
+            </h2>
+            <p className={`text-sm font-bold tracking-widest uppercase mt-0.5 ${isLive ? "text-green-400" : "text-purple-300"}`}>
+              {isLive ? "🔴 Live Event" : "⏳ Coming Soon"}
+            </p>
+          </div>
+        </div>
+
+        {/* Countdown Clock */}
+        <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl backdrop-blur-md border border-white/10 shadow-inner">
+          <div className="text-center min-w-[44px]">
+            <span className="block text-2xl font-mono font-black text-white">{String(d).padStart(2, '0')}</span>
+            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Days</span>
+          </div>
+          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
+          <div className="text-center min-w-[44px]">
+            <span className="block text-2xl font-mono font-black text-white">{String(h).padStart(2, '0')}</span>
+            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Hrs</span>
+          </div>
+          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
+          <div className="text-center min-w-[44px]">
+            <span className="block text-2xl font-mono font-black text-white">{String(m).padStart(2, '0')}</span>
+            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Min</span>
+          </div>
+          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
+          <div className="text-center min-w-[44px]">
+            <span className="block text-2xl font-mono font-black text-white">{String(s).padStart(2, '0')}</span>
+            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Sec</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Product Showcase Slider */}
+      <div className="p-6 md:p-8 overflow-x-auto pb-8" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-5 min-w-max">
+          {campaignProducts.map(product => {
+            const flashPrice = campaign.customPrices?.[product.id] || product.price;
+            const isDiscounted = flashPrice < product.price;
+
+            return (
+              <div
+                key={product.id}
+                onClick={() => { if (isLive && onViewProduct) onViewProduct(product); }}
+                className={`w-44 md:w-52 bg-white rounded-xl overflow-hidden shadow-xl flex-shrink-0 transition-all duration-300 ${isLive ? 'cursor-pointer hover:-translate-y-2 hover:shadow-purple-900/50' : 'opacity-90 grayscale-[40%]'}`}
+              >
+                <div className="aspect-[4/5] bg-gray-100 relative overflow-hidden">
+                  <img src={product.images?.[0] || product.image} alt={product.name} className="w-full h-full object-cover" />
+                  {!isLive && (
+                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-[3px] flex items-center justify-center z-10">
+                      <span className="bg-white text-gray-900 text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest shadow-xl flex items-center gap-1.5">
+                        <Lock size={12} /> Locked
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-xs md:text-sm text-gray-900 line-clamp-2 leading-tight mb-3 h-8">{product.name}</h3>
+
+                  {isLive ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-mono font-black text-[#8B5CF6]">{Number(flashPrice).toFixed(3)}</span>
+                      {isDiscounted && (
+                        <span className="text-xs font-mono font-bold text-gray-400 line-through">{Number(product.price).toFixed(3)}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Price unlocks at launch</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };
@@ -4318,124 +4406,13 @@ export default function App() {
               )}
             </div>
 
-            {/* --- ⚡ FLASH SALE HOMEPAGE PREVIEW (STREAMLINED & MOBILE OPTIMIZED) --- */}
-            {(() => {
-              // Find active flash sale
-              const flashPromo = promotions.find(p => p.type === 'flash' && p.active !== false && isPromoActive(p));
-
-              // Only show if a flash sale exists AND we are on the main "All" homepage
-              if (!flashPromo || selectedCategory !== "All") return null;
-
-              // Get exactly 4 products for the preview
-              const flashProductsRaw = products.filter(p =>
-                p.active && (
-                  flashPromo.scope === 'all' ||
-                  (flashPromo.scope === 'category' && (flashPromo.targetSelections?.includes(p.category) || flashPromo.targetSelections?.includes(p.subcategory))) ||
-                  (flashPromo.scope === 'specific' && (flashPromo.targetSelections?.includes(p.id) || flashPromo.productIds?.includes(p.id)))
-                )
-              ).slice(0, 4);
-
-              if (flashProductsRaw.length === 0) return null;
-
-              // 🌟 2. NEW: Identify & Group "Coming Soon" products using the global pricing engine
-              const allDeals = flashProductsRaw.map(p => {
-                // Use the helper we updated in Step 1! It handles custom prices AND coming soon dates automatically!
-                const priceState = getProductPrice(p);
-                return {
-                  ...p,
-                  originalPrice: p.originalPrice || p.price,
-                  price: priceState.final, // Apply the discounted price to the preview
-                  priceInfo: priceState    // Save the state so we know if it's "Coming Soon"
-                };
-              });
-
-              // ✨ UPDATED: Filter AND sort so active deals appear before coming soon deals
-              const visibleDeals = allDeals
-                .filter(d => d.priceInfo.isSale || d.priceInfo.isComingSoon)
-                .sort((a, b) => {
-                  if (a.priceInfo.isSale && b.priceInfo.isComingSoon) return -1; // Active comes first
-                  if (a.priceInfo.isComingSoon && b.priceInfo.isSale) return 1;  // Coming soon goes last
-                  return 0; // Keep standard order if they are the same type
-                })
-                .slice(0, 4);
-
-              if (visibleDeals.length === 0) return null;
-
-              return (
-                <div className="mb-8 md:mb-10 animate-fade-in">
-                  {/* Header Section */}
-                  <div className="flex justify-between items-end mb-2 px-1">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <Sparkles size={14} className="text-purple-600" />
-                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-purple-600">Limited Time Offer</span>
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-serif font-bold text-gray-900 uppercase italic">
-                        {flashPromo.title}
-                      </h3>
-                    </div>
-
-                    {/* Minimalist See All Button */}
-                    <button
-                      onClick={() => { setSelectedCategory(flashPromo.title); setVisibleCount(12); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      className="text-[10px] md:text-xs font-semibold text-gray-500 hover:text-purple-700 transition-colors border border-gray-200 px-3 py-1 bg-white hover:bg-gray-50 uppercase tracking-wider"
-                    >
-                      See All
-                    </button>
-                  </div>
-
-                  {/* Single Row Timer */}
-                  <div className="mb-4">
-                    <FlashTimer endDate={flashPromo.enxdDate} endTime={flashPromo.endTime} />
-                  </div>
-
-                  {/* 4 Item Preview Grid (2x2 on mobile) */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                    {visibleDeals.map(p => (
-                      <div
-                        key={p.id}
-                        onClick={() => { setSelectedCategory(flashPromo.title); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                        className="bg-white rounded-xl p-2.5 md:p-3 shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-purple-200 transition-all group flex flex-col"
-                      >
-                        <div className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative border border-purple-100">
-                          <img src={p.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-
-                          {/* 🌟 NEW ARRIVAL TAG (MOBILE-READY) */}
-                          <div className={`absolute top-1.5 left-1.5 md:top-2 md:left-2 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1.5 ${p.priceInfo.isComingSoon ? 'bg-amber-600' : 'bg-purple-600'}`}>
-                            {p.priceInfo.isComingSoon ? (
-                              <>
-                                <Clock size={10} className="text-amber-200" />
-                                COMING SOON
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles size={10} className="text-purple-200" />
-                                FLASH DEAL
-                              </>
-                            )}
-                          </div>
-
-                          {/* 🌟 CLEAN TEXT OVERLAY (COMING SOON) */}
-                          {p.priceInfo.isComingSoon && (
-                            <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-2 text-center">
-                              <p className="font-serif font-black text-sm md:text-base uppercase tracking-widest text-gray-900 drop-shadow-md">Coming Soon</p>
-                              <p className="text-[10px] md:text-xs font-bold mt-1 text-gray-800 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
-                                {p.priceInfo.comingSoonDate.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        <h4 className="font-serif font-bold text-xs md:text-sm text-gray-900 line-clamp-1 mb-1">{p.name}</h4>
-                        <div className="mt-auto flex flex-wrap items-center gap-1.5 md:gap-2">
-                          {p.originalPrice && <span className="text-[9px] md:text-[10px] text-gray-400 line-through">{p.originalPrice.toFixed(3)}</span>}
-                          <span className="text-xs md:text-sm font-bold text-purple-600">{p.price.toFixed(3)} BHD</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* ✨ PHASE 2: NEW FLASH DEAL SHOWCASE */}
+            <FlashDealShowcase
+              promotions={promotions}
+              products={products}
+              selectedCategory={selectedCategory}
+              onViewProduct={(p) => { setSelectedProduct(p); setViewMode("product"); window.scrollTo(0, 0); }}
+            />
 
             {/* 2. THE STICKY CONTROL BAR */}
             <div className="sticky top-20 z-40 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
@@ -5124,12 +5101,10 @@ export default function App() {
               >
                 Enter
               </button>
-            </div>
+              </div>
           </div>
         </div>
       )}
     </div>
   );
 };
-
-
