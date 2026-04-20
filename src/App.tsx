@@ -3918,7 +3918,7 @@ export default function App() {
     }
   };
 
-  // --- UPDATED: Checkout with Cost & Discount Support ---
+  // --- ✨ PHASE 4: FINAL SECURE CHECKOUT (ANTI-CHEAT + COGS + PROOF) ---
   const handleCheckout = async (e) => {
     e.preventDefault();
 
@@ -3934,29 +3934,17 @@ export default function App() {
       const orderId = generateOrderId();
       const cartItems = Object.values(cart);
 
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      // Fixed Fee
       const deliveryFee = deliveryMethod === 'delivery' ? 1.000 : 0;
-
-      // Calculate actual discount at the moment of checkout
-      let discount = 0;
-      if (appliedCode) {
-        if (appliedCode.type === 'free_delivery') {
-          discount = deliveryMethod === 'delivery' ? 1.000 : 0;
-        } else {
-          discount = appliedCode.discount;
-        }
-      }
-
-      const finalTotal = Math.max(0, subtotal + deliveryFee - discount);
 
       await runTransaction(db, async (transaction) => {
         const validatedItems = [];
         let totalOrderCOGS = 0;
+        let verifiedSubtotal = 0;
         const finalOrderItems = {};
+        const now = new Date().getTime();
 
-        // --- STEP 1: EXECUTE ALL "READS" FIRST ---
-
-        // Read 1: Check all products and stock
+        // --- STEP 1: EXECUTE ALL "READS" & PRICE VERIFICATION ---
         for (const item of cartItems) {
           const productRef = doc(db, "products", item.id);
           const productSnap = await transaction.get(productRef);
@@ -3970,37 +3958,67 @@ export default function App() {
             throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
 
+          // --- 🛡️ ANTI-CHEAT PRICE PROTECTION ---
+          let verifiedPrice = productData.price;
+
+          // Verify if Flash Deal is ACTUALLY active at this precise millisecond
+          const activeFlash = promotions.find(promo =>
+            promo.type === 'flash' && promo.active !== false &&
+            now >= new Date(`${promo.startDate}T${promo.startTime || '10:00'}`).getTime() &&
+            now <= new Date(`${promo.endDate}T${promo.endTime || '09:59'}`).getTime() &&
+            (promo.scope === 'all' || (promo.targetSelections || []).includes(item.id))
+          );
+
+          if (activeFlash && activeFlash.customPrices?.[item.id]) {
+            verifiedPrice = Number(activeFlash.customPrices[item.id]);
+          }
+          // ---------------------------------------
+
           totalOrderCOGS += (currentCost * item.qty);
+          verifiedSubtotal += (verifiedPrice * item.qty);
 
           finalOrderItems[item.id] = {
             ...item,
+            price: verifiedPrice,
             cost: currentCost
           };
 
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
-        // Read 2: Check Promo usage (MOVED TO TOP TO PREVENT CRASH)
+        // Read 2: Check Promo usage (MOVED INSIDE TRANSACTION FOR SECURITY)
         let promoRef = null;
         let promoSnap = null;
+        let verifiedDiscount = 0;
+
         if (appliedCode && appliedCode.id) {
           promoRef = doc(db, "promotions", appliedCode.id);
           promoSnap = await transaction.get(promoRef);
+
+          if (promoSnap && promoSnap.exists()) {
+            const pData = promoSnap.data();
+            // Re-calculate discount based on verified prices
+            if (pData.type === 'free_delivery') {
+              verifiedDiscount = deliveryMethod === 'delivery' ? 1.000 : 0;
+            } else if (pData.discountType === 'percentage') {
+              verifiedDiscount = (verifiedSubtotal * (pData.value / 100));
+            } else {
+              verifiedDiscount = Number(pData.value) || 0;
+            }
+          }
         }
 
-        // --- STEP 2: EXECUTE ALL "WRITES" SECOND ---
+        const finalTotal = Math.max(0, verifiedSubtotal + deliveryFee - verifiedDiscount);
 
-        // Write 1: Update Stock
+        // --- STEP 2: EXECUTE ALL "WRITES" ---
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
-        // Write 2: Increment Promo
         if (promoSnap && promoSnap.exists()) {
           transaction.update(promoRef, { usedCount: (promoSnap.data().usedCount || 0) + 1 });
         }
 
-        // Write 3: Create Order
         const newOrderRef = doc(collection(db, "orders"));
         const orderData = {
           orderId,
@@ -4014,9 +4032,9 @@ export default function App() {
           },
           items: finalOrderItems,
           totalCOGS: totalOrderCOGS,
-          subtotal: subtotal,
+          subtotal: verifiedSubtotal,
           deliveryFee: deliveryFee,
-          discount: discount,
+          discount: verifiedDiscount,
           promoCode: appliedCode ? appliedCode.code : null,
           total: finalTotal,
           journeyStatus: "pending",
