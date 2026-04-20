@@ -1,6 +1,6 @@
 // V2 Live 
 // @ts-nocheck
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getFirestore,
@@ -156,32 +156,40 @@ const compressImage = (file) => {
 
 // --- Components ---
 
-// --- ✨ PHASE 2: THE FLASH DEAL SHOWCASE ENGINE ---
-const FlashDealShowcase = ({ promotions = [], products = [], selectedCategory, onViewProduct }) => {
+// --- ✨ PHASE 3: COMPACT TIMEDEAL SHOWCASE ENGINE (ANIMATED DOTS & JUMP SCROLL) ---
+const FlashDealShowcase = ({ promotions = [], products = [], selectedCategory, setSelectedCategory, onViewProduct }) => {
   const [now, setNow] = useState(new Date().getTime());
+  const scrollRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date().getTime()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Only show on the main homepage ("All" category)
   if (selectedCategory !== "All") return null;
 
-  // 1. Find the active flash campaign
-  const campaign = promotions.find(p => p.type === 'flash' && p.active !== false);
-  if (!campaign || !campaign.endDate) return null;
+  const flashDeals = promotions.filter(p => p.type === 'flash' && p.active !== false);
+  if (flashDeals.length === 0) return null;
 
-  // 2. Time Math
-  const startTime = campaign.startDate ? new Date(`${campaign.startDate}T${campaign.startTime || '00:00:00'}`).getTime() : 0;
-  const endTime = new Date(`${campaign.endDate}T${campaign.endTime || '23:59:59'}`).getTime();
+  const sortedDeals = flashDeals.sort((a, b) => new Date(`${a.startDate}T${a.startTime || '10:00'}`).getTime() - new Date(`${b.startDate}T${b.startTime || '10:00'}`).getTime());
 
-  // 3. Status checks
-  if (now > endTime) return null; // AUTO-DELETE: Event is over
-  const isLive = now >= startTime;
+  const liveDeal = sortedDeals.find(deal => {
+    const startTarget = new Date(`${deal.startDate}T${deal.startTime || '10:00'}`).getTime();
+    const endTarget = new Date(`${deal.endDate}T${deal.endTime || '09:59'}`).getTime();
+    return now >= startTarget && now <= endTarget;
+  });
 
-  // 4. Countdown target
-  const targetTime = isLive ? endTime : startTime;
+  const nextDeal = sortedDeals.find(deal => new Date(`${deal.startDate}T${deal.startTime || '10:00'}`).getTime() > now);
+
+  const displayDeal = liveDeal || nextDeal;
+  if (!displayDeal) return null;
+
+  const isLive = !!liveDeal;
+
+  const startTarget = new Date(`${displayDeal.startDate}T${displayDeal.startTime || '10:00'}`).getTime();
+  const endTarget = new Date(`${displayDeal.endDate}T${displayDeal.endTime || '09:59'}`).getTime();
+  const targetTime = isLive ? endTarget : startTarget;
   const diff = Math.max(0, targetTime - now);
 
   const d = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -189,93 +197,122 @@ const FlashDealShowcase = ({ promotions = [], products = [], selectedCategory, o
   const m = Math.floor((diff / 1000 / 60) % 60);
   const s = Math.floor((diff / 1000) % 60);
 
-  // 5. Get the products for this event
-  const campaignProducts = products.filter(p => (campaign.targetSelections || []).includes(p.id));
+  const campaignProducts = products.filter(p =>
+    (displayDeal.scope === 'all') ||
+    (displayDeal.scope === 'category' && (displayDeal.targetSelections?.includes(p.category) || displayDeal.targetSelections?.includes(p.subcategory))) ||
+    (displayDeal.scope === 'specific' && (displayDeal.targetSelections?.includes(p.id) || displayDeal.productIds?.includes(p.id)))
+  );
+
+  const handleScroll = () => {
+    if (!scrollRef.current || !scrollRef.current.firstChild) return;
+    const itemWidth = scrollRef.current.firstChild.offsetWidth + 10;
+    const index = Math.round(scrollRef.current.scrollLeft / itemWidth);
+    setActiveIndex(Math.min(Math.max(index, 0), campaignProducts.length - 1));
+  };
+
+  // ✨ NEW: THE SMART JUMP FUNCTION
+  const handleJumpToGrid = () => {
+    if (setSelectedCategory) setSelectedCategory(displayDeal.title);
+    setTimeout(() => {
+      const grid = document.getElementById("product-grid");
+      if (grid) {
+        const y = grid.getBoundingClientRect().top + window.scrollY - 80; // 80px offset so the sticky header doesn't block it
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 50); // Tiny delay ensures the grid filters first before scrolling
+  };
+
   if (campaignProducts.length === 0) return null;
 
+  const [year, month, day] = (displayDeal.startDate || "").split('-');
+
   return (
-    <div className="mb-10 bg-gradient-to-br from-gray-900 to-[#3B1A54] rounded-2xl overflow-hidden shadow-2xl animate-fade-in border border-purple-800/50">
-      {/* Header Area */}
-      <div className="px-5 py-5 md:px-8 md:py-6 border-b border-white/10 flex flex-col md:flex-row items-center justify-between gap-5">
-        <div className="flex items-center gap-4">
-          <div className="bg-[#8B5CF6] text-white p-2.5 rounded-xl shadow-lg">
-            <Sparkles size={24} className={isLive ? "animate-pulse" : ""} />
+    <div className="mb-6 bg-white border border-gray-200 rounded-xl shadow-sm animate-fade-in overflow-hidden hover:shadow-md transition-shadow">
+      <style>{`.hide-scroll::-webkit-scrollbar { display: none; }`}</style>
+
+      {isLive ? (
+        <div className="bg-purple-600 px-4 py-3 flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={16} className="text-yellow-300" />
+              <h2 className="font-bold text-white text-base md:text-lg italic tracking-wide">Flash Deal of the Week</h2>
+            </div>
+            <div className="bg-black/20 text-white px-2 py-0.5 rounded text-[11px] md:text-xs font-mono font-bold tracking-widest flex items-center w-fit">
+              {String(d).padStart(2, '0')}d : {String(h).padStart(2, '0')}h : {String(m).padStart(2, '0')}m : {String(s).padStart(2, '0')}s
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl md:text-2xl font-serif font-bold text-white tracking-wide">
-              {campaign.title}
-            </h2>
-            <p className={`text-sm font-bold tracking-widest uppercase mt-0.5 ${isLive ? "text-green-400" : "text-purple-300"}`}>
-              {isLive ? "🔴 Live Event" : "⏳ Coming Soon"}
-            </p>
+          <button
+            onClick={handleJumpToGrid} // ✨ Now triggers the jump
+            className="text-white text-[10px] md:text-xs font-bold hover:underline flex items-center gap-0.5 whitespace-nowrap"
+          >
+            See All <ChevronRight size={14} />
+          </button>
+        </div>
+      ) : (
+        <div className="bg-purple-50 border-b border-purple-100 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-200 p-1.5 rounded-lg text-purple-600">
+              <Lock size={16} />
+            </div>
+            <div>
+              <h2 className="font-bold text-sm md:text-base text-gray-900">Flash Deal of the Week <span className="font-normal text-purple-600 ml-1 text-xs">• Coming Soon</span></h2>
+              <p className="text-[10px] md:text-xs text-purple-500 mt-0.5 font-bold tracking-wide">
+                Drops on {day}/{month} at {displayDeal.startTime || '10:00 AM'}
+              </p>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Countdown Clock */}
-        <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl backdrop-blur-md border border-white/10 shadow-inner">
-          <div className="text-center min-w-[44px]">
-            <span className="block text-2xl font-mono font-black text-white">{String(d).padStart(2, '0')}</span>
-            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Days</span>
-          </div>
-          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
-          <div className="text-center min-w-[44px]">
-            <span className="block text-2xl font-mono font-black text-white">{String(h).padStart(2, '0')}</span>
-            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Hrs</span>
-          </div>
-          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
-          <div className="text-center min-w-[44px]">
-            <span className="block text-2xl font-mono font-black text-white">{String(m).padStart(2, '0')}</span>
-            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Min</span>
-          </div>
-          <span className="text-purple-500 font-bold text-xl mb-3">:</span>
-          <div className="text-center min-w-[44px]">
-            <span className="block text-2xl font-mono font-black text-white">{String(s).padStart(2, '0')}</span>
-            <span className="block text-[9px] uppercase tracking-widest text-purple-300 font-bold">Sec</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Product Showcase Slider */}
-      <div className="p-6 md:p-8 overflow-x-auto pb-8" style={{ scrollbarWidth: 'none' }}>
-        <div className="flex gap-5 min-w-max">
-          {campaignProducts.map(product => {
-            const flashPrice = campaign.customPrices?.[product.id] || product.price;
-            const isDiscounted = flashPrice < product.price;
-
+      <div className="p-3 md:p-4">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="hide-scroll flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {campaignProducts.map((product) => {
+            const flashPrice = displayDeal.customPrices?.[product.id] || product.price;
             return (
               <div
                 key={product.id}
-                onClick={() => { if (isLive && onViewProduct) onViewProduct(product); }}
-                className={`w-44 md:w-52 bg-white rounded-xl overflow-hidden shadow-xl flex-shrink-0 transition-all duration-300 ${isLive ? 'cursor-pointer hover:-translate-y-2 hover:shadow-purple-900/50' : 'opacity-90 grayscale-[40%]'}`}
+                onClick={isLive ? handleJumpToGrid : undefined} // ✨ Thumbnails now trigger the jump too!
+                className={`snap-start w-20 md:w-24 flex-shrink-0 bg-white border border-gray-100 rounded-lg p-1.5 transition-all group ${isLive ? 'cursor-pointer hover:shadow-lg hover:border-purple-200' : 'opacity-70 grayscale-[30%] cursor-not-allowed'}`}
               >
-                <div className="aspect-[4/5] bg-gray-100 relative overflow-hidden">
-                  <img src={product.images?.[0] || product.image} alt={product.name} className="w-full h-full object-cover" />
+                <div className="aspect-[4/5] bg-gray-50 rounded md:rounded-md overflow-hidden mb-1.5 relative">
+                  <img src={product.images?.[0] || product.image} alt={product.name} className={`w-full h-full object-cover ${isLive ? 'group-hover:scale-105 transition-transform' : ''}`} />
                   {!isLive && (
-                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-[3px] flex items-center justify-center z-10">
-                      <span className="bg-white text-gray-900 text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest shadow-xl flex items-center gap-1.5">
-                        <Lock size={12} /> Locked
-                      </span>
+                    <div className="absolute inset-0 bg-gray-900/10 flex items-center justify-center">
+                      <Lock size={16} className="text-white drop-shadow-md" />
                     </div>
                   )}
                 </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-xs md:text-sm text-gray-900 line-clamp-2 leading-tight mb-3 h-8">{product.name}</h3>
-
+                <div className="text-center">
                   {isLive ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-mono font-black text-[#8B5CF6]">{Number(flashPrice).toFixed(3)}</span>
-                      {isDiscounted && (
-                        <span className="text-xs font-mono font-bold text-gray-400 line-through">{Number(product.price).toFixed(3)}</span>
-                      )}
-                    </div>
+                    <p className="text-red-600 font-bold text-[11px] md:text-xs leading-tight">
+                      {Number(flashPrice).toFixed(3)}
+                    </p>
                   ) : (
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Price unlocks at launch</div>
+                    <p className="text-gray-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest">
+                      Locked
+                    </p>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
+
+        {campaignProducts.length > 1 && (
+          <div className="flex justify-center items-center gap-1.5 mt-2">
+            {campaignProducts.map((_, idx) => (
+              <div
+                key={idx}
+                className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeIndex ? 'w-4 bg-purple-600' : 'w-1.5 bg-gray-200'}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2563,7 +2600,7 @@ const AdminDashboard = ({
                   };
 
                   setNewPromo({
-                    title: "Flash Deal of the Week",
+                    title: "Flash Deal",
                     type: "flash",
                     code: "",
                     discountType: "custom",
@@ -4442,7 +4479,7 @@ export default function App() {
             </div>
 
             {/* 1. TOP FILTERS */}
-            <div className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div id="product-grid" className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
 
               {/* Search Bar */}
               <div className="relative w-full">
@@ -4515,6 +4552,7 @@ export default function App() {
               promotions={promotions}
               products={products}
               selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
               onViewProduct={(p) => { setSelectedProduct(p); setViewMode("product"); window.scrollTo(0, 0); }}
             />
 
@@ -5174,6 +5212,24 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* ✨ FLOATING SCROLL BUTTONS */}
+      <div className="fixed bottom-6 right-4 md:right-6 z-[90] flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="w-9 h-9 md:w-10 md:h-10 bg-white/80 backdrop-blur border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow-sm hover:text-purple-600 hover:border-purple-200 hover:bg-white transition-all"
+          title="Scroll to Top"
+        >
+          <ChevronUp size={18} />
+        </button>
+        <button
+          onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+          className="w-9 h-9 md:w-10 md:h-10 bg-white/80 backdrop-blur border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow-sm hover:text-purple-600 hover:border-purple-200 hover:bg-white transition-all"
+          title="Scroll to Bottom"
+        >
+          <ChevronDown size={18} />
+        </button>
+      </div>
 
       {/* ADMIN LOGIN MODAL */}
       {showAdminLogin && (
