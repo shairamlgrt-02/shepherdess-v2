@@ -2526,6 +2526,111 @@ const AdminDashboard = ({
       {/* PROMOTIONS TAB (UPGRADED) */}
       {tab === "promos" && (
         <div className="space-y-6">
+
+          {/* ✨ PHASE 1: WEEKLY FLASH DEAL ENGINE */}
+          <div className="bg-gradient-to-br from-gray-900 to-[#3B1A54] p-6 rounded-2xl shadow-xl mb-8 border border-purple-800 animate-fade-in">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="bg-[#8B5CF6] p-3 rounded-xl text-white shadow-lg">
+                <Sparkles size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl md:text-2xl font-serif font-bold text-white tracking-wide">Weekly Flash Deals</h3>
+                <p className="text-xs md:text-sm text-purple-300 font-bold uppercase tracking-widest mt-1">Perpetual Friday-to-Friday Engine</p>
+              </div>
+            </div>
+
+            <div className="bg-white/10 p-5 rounded-xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-5">
+              <div className="text-gray-200 text-sm max-w-xl">
+                <p>Schedule your next drop. The engine will automatically lock the timeline from <b>Friday 10:00 AM</b> to the following <b>Friday 09:59 AM</b>. Customers will see a "Coming Soon" VIP timer until launch.</p>
+              </div>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const nextFriday = new Date(now);
+                  nextFriday.setDate(now.getDate() + ((5 - now.getDay() + 7) % 7));
+
+                  // If it is Friday and past 10AM, target the *next* week's Friday
+                  if (now.getDay() === 5 && now.getHours() >= 10) {
+                    nextFriday.setDate(nextFriday.getDate() + 7);
+                  }
+
+                  const followingFriday = new Date(nextFriday);
+                  followingFriday.setDate(followingFriday.getDate() + 7);
+
+                  const formatDate = (date) => {
+                    const offset = date.getTimezoneOffset() * 60000;
+                    return new Date(date.getTime() - offset).toISOString().split('T')[0];
+                  };
+
+                  setNewPromo({
+                    title: "Flash Deal of the Week",
+                    type: "flash",
+                    code: "",
+                    discountType: "custom",
+                    value: 0,
+                    startDate: formatDate(nextFriday),
+                    startTime: "10:00",
+                    endDate: formatDate(followingFriday),
+                    endTime: "09:59",
+                    scope: "specific",
+                    targetSelections: [],
+                    customPrices: {},
+                    active: true,
+                    showTag: true,
+                    showInMenu: true
+                  });
+
+                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }}
+                className="bg-[#8B5CF6] text-white px-6 py-3.5 rounded-xl font-bold hover:bg-purple-500 shadow-lg shadow-purple-900/50 whitespace-nowrap transition-all w-full md:w-auto"
+              >
+                + Prime Next Weekly Deal
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <h4 className="text-xs font-bold text-purple-300 uppercase tracking-widest mb-3">Drop Queue</h4>
+              <div className="space-y-3">
+                {promotions.filter(p => p.type === 'flash').map(promo => {
+                  const startTarget = new Date(`${promo.startDate}T${promo.startTime || '00:00'}`).getTime();
+                  const endTarget = new Date(`${promo.endDate}T${promo.endTime || '23:59'}`).getTime();
+                  const nowTime = new Date().getTime();
+                  const isLive = nowTime >= startTarget && nowTime <= endTarget;
+                  const isPast = nowTime > endTarget;
+
+                  return (
+                    <div key={promo.id} className={`bg-white rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm border ${isLive ? 'border-red-400' : 'border-transparent'}`}>
+                      <div>
+                        <div className="flex items-center gap-3 mb-1.5">
+                          {isLive && <span className="flex h-2.5 w-2.5 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span></span>}
+                          <h5 className="font-bold text-gray-900 text-lg">{promo.title}</h5>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm uppercase tracking-wider ${isLive ? 'bg-red-100 text-red-600' : isPast ? 'bg-gray-100 text-gray-500' : 'bg-purple-100 text-purple-600'}`}>
+                            {isLive ? '🔴 Live Now' : isPast ? 'Expired' : '⏳ Scheduled'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                          <Calendar size={14} />
+                          {new Date(promo.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} 10:00 AM
+                          <ChevronRight size={14} className="text-gray-400" />
+                          {new Date(promo.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} 09:59 AM
+                        </p>
+                      </div>
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <button onClick={() => { setNewPromo(promo); setIsEditingPromo(promo.id); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }} className="flex-1 md:flex-none p-2 text-gray-500 hover:text-purple-600 bg-gray-50 hover:bg-purple-50 rounded-lg flex items-center justify-center transition-colors"><Edit size={18} /></button>
+                        <button onClick={() => onDeletePromotion(promo.id)} className="flex-1 md:flex-none p-2 text-gray-500 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors"><Trash2 size={18} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {promotions.filter(p => p.type === 'flash').length === 0 && (
+                  <div className="text-sm text-purple-200/60 italic text-center py-6 bg-black/20 rounded-xl border border-white/5 border-dashed">
+                    No weekly deals scheduled. Prime the engine above!
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm animate-fade-in">
             <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-purple-900">
               <Tag size={20} className="text-purple-600" />
@@ -2538,7 +2643,6 @@ const AdminDashboard = ({
                 { id: 'collection', label: 'Collection Tab', icon: LayoutDashboard, desc: 'Group items for Home Page' },
                 { id: 'coupon', label: 'Coupon Code', icon: Tag, desc: 'Customer enters code at checkout' },
                 { id: 'auto', label: 'Seasonal Sale', icon: Sparkles, desc: 'Auto-discount visible in shop' },
-                { id: 'flash', label: 'Flash Sale', icon: Clock, desc: 'Time-limited deal with countdown' },
               ].map(type => (
                 <button
                   key={type.id}
@@ -5101,7 +5205,7 @@ export default function App() {
               >
                 Enter
               </button>
-              </div>
+            </div>
           </div>
         </div>
       )}
