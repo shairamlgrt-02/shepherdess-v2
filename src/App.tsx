@@ -2548,53 +2548,57 @@ const AdminDashboard = ({
               </div>
             </div>
 
-            {/* 3. RULES ENGINE (Only for Coupons & Sales) */}
+            {/* 3. RULES ENGINE / EVENT SCHEDULER */}
             {newPromo.type !== 'collection' && (
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 space-y-4">
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Discount Rules</h4>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                  {newPromo.type === 'flash' ? 'Event Schedule' : 'Discount Rules'}
+                </h4>
 
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500">Value</label>
-                    <div className="flex mt-1">
+                {/* Hide standard discounts for Flash Deals (Flash uses exact prices) */}
+                {newPromo.type !== 'flash' && (
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="text-xs font-bold text-gray-500">Value</label>
+                      <div className="flex mt-1">
+                        <input
+                          type="number"
+                          className={`w-full p-2 border rounded-l-lg text-sm ${newPromo.discountType === 'free_delivery' ? 'bg-gray-100 text-gray-400' : ''}`}
+                          value={newPromo.value}
+                          onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
+                          disabled={newPromo.discountType === 'free_delivery'}
+                        />
+                        <select
+                          className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold outline-none"
+                          value={newPromo.discountType}
+                          onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
+                        >
+                          <option value="percentage">% OFF</option>
+                          <option value="fixed">BHD OFF</option>
+                          {newPromo.type === 'coupon' && <option value="free_delivery">Free Delivery</option>}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="text-xs font-bold text-gray-500">Min Spend (Optional)</label>
                       <input
                         type="number"
-                        className={`w-full p-2 border rounded-l-lg text-sm ${newPromo.discountType === 'free_delivery' ? 'bg-gray-100 text-gray-400' : ''}`}
-                        value={newPromo.value}
-                        onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
-                        disabled={newPromo.discountType === 'free_delivery'}
+                        placeholder="0.000"
+                        className="w-full p-2 border rounded-lg mt-1 text-sm"
+                        value={newPromo.minSpend}
+                        onChange={(e) => setNewPromo({ ...newPromo, minSpend: e.target.value })}
                       />
-                      <select
-                        className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold outline-none"
-                        value={newPromo.discountType}
-                        onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
-                      >
-                        <option value="percentage">% OFF</option>
-                        <option value="fixed">BHD OFF</option>
-                        {/* ✨ NEW: Free Delivery Option */}
-                        {newPromo.type === 'coupon' && <option value="free_delivery">Free Delivery</option>}
-                      </select>
                     </div>
                   </div>
+                )}
 
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500">Min Spend (Optional)</label>
-                    <input
-                      type="number"
-                      placeholder="0.000"
-                      className="w-full p-2 border rounded-lg mt-1 text-sm"
-                      value={newPromo.minSpend}
-                      onChange={(e) => setNewPromo({ ...newPromo, minSpend: e.target.value })}
-                    />
-                  </div>
-                </div>
-
+                {/* Universal Scheduling */}
                 <div className="flex flex-wrap gap-4">
                   <div className="flex-1 min-w-[120px]">
                     <label className="text-xs font-bold text-gray-500">Start Date</label>
                     <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.startDate} onChange={(e) => setNewPromo({ ...newPromo, startDate: e.target.value })} />
                   </div>
-                  {/* ✨ NEW: START TIME */}
                   {(newPromo.type === 'flash' || newPromo.type === 'auto') && (
                     <div className="flex-1 min-w-[120px] animate-fade-in">
                       <label className="text-xs font-bold text-blue-500 flex items-center gap-1"><Clock size={12} /> Start Time</label>
@@ -2608,7 +2612,7 @@ const AdminDashboard = ({
                   {newPromo.type === 'flash' && (
                     <div className="flex-1 min-w-[120px] animate-fade-in">
                       <label className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12} /> End Time</label>
-                      <input type="time" className="w-full p-2 border-2 border-red-100 rounded-lg mt-1 text-sm focus:border-red-400 outline-none font-mono" value={newPromo.endTime || ""} onChange={(e) => setNewPromo({ ...newPromo, endTime: e.target.value })} />
+                      <input type="time" className="w-full p-2 border border-red-100 rounded-lg mt-1 text-sm focus:border-red-400 outline-none font-mono" value={newPromo.endTime || ""} onChange={(e) => setNewPromo({ ...newPromo, endTime: e.target.value })} />
                     </div>
                   )}
                   {newPromo.type === 'coupon' && (
@@ -2623,25 +2627,32 @@ const AdminDashboard = ({
 
             {/* 4. SCOPE SELECTION */}
             <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">Apply To:</label>
-                <select
-                  className="text-sm border rounded-lg p-1 bg-white"
-                  value={newPromo.scope}
-                  onChange={(e) => setNewPromo({ ...newPromo, scope: e.target.value, targetSelections: [] })}
-                >
-                  <option value="specific">Specific Products</option>
-                  <option value="category">Specific Categories</option>
-                  <option value="all">Entire Store (All Items)</option>
-                </select>
-              </div>
+              {newPromo.type !== 'flash' ? (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Apply To:</label>
+                  <select
+                    className="text-sm border rounded-lg p-1 bg-white"
+                    value={newPromo.scope}
+                    onChange={(e) => setNewPromo({ ...newPromo, scope: e.target.value, targetSelections: [] })}
+                  >
+                    <option value="specific">Specific Products</option>
+                    <option value="category">Specific Categories</option>
+                    <option value="all">Entire Store (All Items)</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-teal-600 uppercase bg-teal-50 px-2 py-1 rounded">Flash Event Payload</label>
+                </div>
+              )}
 
-              {newPromo.scope === 'specific' && (
+              {/* Force search bar to always show for Flash Deals since they must be specific products */}
+              {(newPromo.scope === 'specific' || newPromo.type === 'flash') && (
                 <div className="relative w-full md:w-auto flex-1 max-w-sm">
                   <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder="Search products to add..."
                     className="w-full pl-8 pr-4 py-2 border rounded-full text-sm bg-gray-50 focus:bg-white"
                     value={promoSearchQuery}
                     onChange={(e) => setPromoSearchQuery(e.target.value)}
@@ -2680,75 +2691,25 @@ const AdminDashboard = ({
                         </div>
                       </label>
 
-                      {/* ✨ COMBINED: Custom Price & Per-Product Scheduling */}
+                      {/* ✨ STRICT EVENT PRICING (No per-product schedules) */}
                       {isSelected && (newPromo.type === 'flash' || newPromo.type === 'auto') && (
-                        <div className="mt-1 pl-6 animate-fade-in space-y-2 pb-1">
-                          {/* 1. Custom Price Override */}
-                          <div>
-                            <input
-                              type="number"
-                              step="0.001"
-                              placeholder="Custom Price (Optional)"
-                              className="w-full p-1.5 text-xs font-bold text-purple-700 border border-purple-200 rounded outline-none focus:ring-1 focus:ring-purple-400"
-                              value={newPromo.customPrices?.[p.id] || ''}
-                              onChange={(e) => setNewPromo({
-                                ...newPromo,
-                                customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
-                              })}
-                            />
-                            <p className="text-[9px] text-gray-400 mt-0.5">Leave blank to use the default rule</p>
-                          </div>
-
-                          {/* 2. ✨ UPDATED: Individual Start & End Scheduling */}
+                        <div className="mt-2 pl-6 animate-fade-in border-t border-gray-100 pt-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                            {newPromo.type === 'flash' ? "Exact Flash Deal Price (BHD)" : "Custom Price Override"}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.001"
+                            placeholder="e.g. 5.500"
+                            className={`w-full p-2 text-sm font-bold border rounded outline-none focus:ring-2 ${newPromo.type === 'flash' ? 'text-teal-700 border-teal-200 focus:ring-teal-400 bg-teal-50' : 'text-purple-700 border-purple-200 focus:ring-purple-400'}`}
+                            value={newPromo.customPrices?.[p.id] || ''}
+                            onChange={(e) => setNewPromo({
+                              ...newPromo,
+                              customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
+                            })}
+                          />
                           {newPromo.type === 'flash' && (
-                            <div className="border-t border-purple-100 pt-2 space-y-2">
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Schedule Start (Optional)</label>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="date"
-                                    className="flex-1 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400"
-                                    value={newPromo.scheduledProducts?.[p.id]?.startDate || ''}
-                                    onChange={(e) => setNewPromo({
-                                      ...newPromo,
-                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), startDate: e.target.value } }
-                                    })}
-                                  />
-                                  <input
-                                    type="time"
-                                    className="w-24 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400 font-mono"
-                                    value={newPromo.scheduledProducts?.[p.id]?.startTime || ''}
-                                    onChange={(e) => setNewPromo({
-                                      ...newPromo,
-                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), startTime: e.target.value } }
-                                    })}
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Schedule End (Optional)</label>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="date"
-                                    className="flex-1 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400"
-                                    value={newPromo.scheduledProducts?.[p.id]?.endDate || ''}
-                                    onChange={(e) => setNewPromo({
-                                      ...newPromo,
-                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), endDate: e.target.value } }
-                                    })}
-                                  />
-                                  <input
-                                    type="time"
-                                    className="w-24 p-1.5 border border-purple-100 rounded text-xs focus:ring-1 focus:ring-purple-400 font-mono"
-                                    value={newPromo.scheduledProducts?.[p.id]?.endTime || ''}
-                                    onChange={(e) => setNewPromo({
-                                      ...newPromo,
-                                      scheduledProducts: { ...(newPromo.scheduledProducts || {}), [p.id]: { ...(newPromo.scheduledProducts?.[p.id] || {}), endTime: e.target.value } }
-                                    })}
-                                  />
-                                </div>
-                              </div>
-                            </div>
+                            <p className="text-[9px] text-teal-600 mt-1 font-bold">Locks to event schedule automatically.</p>
                           )}
                         </div>
                       )}
