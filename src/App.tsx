@@ -4556,7 +4556,16 @@ export default function App() {
             {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
               {displayedProducts.map((p) => {
-                const activePromosForProduct = promotions.filter(promo =>
+                // 1. GOD MODE CHECK: Is this product in an active Weekly Flash Deal?
+                const activeFlash = promotions.find(promo =>
+                  promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
+                  (promo.scope === 'all' ||
+                    (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
+                    (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
+                );
+
+                // 2. NORMAL PROMOS: Only show standard tags if God Mode is OFF
+                const activePromosForProduct = activeFlash ? [] : promotions.filter(promo =>
                   promo.active !== false &&
                   isPromoActive(promo) &&
                   promo.showTag !== false &&
@@ -4570,70 +4579,58 @@ export default function App() {
                 return (
                   <div
                     key={p.id}
-                    className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
+                    className={`group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border ${activeFlash ? 'border-red-200 shadow-red-100/50' : 'border-transparent hover:border-purple-100'} flex flex-col relative`}
                   >
-                    {/* --- ⚡ UNIVERSAL FLASH SALE BADGE --- */}
-                    {(() => {
-                      const activeFlash = promotions.find(promo =>
-                        promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
-                        (promo.scope === 'all' ||
-                          (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
-                          (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
-                      );
-
-                      if (!activeFlash) return null;
-
-                      const [y, m, d] = (activeFlash.endDate || "").split('-');
-                      const shortDate = d && m ? `${d}/${m}` : '';
-                      const shortTime = activeFlash.endTime || "23:59";
-
-                      return (
-                        <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none">
-                          <div className="bg-purple-600 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
-                            <Sparkles size={10} className="text-purple-200" />
-                            FLASH DEAL
-                          </div>
-                          <div className="text-[8px] md:text-[9px] font-bold text-white bg-gray-900/80 px-1.5 py-0.5 rounded mt-1 shadow-sm tracking-wide">
-                            Ends {shortDate} {shortTime}
-                          </div>
+                    {/* --- ⚡ GOD MODE: FLASH DEAL OVERRIDE BADGE --- */}
+                    {activeFlash && (
+                      <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none animate-fade-in">
+                        <div className="bg-red-600 text-white text-[10px] md:text-xs font-black px-3 py-1.5 rounded shadow-lg flex items-center gap-1.5 uppercase tracking-widest border border-red-500 animate-pulse">
+                          <Sparkles size={12} className="text-red-200" />
+                          FLASH DEAL
                         </div>
-                      );
-                    })()}
+                        <div className="text-[9px] md:text-[10px] font-bold text-white bg-gray-900/95 px-2.5 py-0.5 rounded mt-1 shadow-md tracking-widest uppercase">
+                          Ends {(() => {
+                            const [y, m, d] = (activeFlash.endDate || "").split('-');
+                            return `${d}/${m}`;
+                          })()} {activeFlash.endTime || "09:59"}
+                        </div>
+                      </div>
+                    )}
 
                     <ProductImage
                       src={p.image}
                       alt={p.name}
                       stock={p.stock}
-                      isNew={isNewArrival(p.createdAt)}
+                      // Hides "New" tag if God Mode is active
+                      isNew={!activeFlash && isNewArrival(p.createdAt)}
                       discount={
                         p.originalPrice
-                          ? Math.round(
-                            ((p.originalPrice - p.price) / p.originalPrice) * 100
-                          )
+                          ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
                           : 0
                       }
                       activePromos={activePromosForProduct}
                     />
-                    {/* ✨ NEW: Added items-start, text-left, and w-full */}
+
                     <div className="flex-1 flex flex-col items-start text-left w-full">
-                      {/* ✨ NEW: Added justify-start to push tags to the left */}
-                      <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
-                        <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                          {p.category}
-                        </span>
-                        {p.subcategory && (
-                          <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-                            {p.subcategory}
+                      {/* ✨ Hides standard categories if God Mode is active */}
+                      {!activeFlash && (
+                        <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
+                          <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                            {p.category}
                           </span>
-                        )}
-                      </div>
+                          {p.subcategory && (
+                            <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
+                              {p.subcategory}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Integrated Expandable Title, Expiry & Description */}
                       <ExpandableTextGroup name={p.name} expiryDate={p.expiryDate} text={p.description} />
 
                       {/* UPDATED PRICE & TAGS CONTAINER */}
                       <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
-
                         {/* Top Row: Price, Discount Badge, and Cart Button */}
                         <div className="flex justify-between items-end">
                           <div className="flex flex-col">
@@ -4643,40 +4640,40 @@ export default function App() {
                               </span>
                             )}
                             <div className="flex items-center gap-2">
-                              <span className="text-sm md:text-lg font-bold text-red-600 leading-none">
+                              {/* Price turns urgent RED during a Flash Deal */}
+                              <span className={`text-sm md:text-lg font-black leading-none ${activeFlash ? 'text-red-600' : 'text-purple-600'}`}>
                                 {p.price.toFixed(3)} BHD
                               </span>
                               {/* Save % Badge next to price */}
                               {p.originalPrice && p.originalPrice > p.price && (
-                                <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-tight">
+                                <span className={`${activeFlash ? 'bg-red-50 text-red-600 border-red-100' : 'bg-red-50 text-red-600 border-red-100'} text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight`}>
                                   Save {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}%
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          {/* Responsive Add to Cart Button */}
+                          {/* Responsive Add to Cart Button (Turns Red during Flash Deal) */}
                           <button
                             onClick={() => addToCart(p)}
                             disabled={p.stock === 0}
                             className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
                               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                              : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                              : activeFlash ? "bg-red-600 hover:bg-red-700 hover:shadow-lg shadow-red-500/30" : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
                               }`}
                           >
                             <Plus size={16} className="md:w-5 md:h-5" />
                           </button>
                         </div>
 
-                        {/* Bottom Row: NEW ARRIVAL & EXACT STOCK TAGS */}
-                        {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
+                        {/* Bottom Row: NEW ARRIVAL & EXACT STOCK TAGS (Hidden in God Mode) */}
+                        {!activeFlash && (isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
                           <div className="flex flex-wrap gap-1.5 mt-1">
                             {isNewArrival(p.createdAt) && (
                               <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
                                 <Sparkles size={10} /> NEW
                               </span>
                             )}
-                            {/* ✨ UPDATED: Clean, subtle, italicized exact stock counter */}
                             {p.stock < 3 && p.stock > 0 && (
                               <span className="text-[9px] md:text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 italic tracking-tight">
                                 Only {p.stock} left!
