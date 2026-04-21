@@ -156,168 +156,6 @@ const compressImage = (file) => {
 
 // --- Components ---
 
-// --- ✨ PHASE 3: COMPACT TIMEDEAL SHOWCASE ENGINE (ANIMATED DOTS & JUMP SCROLL) ---
-const FlashDealShowcase = ({ promotions = [], products = [], selectedCategory, setSelectedCategory, onViewProduct }) => {
-  const [now, setNow] = useState(new Date().getTime());
-  const scrollRef = useRef(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date().getTime()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  if (selectedCategory !== "All") return null;
-
-  const flashDeals = promotions.filter(p => p.type === 'flash' && p.active !== false);
-  if (flashDeals.length === 0) return null;
-
-  const sortedDeals = flashDeals.sort((a, b) => new Date(`${a.startDate}T${a.startTime || '10:00'}`).getTime() - new Date(`${b.startDate}T${b.startTime || '10:00'}`).getTime());
-
-  const liveDeal = sortedDeals.find(deal => {
-    const startTarget = new Date(`${deal.startDate}T${deal.startTime || '10:00'}`).getTime();
-    const endTarget = new Date(`${deal.endDate}T${deal.endTime || '09:59'}`).getTime();
-    return now >= startTarget && now <= endTarget;
-  });
-
-  const nextDeal = sortedDeals.find(deal => new Date(`${deal.startDate}T${deal.startTime || '10:00'}`).getTime() > now);
-
-  const displayDeal = liveDeal || nextDeal;
-  if (!displayDeal) return null;
-
-  const isLive = !!liveDeal;
-
-  const startTarget = new Date(`${displayDeal.startDate}T${displayDeal.startTime || '10:00'}`).getTime();
-  const endTarget = new Date(`${displayDeal.endDate}T${displayDeal.endTime || '09:59'}`).getTime();
-  const targetTime = isLive ? endTarget : startTarget;
-  const diff = Math.max(0, targetTime - now);
-
-  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-  const m = Math.floor((diff / 1000 / 60) % 60);
-  const s = Math.floor((diff / 1000) % 60);
-
-  const campaignProducts = products.filter(p =>
-    (displayDeal.scope === 'all') ||
-    (displayDeal.scope === 'category' && (displayDeal.targetSelections?.includes(p.category) || displayDeal.targetSelections?.includes(p.subcategory))) ||
-    (displayDeal.scope === 'specific' && (displayDeal.targetSelections?.includes(p.id) || displayDeal.productIds?.includes(p.id)))
-  );
-
-  const handleScroll = () => {
-    if (!scrollRef.current || !scrollRef.current.firstChild) return;
-    const itemWidth = scrollRef.current.firstChild.offsetWidth + 10;
-    const index = Math.round(scrollRef.current.scrollLeft / itemWidth);
-    setActiveIndex(Math.min(Math.max(index, 0), campaignProducts.length - 1));
-  };
-
-  // ✨ NEW: THE SMART JUMP FUNCTION
-  const handleJumpToGrid = () => {
-    if (setSelectedCategory) setSelectedCategory(displayDeal.title);
-    setTimeout(() => {
-      const grid = document.getElementById("product-grid");
-      if (grid) {
-        const y = grid.getBoundingClientRect().top + window.scrollY - 80; // 80px offset so the sticky header doesn't block it
-        window.scrollTo({ top: y, behavior: "smooth" });
-      }
-    }, 50); // Tiny delay ensures the grid filters first before scrolling
-  };
-
-  if (campaignProducts.length === 0) return null;
-
-  const [year, month, day] = (displayDeal.startDate || "").split('-');
-
-  return (
-    <div className="mb-6 bg-white border border-gray-200 rounded-xl shadow-sm animate-fade-in overflow-hidden hover:shadow-md transition-shadow">
-      <style>{`.hide-scroll::-webkit-scrollbar { display: none; }`}</style>
-
-      {isLive ? (
-        <div className="bg-purple-600 px-4 py-3 flex justify-between items-center">
-          <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={16} className="text-yellow-300" />
-              <h2 className="font-bold text-white text-base md:text-lg italic tracking-wide">Flash Deal of the Week</h2>
-            </div>
-            <div className="bg-black/20 text-white px-2 py-0.5 rounded text-[11px] md:text-xs font-mono font-bold tracking-widest flex items-center w-fit">
-              {String(d).padStart(2, '0')}d : {String(h).padStart(2, '0')}h : {String(m).padStart(2, '0')}m : {String(s).padStart(2, '0')}s
-            </div>
-          </div>
-          <button
-            onClick={handleJumpToGrid} // ✨ Now triggers the jump
-            className="text-white text-[10px] md:text-xs font-bold hover:underline flex items-center gap-0.5 whitespace-nowrap"
-          >
-            See All <ChevronRight size={14} />
-          </button>
-        </div>
-      ) : (
-        <div className="bg-purple-50 border-b border-purple-100 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-200 p-1.5 rounded-lg text-purple-600">
-              <Lock size={16} />
-            </div>
-            <div>
-              <h2 className="font-bold text-sm md:text-base text-gray-900">Flash Deal of the Week <span className="font-normal text-purple-600 ml-1 text-xs">• Coming Soon</span></h2>
-              <p className="text-[10px] md:text-xs text-purple-500 mt-0.5 font-bold tracking-wide">
-                Drops on {day}/{month} at {displayDeal.startTime || '10:00 AM'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="p-3 md:p-4">
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="hide-scroll flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {campaignProducts.map((product) => {
-            const flashPrice = displayDeal.customPrices?.[product.id] || product.price;
-            return (
-              <div
-                key={product.id}
-                onClick={isLive ? handleJumpToGrid : undefined} // ✨ Thumbnails now trigger the jump too!
-                className={`snap-start w-20 md:w-24 flex-shrink-0 bg-white border border-gray-100 rounded-lg p-1.5 transition-all group ${isLive ? 'cursor-pointer hover:shadow-lg hover:border-purple-200' : 'opacity-70 grayscale-[30%] cursor-not-allowed'}`}
-              >
-                <div className="aspect-[4/5] bg-gray-50 rounded md:rounded-md overflow-hidden mb-1.5 relative">
-                  <img src={product.images?.[0] || product.image} alt={product.name} className={`w-full h-full object-cover ${isLive ? 'group-hover:scale-105 transition-transform' : ''}`} />
-                  {!isLive && (
-                    <div className="absolute inset-0 bg-gray-900/10 flex items-center justify-center">
-                      <Lock size={16} className="text-white drop-shadow-md" />
-                    </div>
-                  )}
-                </div>
-                <div className="text-center">
-                  {isLive ? (
-                    <p className="text-red-600 font-bold text-[11px] md:text-xs leading-tight">
-                      {Number(flashPrice).toFixed(3)}
-                    </p>
-                  ) : (
-                    <p className="text-gray-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest">
-                      Locked
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {campaignProducts.length > 1 && (
-          <div className="flex justify-center items-center gap-1.5 mt-2">
-            {campaignProducts.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeIndex ? 'w-4 bg-purple-600' : 'w-1.5 bg-gray-200'}`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
   return (
@@ -1510,25 +1348,32 @@ const AdminDashboard = ({
             <div className="space-y-4">
               {filteredOrders.map((order) => {
                 const status = order.status || "pending";
+
+                // ✨ BULLETPROOF FIX 1: Added safe fallbacks for old database test orders
                 const statusColors = {
                   delivered: "border-green-500 bg-green-50/30 text-green-700",
+                  completed: "border-green-500 bg-green-50/30 text-green-700", // For old data
+                  shipped: "border-blue-500 bg-blue-50/30 text-blue-700", // For old data
                   confirmed: "border-blue-500 bg-blue-50/30 text-blue-700",
                   canceled: "border-red-500 bg-red-50/30 text-red-700",
                   pending: "border-amber-500 bg-amber-50/30 text-amber-700"
                 };
 
+                // ✨ BULLETPROOF FIX 2: If a weird status appears, safely default to pending colors
+                const safeColorString = statusColors[status] || statusColors.pending;
+
                 return (
                   <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-4 md:p-6 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
                     {/* Status Indicator Line */}
-                    <div className={`absolute top-0 left-0 right-0 h-1 ${statusColors[status].split(' ')[0]}`} />
+                    <div className={`absolute top-0 left-0 right-0 h-1 ${safeColorString.split(' ')[0]}`} />
 
                     {/* --- TOP HEADER: NAME, STATUS, DATE, JOURNEY --- */}
                     <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-gray-900 text-lg">{order.customer?.name}</h3>
+                          <h3 className="font-bold text-gray-900 text-lg">{order.customer?.name || "Guest"}</h3>
                           <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">
-                            {order.orderId}
+                            {order.orderId || "#UNKNOWN"}
                           </span>
                         </div>
 
@@ -1537,7 +1382,7 @@ const AdminDashboard = ({
                           <select
                             value={status}
                             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                            className={`text-[10px] font-bold uppercase py-1 px-3 rounded-full border cursor-pointer focus:outline-none transition-colors ${statusColors[status]}`}
+                            className={`text-[10px] font-bold uppercase py-1 px-3 rounded-full border cursor-pointer focus:outline-none transition-colors ${safeColorString}`}
                           >
                             <option value="pending">Pending</option>
                             <option value="confirmed">Confirmed</option>
@@ -1549,17 +1394,11 @@ const AdminDashboard = ({
                         {/* Date & Time below Status */}
                         <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1.5 ml-1">
                           <Clock size={12} className="opacity-70" />
-                          {order.date.toLocaleString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
+                          {order.date instanceof Date && !isNaN(order.date) ? order.date.toLocaleString('en-GB', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          }) : "Unknown Date"}
                         </p>
-
-
 
                         {/* Detailed Journey below Date */}
                         <div className="mt-1 ml-1">
@@ -1583,7 +1422,7 @@ const AdminDashboard = ({
                       {/* Right Side: Price & Receipt Link */}
                       <div className="flex flex-col items-end gap-2">
                         <p className="text-2xl font-bold text-purple-600 leading-none">
-                          {order.total?.toFixed(3)} <span className="text-xs">BHD</span>
+                          {(Number(order.total) || 0).toFixed(3)} <span className="text-xs">BHD</span>
                         </p>
                         <button
                           onClick={() => generateReceipt(order)}
@@ -1595,7 +1434,7 @@ const AdminDashboard = ({
                       </div>
                     </div>
 
-                    {/* --- BOTTOM GRID: SHIPPING & ITEMS (NOTES/TOOLS PRESERVED) --- */}
+                    {/* --- BOTTOM GRID: SHIPPING & ITEMS --- */}
                     <div className="grid md:grid-cols-2 gap-8 text-sm border-t border-gray-50 pt-6">
 
                       {/* LEFT: Shipping & Proof */}
@@ -1606,15 +1445,15 @@ const AdminDashboard = ({
                             {order.customer?.deliveryMethod === 'delivery' ? <Truck size={18} /> : <Store size={18} />}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900">{order.customer?.phone}</p>
-                            <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">{order.customer?.deliveryMethod}</p>
+                            <p className="font-bold text-gray-900">{order.customer?.phone || "N/A"}</p>
+                            <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">{order.customer?.deliveryMethod || "Unknown"}</p>
                             <p className="text-xs italic text-gray-500 mt-1">
                               {order.customer?.deliveryMethod === 'delivery' ? order.customer?.deliveryAddress : order.customer?.meetupNote}
                             </p>
                           </div>
                         </div>
 
-                        {/* START OF NEW PAYMENT PROOF SECTION */}
+                        {/* START OF PAYMENT PROOF SECTION */}
                         <div className="mt-4">
                           <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
                             Payment Proof
@@ -1622,14 +1461,12 @@ const AdminDashboard = ({
 
                           {order.customer?.proof ? (
                             <div className="flex items-start gap-3">
-                              {/* 1. The Image (Click to Preview) */}
                               <div className="relative group">
                                 <img
                                   src={order.customer.proof}
                                   onClick={() => setPreviewImage(order.customer.proof)}
                                   className="w-24 h-24 object-cover rounded-xl border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
                                 />
-                                {/* Delete Button (Appears on Hover) */}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1642,21 +1479,14 @@ const AdminDashboard = ({
                                 </button>
                               </div>
 
-                              {/* 2. Change Button */}
                               <div className="flex flex-col gap-2 pt-1">
                                 <label className="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-blue-100 transition-colors flex items-center gap-1">
                                   <Upload size={12} /> Change
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) => handleProofUpload(e, order.id)}
-                                  />
+                                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleProofUpload(e, order.id)} />
                                 </label>
                               </div>
                             </div>
                           ) : (
-                            /* 3. Upload Button (If no proof exists) */
                             <label className="flex items-center gap-3 border border-dashed border-gray-300 rounded-xl p-3 cursor-pointer hover:bg-gray-50 hover:border-purple-300 transition-colors w-full max-w-[200px] group">
                               <div className="bg-gray-100 group-hover:bg-purple-100 p-2 rounded-full text-gray-400 group-hover:text-purple-500 transition-colors">
                                 <Upload size={16} />
@@ -1665,19 +1495,13 @@ const AdminDashboard = ({
                                 <span className="text-xs font-bold text-gray-600 block group-hover:text-purple-700">Upload Proof</span>
                                 <span className="text-[10px] text-gray-400 block">Click to add image</span>
                               </div>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={(e) => handleProofUpload(e, order.id)}
-                              />
+                              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleProofUpload(e, order.id)} />
                             </label>
                           )}
                         </div>
-                        {/* END OF NEW PAYMENT PROOF SECTION */}
                       </div>
 
-                      {/* RIGHT: Items & Tools (PRESERVED) */}
+                      {/* RIGHT: Items & Tools */}
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Items</h4>
@@ -1685,14 +1509,15 @@ const AdminDashboard = ({
                         </div>
 
                         <ul className="space-y-2">
-                          {order.items && Object.values(order.items).map((i: any) => (
+                          {order.items && Object.values(order.items).map((i) => (
                             <li key={i.id} className="flex justify-between items-center text-xs bg-gray-50/50 p-2 rounded-xl border border-gray-100 group">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-purple-600">{i.qty}x</span>
-                                <span className="text-gray-700">{i.name}</span>
+                                <span className="font-bold text-purple-600">{i.qty || 1}x</span>
+                                <span className="text-gray-700">{i.name || "Unknown Item"}</span>
                               </div>
                               <div className="flex items-center gap-3">
-                                <span className="font-mono text-gray-400">{i.price.toFixed(3)}</span>
+                                {/* ✨ BULLETPROOF FIX 3: Safely parse item prices */}
+                                <span className="font-mono text-gray-400">{(Number(i.price) || 0).toFixed(3)}</span>
                                 <button
                                   onClick={async () => { if (window.confirm("Remove?")) { const n = { ...order.items }; delete n[i.id]; await updateDoc(doc(db, "orders", order.id), { items: n }); } }}
                                   className="text-gray-300 hover:text-red-500 transition-colors"
@@ -1708,24 +1533,11 @@ const AdminDashboard = ({
                         <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                           <span className="text-[10px] font-bold text-gray-400 uppercase">Delivery Fee:</span>
                           <span className="font-mono text-xs text-gray-600">
-                            {(order.deliveryFee || 0).toFixed(3)} BHD
+                            {(Number(order.deliveryFee) || 0).toFixed(3)} BHD
                           </span>
                         </div>
 
-                        {/* Grand Total Adjustment */}
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Adjusted Total:</span>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number" step="0.001" defaultValue={order.total}
-                              onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
-                              className="w-20 p-1 border border-gray-200 rounded text-right font-bold text-purple-600 text-xs"
-                            />
-                            <span className="text-[10px] font-bold text-gray-400">BHD</span>
-                          </div>
-                        </div>
-
-                        {/* PRESERVED: Replacement Tool */}
+                        {/* Replacement Tool */}
                         <div className="p-3 border border-dashed border-purple-100 rounded-xl bg-purple-50/30">
                           <p className="text-[10px] font-bold text-purple-700 mb-2">✨ ADD REPLACEMENT ITEM</p>
                           <select
@@ -1737,12 +1549,12 @@ const AdminDashboard = ({
                           </select>
                         </div>
 
-                        {/* PRESERVED: Grand Total Adjustment */}
+                        {/* Grand Total Adjustment */}
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-bold text-gray-400 uppercase">Adjust Total:</span>
                           <div className="flex items-center gap-1">
                             <input
-                              type="number" step="0.001" defaultValue={order.total}
+                              type="number" step="0.001" defaultValue={Number(order.total) || 0}
                               onBlur={(e) => updateOrderTotal(order.id, e.target.value)}
                               className="w-20 p-1 border border-gray-200 rounded text-right font-bold text-purple-600 text-xs"
                             />
@@ -1750,7 +1562,7 @@ const AdminDashboard = ({
                           </div>
                         </div>
 
-                        {/* PRESERVED: Admin Notes */}
+                        {/* Admin Notes */}
                         <div>
                           <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Internal Admin Notes 🤫</label>
                           <textarea
@@ -2560,114 +2372,9 @@ const AdminDashboard = ({
         </div>
       )}
 
-      {/* PROMOTIONS TAB (UPGRADED) */}
+      {/* PROMOTIONS TAB (CLEANED) */}
       {tab === "promos" && (
         <div className="space-y-6">
-
-          {/* ✨ PHASE 1: WEEKLY FLASH DEAL ENGINE */}
-          <div className="bg-gradient-to-br from-gray-900 to-[#3B1A54] p-6 rounded-2xl shadow-xl mb-8 border border-purple-800 animate-fade-in">
-            <div className="flex items-center gap-4 mb-5">
-              <div className="bg-[#8B5CF6] p-3 rounded-xl text-white shadow-lg">
-                <Sparkles size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl md:text-2xl font-serif font-bold text-white tracking-wide">Weekly Flash Deals</h3>
-                <p className="text-xs md:text-sm text-purple-300 font-bold uppercase tracking-widest mt-1">Perpetual Friday-to-Friday Engine</p>
-              </div>
-            </div>
-
-            <div className="bg-white/10 p-5 rounded-xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-5">
-              <div className="text-gray-200 text-sm max-w-xl">
-                <p>Schedule your next drop. The engine will automatically lock the timeline from <b>Friday 10:00 AM</b> to the following <b>Friday 09:59 AM</b>. Customers will see a "Coming Soon" VIP timer until launch.</p>
-              </div>
-              <button
-                onClick={() => {
-                  const now = new Date();
-                  const nextFriday = new Date(now);
-                  nextFriday.setDate(now.getDate() + ((5 - now.getDay() + 7) % 7));
-
-                  // If it is Friday and past 10AM, target the *next* week's Friday
-                  if (now.getDay() === 5 && now.getHours() >= 10) {
-                    nextFriday.setDate(nextFriday.getDate() + 7);
-                  }
-
-                  const followingFriday = new Date(nextFriday);
-                  followingFriday.setDate(followingFriday.getDate() + 7);
-
-                  const formatDate = (date) => {
-                    const offset = date.getTimezoneOffset() * 60000;
-                    return new Date(date.getTime() - offset).toISOString().split('T')[0];
-                  };
-
-                  setNewPromo({
-                    title: "Flash Deal",
-                    type: "flash",
-                    code: "",
-                    discountType: "custom",
-                    value: 0,
-                    startDate: formatDate(nextFriday),
-                    startTime: "10:00",
-                    endDate: formatDate(followingFriday),
-                    endTime: "09:59",
-                    scope: "specific",
-                    targetSelections: [],
-                    customPrices: {},
-                    active: true,
-                    showTag: true,
-                    showInMenu: true
-                  });
-
-                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                }}
-                className="bg-[#8B5CF6] text-white px-6 py-3.5 rounded-xl font-bold hover:bg-purple-500 shadow-lg shadow-purple-900/50 whitespace-nowrap transition-all w-full md:w-auto"
-              >
-                + Prime Next Weekly Deal
-              </button>
-            </div>
-
-            <div className="mt-6">
-              <h4 className="text-xs font-bold text-purple-300 uppercase tracking-widest mb-3">Drop Queue</h4>
-              <div className="space-y-3">
-                {promotions.filter(p => p.type === 'flash').map(promo => {
-                  const startTarget = new Date(`${promo.startDate}T${promo.startTime || '00:00'}`).getTime();
-                  const endTarget = new Date(`${promo.endDate}T${promo.endTime || '23:59'}`).getTime();
-                  const nowTime = new Date().getTime();
-                  const isLive = nowTime >= startTarget && nowTime <= endTarget;
-                  const isPast = nowTime > endTarget;
-
-                  return (
-                    <div key={promo.id} className={`bg-white rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm border ${isLive ? 'border-red-400' : 'border-transparent'}`}>
-                      <div>
-                        <div className="flex items-center gap-3 mb-1.5">
-                          {isLive && <span className="flex h-2.5 w-2.5 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span></span>}
-                          <h5 className="font-bold text-gray-900 text-lg">{promo.title}</h5>
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm uppercase tracking-wider ${isLive ? 'bg-red-100 text-red-600' : isPast ? 'bg-gray-100 text-gray-500' : 'bg-purple-100 text-purple-600'}`}>
-                            {isLive ? '🔴 Live Now' : isPast ? 'Expired' : '⏳ Scheduled'}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                          <Calendar size={14} />
-                          {new Date(promo.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} 10:00 AM
-                          <ChevronRight size={14} className="text-gray-400" />
-                          {new Date(promo.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} 09:59 AM
-                        </p>
-                      </div>
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <button onClick={() => { setNewPromo(promo); setIsEditingPromo(promo.id); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }} className="flex-1 md:flex-none p-2 text-gray-500 hover:text-purple-600 bg-gray-50 hover:bg-purple-50 rounded-lg flex items-center justify-center transition-colors"><Edit size={18} /></button>
-                        <button onClick={() => onDeletePromotion(promo.id)} className="flex-1 md:flex-none p-2 text-gray-500 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors"><Trash2 size={18} /></button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {promotions.filter(p => p.type === 'flash').length === 0 && (
-                  <div className="text-sm text-purple-200/60 italic text-center py-6 bg-black/20 rounded-xl border border-white/5 border-dashed">
-                    No weekly deals scheduled. Prime the engine above!
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm animate-fade-in">
             <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-purple-900">
               <Tag size={20} className="text-purple-600" />
@@ -2739,7 +2446,6 @@ const AdminDashboard = ({
                         onChange={(e) => {
                           const file = e.target.files[0];
                           if (file) {
-                            // We use FileReader directly to bypass compression and keep the transparent background intact
                             const reader = new FileReader();
                             reader.onloadend = () => {
                               setNewPromo({ ...newPromo, tagImage: reader.result });
@@ -2772,7 +2478,6 @@ const AdminDashboard = ({
                     />
                     <span className="text-[10px] font-bold text-gray-600 uppercase">Show as Tab in Shop Menu</span>
                   </label>
-
                 </div>
               </div>
             </div>
@@ -2781,46 +2486,44 @@ const AdminDashboard = ({
             {newPromo.type !== 'collection' && (
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 space-y-4">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  {newPromo.type === 'flash' ? 'Event Schedule' : 'Discount Rules'}
+                  Discount Rules
                 </h4>
 
-                {/* Hide standard discounts for Flash Deals (Flash uses exact prices) */}
-                {newPromo.type !== 'flash' && (
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="text-xs font-bold text-gray-500">Value</label>
-                      <div className="flex mt-1">
-                        <input
-                          type="number"
-                          className={`w-full p-2 border rounded-l-lg text-sm ${newPromo.discountType === 'free_delivery' ? 'bg-gray-100 text-gray-400' : ''}`}
-                          value={newPromo.value}
-                          onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
-                          disabled={newPromo.discountType === 'free_delivery'}
-                        />
-                        <select
-                          className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold outline-none"
-                          value={newPromo.discountType}
-                          onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
-                        >
-                          <option value="percentage">% OFF</option>
-                          <option value="fixed">BHD OFF</option>
-                          {newPromo.type === 'coupon' && <option value="free_delivery">Free Delivery</option>}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex-1">
-                      <label className="text-xs font-bold text-gray-500">Min Spend (Optional)</label>
+                {/* Standard discounts */}
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">Value</label>
+                    <div className="flex mt-1">
                       <input
                         type="number"
-                        placeholder="0.000"
-                        className="w-full p-2 border rounded-lg mt-1 text-sm"
-                        value={newPromo.minSpend}
-                        onChange={(e) => setNewPromo({ ...newPromo, minSpend: e.target.value })}
+                        className={`w-full p-2 border rounded-l-lg text-sm ${newPromo.discountType === 'free_delivery' ? 'bg-gray-100 text-gray-400' : ''}`}
+                        value={newPromo.value}
+                        onChange={(e) => setNewPromo({ ...newPromo, value: e.target.value })}
+                        disabled={newPromo.discountType === 'free_delivery'}
                       />
+                      <select
+                        className="bg-gray-100 border-y border-r rounded-r-lg px-3 text-sm font-bold outline-none"
+                        value={newPromo.discountType}
+                        onChange={(e) => setNewPromo({ ...newPromo, discountType: e.target.value })}
+                      >
+                        <option value="percentage">% OFF</option>
+                        <option value="fixed">BHD OFF</option>
+                        {newPromo.type === 'coupon' && <option value="free_delivery">Free Delivery</option>}
+                      </select>
                     </div>
                   </div>
-                )}
+
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500">Min Spend (Optional)</label>
+                    <input
+                      type="number"
+                      placeholder="0.000"
+                      className="w-full p-2 border rounded-lg mt-1 text-sm"
+                      value={newPromo.minSpend}
+                      onChange={(e) => setNewPromo({ ...newPromo, minSpend: e.target.value })}
+                    />
+                  </div>
+                </div>
 
                 {/* Universal Scheduling */}
                 <div className="flex flex-wrap gap-4">
@@ -2828,7 +2531,7 @@ const AdminDashboard = ({
                     <label className="text-xs font-bold text-gray-500">Start Date</label>
                     <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.startDate} onChange={(e) => setNewPromo({ ...newPromo, startDate: e.target.value })} />
                   </div>
-                  {(newPromo.type === 'flash' || newPromo.type === 'auto') && (
+                  {newPromo.type === 'auto' && (
                     <div className="flex-1 min-w-[120px] animate-fade-in">
                       <label className="text-xs font-bold text-blue-500 flex items-center gap-1"><Clock size={12} /> Start Time</label>
                       <input type="time" className="w-full p-2 border border-blue-100 rounded-lg mt-1 text-sm focus:border-blue-400 outline-none font-mono" value={newPromo.startTime || ""} onChange={(e) => setNewPromo({ ...newPromo, startTime: e.target.value })} />
@@ -2838,12 +2541,6 @@ const AdminDashboard = ({
                     <label className="text-xs font-bold text-gray-500">End Date</label>
                     <input type="date" className="w-full p-2 border rounded-lg mt-1 text-sm" value={newPromo.endDate} onChange={(e) => setNewPromo({ ...newPromo, endDate: e.target.value })} />
                   </div>
-                  {newPromo.type === 'flash' && (
-                    <div className="flex-1 min-w-[120px] animate-fade-in">
-                      <label className="text-xs font-bold text-red-500 flex items-center gap-1"><Clock size={12} /> End Time</label>
-                      <input type="time" className="w-full p-2 border border-red-100 rounded-lg mt-1 text-sm focus:border-red-400 outline-none font-mono" value={newPromo.endTime || ""} onChange={(e) => setNewPromo({ ...newPromo, endTime: e.target.value })} />
-                    </div>
-                  )}
                   {newPromo.type === 'coupon' && (
                     <div className="flex-1 min-w-[120px]">
                       <label className="text-xs font-bold text-gray-500">Usage Limit</label>
@@ -2856,27 +2553,20 @@ const AdminDashboard = ({
 
             {/* 4. SCOPE SELECTION */}
             <div className="mb-2 flex flex-col md:flex-row gap-2 justify-between items-center">
-              {newPromo.type !== 'flash' ? (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Apply To:</label>
-                  <select
-                    className="text-sm border rounded-lg p-1 bg-white"
-                    value={newPromo.scope}
-                    onChange={(e) => setNewPromo({ ...newPromo, scope: e.target.value, targetSelections: [] })}
-                  >
-                    <option value="specific">Specific Products</option>
-                    <option value="category">Specific Categories</option>
-                    <option value="all">Entire Store (All Items)</option>
-                  </select>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-teal-600 uppercase bg-teal-50 px-2 py-1 rounded">Flash Event Payload</label>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Apply To:</label>
+                <select
+                  className="text-sm border rounded-lg p-1 bg-white"
+                  value={newPromo.scope}
+                  onChange={(e) => setNewPromo({ ...newPromo, scope: e.target.value, targetSelections: [] })}
+                >
+                  <option value="specific">Specific Products</option>
+                  <option value="category">Specific Categories</option>
+                  <option value="all">Entire Store (All Items)</option>
+                </select>
+              </div>
 
-              {/* Force search bar to always show for Flash Deals since they must be specific products */}
-              {(newPromo.scope === 'specific' || newPromo.type === 'flash') && (
+              {newPromo.scope === 'specific' && (
                 <div className="relative w-full md:w-auto flex-1 max-w-sm">
                   <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                   <input
@@ -2920,26 +2610,23 @@ const AdminDashboard = ({
                         </div>
                       </label>
 
-                      {/* ✨ STRICT EVENT PRICING (No per-product schedules) */}
-                      {isSelected && (newPromo.type === 'flash' || newPromo.type === 'auto') && (
+                      {/* ✨ CUSTOM PRICE OVERRIDE FOR SEASONAL SALES */}
+                      {isSelected && newPromo.type === 'auto' && (
                         <div className="mt-2 pl-6 animate-fade-in border-t border-gray-100 pt-2">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                            {newPromo.type === 'flash' ? "Exact Flash Deal Price (BHD)" : "Custom Price Override"}
+                            Custom Price Override
                           </label>
                           <input
                             type="number"
                             step="0.001"
                             placeholder="e.g. 5.500"
-                            className={`w-full p-2 text-sm font-bold border rounded outline-none focus:ring-2 ${newPromo.type === 'flash' ? 'text-teal-700 border-teal-200 focus:ring-teal-400 bg-teal-50' : 'text-purple-700 border-purple-200 focus:ring-purple-400'}`}
+                            className="w-full p-2 text-sm font-bold border rounded outline-none focus:ring-2 text-purple-700 border-purple-200 focus:ring-purple-400"
                             value={newPromo.customPrices?.[p.id] || ''}
                             onChange={(e) => setNewPromo({
                               ...newPromo,
                               customPrices: { ...(newPromo.customPrices || {}), [p.id]: e.target.value }
                             })}
                           />
-                          {newPromo.type === 'flash' && (
-                            <p className="text-[9px] text-teal-600 mt-1 font-bold">Locks to event schedule automatically.</p>
-                          )}
                         </div>
                       )}
                     </div>
@@ -3013,7 +2700,6 @@ const AdminDashboard = ({
                       </h4>
                       <p className="text-xs text-gray-500 mt-1">
                         {promo.scope === 'all' ? 'Entire Store' : `${promo.targetSelections?.length || 0} Items/Cats`}
-                        {/* ✨ UPDATED: Shows Free Delivery or Standard Discount */}
                         {promo.discountType === 'free_delivery'
                           ? ` • Free Delivery`
                           : (promo.value > 0 ? ` • ${promo.value}${promo.discountType === 'percentage' ? '%' : ' BHD'} OFF` : '')}
@@ -3359,6 +3045,7 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
   // --- 🧾 V8: DYNAMIC HEIGHT RECEIPT (Perfect Cut) ---
   const generateReceipt = async (order) => {
     // 1. CALCULATE HEIGHT BEFORE CREATING PDF
@@ -3645,67 +3332,26 @@ export default function App() {
     return now >= start && now <= end;
   };
 
-  // B. Helper: Calculate Sale Price & Handle "Coming Soon"
+  // --- 5-B. Helper: UNIVERSAL PRICE ENGINE ---
   const getProductPrice = (product) => {
-    // 1. Find an active or upcoming promo
+    // 1. Find an active standard sale
     const relevantPromo = promotions.find(promo =>
-      (promo.type === 'flash' || promo.type === 'auto') &&
-      promo.active !== false &&
-      (
-        promo.scope === 'all' ||
+      promo.type === 'auto' && promo.active !== false && isPromoActive(promo) &&
+      (promo.scope === 'all' ||
         (promo.scope === 'category' && (promo.targetSelections?.includes(product.category) || promo.targetSelections?.includes(product.subcategory))) ||
-        (promo.scope === 'specific' && (promo.targetSelections?.includes(product.id) || promo.productIds?.includes(product.id)))
-      )
+        (promo.scope === 'specific' && (promo.targetSelections?.includes(product.id) || promo.productIds?.includes(product.id))))
     );
 
     if (!relevantPromo) return { final: product.price, original: product.originalPrice, isSale: false };
 
-    // 🌟 2. CALCULATE THE ACTUAL DISCOUNT FIRST (Including Custom Prices!)
+    // 2. Calculate simple discount
     let discountedPrice = product.price;
-    if (relevantPromo.customPrices && relevantPromo.customPrices[product.id]) {
-      discountedPrice = parseFloat(relevantPromo.customPrices[product.id]);
-    } else if (relevantPromo.discountType === 'percentage') {
+    if (relevantPromo.discountType === 'percentage') {
       discountedPrice = product.price * (1 - (relevantPromo.value / 100));
     } else if (relevantPromo.discountType === 'fixed') {
       discountedPrice = Math.max(0, product.price - relevantPromo.value);
     }
 
-    const now = new Date();
-
-    // Check if the global promotion is in the future
-    if (!isPromoActive(relevantPromo)) {
-      const promoStartString = relevantPromo.startTime ? `${relevantPromo.startDate}T${relevantPromo.startTime}` : `${relevantPromo.startDate}T00:00:00`;
-      const promoStart = new Date(promoStartString);
-      if (now < promoStart) {
-        // Return the TEASED custom price for the Coming Soon preview!
-        return { ...product, final: discountedPrice, original: product.price, isSale: false, isComingSoon: true, comingSoonDate: promoStart };
-      }
-      return { final: product.price, original: product.originalPrice, isSale: false };
-    }
-
-    // Check if THIS SPECIFIC PRODUCT is scheduled for later
-    if (relevantPromo.scheduledProducts && relevantPromo.scheduledProducts[product.id]) {
-      const schedule = relevantPromo.scheduledProducts[product.id];
-
-      if (schedule.startDate) {
-        const productStartString = schedule.startTime ? `${schedule.startDate}T${schedule.startTime}` : `${schedule.startDate}T00:00:00`;
-        const productStart = new Date(productStartString);
-        if (now < productStart) {
-          // Return the TEASED custom price for the Coming Soon preview!
-          return { ...product, final: discountedPrice, original: product.price, isSale: false, isComingSoon: true, comingSoonDate: productStart };
-        }
-      }
-
-      if (schedule.endDate) {
-        const productEndString = schedule.endTime ? `${schedule.endDate}T${schedule.endTime}` : `${schedule.endDate}T23:59:59`;
-        const productEnd = new Date(productEndString);
-        if (now > productEnd) {
-          return { final: product.price, original: product.originalPrice, isSale: false }; // Sale ended early
-        }
-      }
-    }
-
-    // 3. If we made it here, the discount IS ACTIVE NOW!
     return {
       final: discountedPrice,
       original: product.price,
@@ -3863,18 +3509,29 @@ export default function App() {
   };
 
   const addToCart = (p) => {
+    // ✨ Use the pricing engine to get the most current active price
+    const priceInfo = getProductPrice(p);
+
     setCart((prev) => {
       if ((prev[p.id]?.qty || 0) >= p.stock) {
         showNotification("Max stock reached", "error");
         return prev;
       }
-      return { ...prev, [p.id]: { ...p, qty: (prev[p.id]?.qty || 0) + 1 } };
+      // We save the 'final' price from our engine into the cart item
+      return {
+        ...prev,
+        [p.id]: {
+          ...p,
+          price: priceInfo.final,
+          qty: (prev[p.id]?.qty || 0) + 1
+        }
+      };
     });
 
-    // Custom success message with clickable "View Bag"
     const successMsg = `Added to cart! <b onclick="window.dispatchEvent(new CustomEvent('openCart'))" style="text-decoration: underline; font-style: italic; cursor: pointer; margin-left: 8px;">View Bag</b>`;
     showNotification(successMsg);
   };
+
   const updateCartQty = (id, delta) => {
     setCart((prev) => {
       const item = prev[id];
@@ -3942,7 +3599,6 @@ export default function App() {
         let totalOrderCOGS = 0;
         let verifiedSubtotal = 0;
         const finalOrderItems = {};
-        const now = new Date().getTime();
 
         // --- STEP 1: EXECUTE ALL "READS" & PRICE VERIFICATION ---
         for (const item of cartItems) {
@@ -3954,25 +3610,13 @@ export default function App() {
           const currentStock = productData.stock || 0;
           const currentCost = productData.cost || 0;
 
+          // 🛡️ BULLETPROOF SOLD-OUT PROTECTION
           if (currentStock < item.qty) {
             throw `Sorry! Only ${currentStock} left of ${item.name}.`;
           }
 
-          // --- 🛡️ ANTI-CHEAT PRICE PROTECTION ---
-          let verifiedPrice = productData.price;
-
-          // Verify if Flash Deal is ACTUALLY active at this precise millisecond
-          const activeFlash = promotions.find(promo =>
-            promo.type === 'flash' && promo.active !== false &&
-            now >= new Date(`${promo.startDate}T${promo.startTime || '10:00'}`).getTime() &&
-            now <= new Date(`${promo.endDate}T${promo.endTime || '09:59'}`).getTime() &&
-            (promo.scope === 'all' || (promo.targetSelections || []).includes(item.id))
-          );
-
-          if (activeFlash && activeFlash.customPrices?.[item.id]) {
-            verifiedPrice = Number(activeFlash.customPrices[item.id]);
-          }
-          // ---------------------------------------
+          // Verify price straight from the database to prevent cart manipulation
+          const verifiedPrice = productData.price;
 
           totalOrderCOGS += (currentCost * item.qty);
           verifiedSubtotal += (verifiedPrice * item.qty);
@@ -3986,7 +3630,7 @@ export default function App() {
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
-        // Read 2: Check Promo usage (MOVED INSIDE TRANSACTION FOR SECURITY)
+        // --- STEP 2: PROMO VERIFICATION ---
         let promoRef = null;
         let promoSnap = null;
         let verifiedDiscount = 0;
@@ -3997,7 +3641,6 @@ export default function App() {
 
           if (promoSnap && promoSnap.exists()) {
             const pData = promoSnap.data();
-            // Re-calculate discount based on verified prices
             if (pData.type === 'free_delivery') {
               verifiedDiscount = deliveryMethod === 'delivery' ? 1.000 : 0;
             } else if (pData.discountType === 'percentage') {
@@ -4010,7 +3653,7 @@ export default function App() {
 
         const finalTotal = Math.max(0, verifiedSubtotal + deliveryFee - verifiedDiscount);
 
-        // --- STEP 2: EXECUTE ALL "WRITES" ---
+        // --- STEP 3: EXECUTE ALL "WRITES" ---
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
@@ -4565,15 +4208,6 @@ export default function App() {
               )}
             </div>
 
-            {/* ✨ PHASE 2: NEW FLASH DEAL SHOWCASE */}
-            <FlashDealShowcase
-              promotions={promotions}
-              products={products}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              onViewProduct={(p) => { setSelectedProduct(p); setViewMode("product"); window.scrollTo(0, 0); }}
-            />
-
             {/* 2. THE STICKY CONTROL BAR */}
             <div className="sticky top-20 z-40 bg-white/90 backdrop-blur-md py-3 mb-8 border-y border-purple-50 shadow-sm px-4 -mx-4">
               <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -4612,16 +4246,8 @@ export default function App() {
             {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
               {displayedProducts.map((p) => {
-                // 1. GOD MODE CHECK: Is this product in an active Weekly Flash Deal?
-                const activeFlash = promotions.find(promo =>
-                  promo.type === 'flash' && promo.active !== false && isPromoActive(promo) &&
-                  (promo.scope === 'all' ||
-                    (promo.scope === 'category' && (promo.targetSelections?.includes(p.category) || promo.targetSelections?.includes(p.subcategory))) ||
-                    (promo.scope === 'specific' && (promo.targetSelections?.includes(p.id) || promo.productIds?.includes(p.id))))
-                );
 
-                // 2. NORMAL PROMOS: Only show standard tags if God Mode is OFF
-                const activePromosForProduct = activeFlash ? [] : promotions.filter(promo =>
+                const activePromosForProduct = promotions.filter(promo =>
                   promo.active !== false &&
                   isPromoActive(promo) &&
                   promo.showTag !== false &&
@@ -4635,30 +4261,14 @@ export default function App() {
                 return (
                   <div
                     key={p.id}
-                    className={`group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border ${activeFlash ? 'border-red-200 shadow-red-100/50' : 'border-transparent hover:border-purple-100'} flex flex-col relative`}
+                    className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
                   >
-                    {/* --- ⚡ GOD MODE: FLASH DEAL OVERRIDE BADGE --- */}
-                    {activeFlash && (
-                      <div className="absolute top-6 right-6 flex flex-col items-end z-20 pointer-events-none animate-fade-in">
-                        <div className="bg-red-600 text-white text-[10px] md:text-xs font-black px-3 py-1.5 rounded shadow-lg flex items-center gap-1.5 uppercase tracking-widest border border-red-500 animate-pulse">
-                          <Sparkles size={12} className="text-red-200" />
-                          FLASH DEAL
-                        </div>
-                        <div className="text-[9px] md:text-[10px] font-bold text-white bg-gray-900/95 px-2.5 py-0.5 rounded mt-1 shadow-md tracking-widest uppercase">
-                          Ends {(() => {
-                            const [y, m, d] = (activeFlash.endDate || "").split('-');
-                            return `${d}/${m}`;
-                          })()} {activeFlash.endTime || "09:59"}
-                        </div>
-                      </div>
-                    )}
 
                     <ProductImage
                       src={p.image}
                       alt={p.name}
                       stock={p.stock}
-                      // Hides "New" tag if God Mode is active
-                      isNew={!activeFlash && isNewArrival(p.createdAt)}
+                      isNew={isNewArrival(p.createdAt)}
                       discount={
                         p.originalPrice
                           ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
@@ -4668,19 +4278,17 @@ export default function App() {
                     />
 
                     <div className="flex-1 flex flex-col items-start text-left w-full">
-                      {/* ✨ Hides standard categories if God Mode is active */}
-                      {!activeFlash && (
-                        <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
-                          <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                            {p.category}
+                      {/* Category & Subcategory Tags */}
+                      <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
+                        <span className="text-[9px] md:text-[10px] bg-purple-50 text-purple-600 px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          {p.category}
+                        </span>
+                        {p.subcategory && (
+                          <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
+                            {p.subcategory}
                           </span>
-                          {p.subcategory && (
-                            <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-                              {p.subcategory}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       {/* Integrated Expandable Title, Expiry & Description */}
                       <ExpandableTextGroup name={p.name} expiryDate={p.expiryDate} text={p.description} />
@@ -4696,34 +4304,33 @@ export default function App() {
                               </span>
                             )}
                             <div className="flex items-center gap-2">
-                              {/* Price turns urgent RED during a Flash Deal */}
-                              <span className={`text-sm md:text-lg font-black leading-none ${activeFlash ? 'text-red-600' : 'text-purple-600'}`}>
+                              <span className="text-sm md:text-lg font-black leading-none text-purple-600">
                                 {p.price.toFixed(3)} BHD
                               </span>
                               {/* Save % Badge next to price */}
                               {p.originalPrice && p.originalPrice > p.price && (
-                                <span className={`${activeFlash ? 'bg-red-50 text-red-600 border-red-100' : 'bg-red-50 text-red-600 border-red-100'} text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight`}>
+                                <span className="bg-red-50 text-red-600 border-red-100 text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight">
                                   Save {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}%
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          {/* Responsive Add to Cart Button (Turns Red during Flash Deal) */}
+                          {/* Responsive Add to Cart Button */}
                           <button
                             onClick={() => addToCart(p)}
                             disabled={p.stock === 0}
                             className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white transition-all flex-shrink-0 ${p.stock === 0
                               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                              : activeFlash ? "bg-red-600 hover:bg-red-700 hover:shadow-lg shadow-red-500/30" : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
+                              : "bg-gray-900 hover:bg-purple-600 hover:shadow-lg"
                               }`}
                           >
                             <Plus size={16} className="md:w-5 md:h-5" />
                           </button>
                         </div>
 
-                        {/* Bottom Row: NEW ARRIVAL & EXACT STOCK TAGS (Hidden in God Mode) */}
-                        {!activeFlash && (isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
+                        {/* Bottom Row: NEW ARRIVAL & EXACT STOCK TAGS */}
+                        {(isNewArrival(p.createdAt) || (p.stock < 3 && p.stock > 0)) && (
                           <div className="flex flex-wrap gap-1.5 mt-1">
                             {isNewArrival(p.createdAt) && (
                               <span className="text-[9px] md:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 uppercase tracking-tight">
@@ -4743,6 +4350,7 @@ export default function App() {
                 );
               })}
             </div>
+
             {displayedProducts.length < filteredProducts.length && (
               <div className="text-center mt-12 pb-12">
                 <button
@@ -4866,7 +4474,9 @@ export default function App() {
                             {isOutOfStock && <p className="text-[9px] text-red-500 font-bold italic mt-1">Item no longer available</p>}
                           </div>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-gray-900">{(i.price * i.qty).toFixed(3)} BHD</span>
+                            <span className="font-bold text-gray-900">
+                              {(getProductPrice(i).final * i.qty).toFixed(3)} BHD
+                            </span>
                             <div className="flex items-center gap-3 bg-white rounded-full px-2 py-1 border border-gray-200">
                               <button onClick={() => updateCartQty(i.id, -1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><Minus size={14} /></button>
                               <span className="text-sm font-bold w-4 text-center">{i.qty}</span>
@@ -5000,7 +4610,9 @@ export default function App() {
                     <div className="space-y-1 pb-3 border-b border-purple-200">
                       <div className="flex justify-between text-xs text-gray-500">
                         <span>Subtotal:</span>
-                        <span>{Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0).toFixed(3)} BHD</span>
+                        <span>{Object.values(cart)
+                          .reduce((s, i) => s + (getProductPrice(i).final * i.qty), 0)
+                          .toFixed(3)} BHD</span>
                       </div>
                       <div className="flex justify-between text-xs text-gray-500">
                         <span>Delivery Fee:</span>
@@ -5043,8 +4655,7 @@ export default function App() {
                       <span className="text-purple-700 font-bold text-lg">Total:</span>
                       <span className="font-mono text-2xl font-bold text-gray-900">
                         {(() => {
-                          const cartSub = Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
-                          const fee = deliveryMethod === 'delivery' ? 1.000 : 0;
+                          const cartSub = Object.values(cart).reduce((s, i) => s + (getProductPrice(i).final * i.qty), 0); const fee = deliveryMethod === 'delivery' ? 1.000 : 0;
                           let codeDeduct = 0;
                           if (appliedCode) {
                             if (appliedCode.type === 'free_delivery') {
@@ -5105,14 +4716,34 @@ export default function App() {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="text-xl font-bold text-gray-900">
                     {Object.values(cart)
-                      .reduce((s, i) => s + i.price * i.qty, 0)
-                      .toFixed(3)}{" "}
+                      .reduce((s, i) => s + (getProductPrice(i).final * i.qty), 0).toFixed(3)}{" "}
                     BHD
                   </span>
                 </div>
                 {checkoutStep === "cart" ? (
                   <button
                     onClick={() => {
+                      let hasPriceChanged = false;
+                      const updatedCart = { ...cart };
+
+                      // 🛡️ SECURITY CHECK: Compare Cart Price vs. The Pricing Engine's Live Price
+                      Object.values(updatedCart).forEach(item => {
+                        const livePriceInfo = getProductPrice(item);
+
+                        // Compare prices as strings to avoid tiny decimal math errors
+                        if (Number(item.price).toFixed(3) !== Number(livePriceInfo.final).toFixed(3)) {
+                          hasPriceChanged = true;
+                          updatedCart[item.id].price = livePriceInfo.final; // Update to the new price
+                        }
+                      });
+
+                      if (hasPriceChanged) {
+                        setCart(updatedCart); // Force the UI to show the new, corrected prices
+                        showNotification("⚠️ Note: Prices have been updated to reflect current store promotions.", "error");
+                        return; // ⛔ STOP! They must see the new price before they can proceed.
+                      }
+
+                      // Original sold out check
                       const hasSoldOut = Object.values(cart).some(item => {
                         const live = products.find(p => p.id === item.id);
                         return !live || live.stock <= 0;
