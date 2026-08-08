@@ -157,23 +157,26 @@ const compressImage = (file) => {
 
 // --- Components ---
 
-const Notification = ({ message, type, onClose }) => {
+const Notification = ({ message, type, onClose, onAction, actionLabel }) => {
   if (!message) return null;
   return (
     <div
-      className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-xl animate-bounce-in ${type === "success"
-        ? "bg-green-100 text-green-800 border border-green-200"
-        : "bg-red-100 text-red-800 border border-red-200"
-        }`}
-      // This line allows the "View Bag" link to be clickable
-      dangerouslySetInnerHTML={{ __html: message }}
-      onClick={(e) => {
-        // If they click the "View Bag" link specifically
-        if (e.target.tagName === 'B') {
-          onClose();
-        }
-      }}
-    />
+      className={`fixed top-4 right-4 z-[60] px-6 py-3 rounded-lg shadow-xl animate-bounce-in flex items-center gap-3 ${
+        type === "success"
+          ? "bg-green-100 text-green-800 border border-green-200"
+          : "bg-red-100 text-red-800 border border-red-200"
+      }`}
+    >
+      <span className="text-sm font-medium">{message}</span>
+      {actionLabel && (
+        <button
+          onClick={() => { if (onAction) onAction(); onClose(); }}
+          className="underline font-bold text-purple-600 hover:text-purple-800 whitespace-nowrap"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -3692,8 +3695,8 @@ export default function App() {
   }, []);
 
   // --- Actions ---
-  const showNotification = (msg, type = "success") => {
-    setNotification({ message: msg, type });
+  const showNotification = (msg, type = "success", onAction = null, actionLabel = "") => {
+    setNotification({ message: msg, type, onAction, actionLabel });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -3773,8 +3776,7 @@ export default function App() {
       };
     });
 
-    const successMsg = `Added to cart! <b onclick="window.dispatchEvent(new CustomEvent('openCart'))" style="text-decoration: underline; font-style: italic; cursor: pointer; margin-left: 8px;">View Bag</b>`;
-    showNotification(successMsg);
+    showNotification("Added to cart!", "success", () => setIsCartOpen(true), "View Bag");
   };
 
   const updateCartQty = (id, delta) => {
@@ -4168,7 +4170,7 @@ export default function App() {
       `}</style>
 
       {notification && (
-        <Notification {...notification} onClose={() => setNotification(null)} />
+        <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} onAction={notification.onAction} actionLabel={notification.actionLabel} />
       )}
 
       {/* HEADER */}
@@ -4203,11 +4205,11 @@ export default function App() {
           <div className="flex items-center gap-4">
             {isAdmin && (
               <button
-                onClick={() =>
-                  setViewMode((prev) =>
-                    prev === "shop" ? "dashboard" : "shop"
-                  )
-                }
+                onClick={() => {
+                  const next = viewMode === "shop" ? "dashboard" : "shop";
+                  setViewMode(next);
+                  navigate(next === "dashboard" ? "/admin" : "/");
+                }}
                 className="flex items-center gap-1.5 bg-purple-100 text-purple-800 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-sm font-bold hover:bg-purple-200 transition-colors shadow-sm"
               >
                 {viewMode === "shop" ? (
