@@ -39,7 +39,6 @@ import {
   Calendar,
   Copy,
   Upload,
-  ExternalLink,
   ChevronDown,
   Trash2,
   Eye,
@@ -67,8 +66,7 @@ import {
   Printer,
   ChevronUp,
   ArrowUp,
-  ArrowDown,
-  ArrowLeft
+  ArrowDown
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -228,8 +226,9 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick 
   const [loaded, setLoaded] = useState(false);
   return (
     <div
-      className={`aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group ${onClick ? "cursor-pointer" : ""}`}
+      className={`aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group/img ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
+      title={onClick ? "Quick View" : undefined}
     >
       {!loaded && (
         <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
@@ -242,7 +241,7 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick 
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${loaded ? "opacity-100" : "opacity-0"
+        className={`w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-700 ${loaded ? "opacity-100" : "opacity-0"
           }`}
         onError={(e) => {
           e.currentTarget.src =
@@ -273,6 +272,22 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick 
         </div>
       )}
 
+      {/* 👁 QUICK VIEW OVERLAY (Desktop: appears when hovering the product photo) */}
+      {onClick && (
+        <div className="absolute inset-0 z-20 hidden md:flex items-center justify-center pointer-events-none bg-black/0 group-hover/img:bg-black/45 transition-colors duration-300">
+          <span className="flex items-center gap-2 bg-white text-gray-900 text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-full shadow-xl opacity-0 scale-90 group-hover/img:opacity-100 group-hover/img:scale-100 transition-all duration-300">
+            <Eye size={15} /> Quick View
+          </span>
+        </div>
+      )}
+
+      {/* 👁 QUICK VIEW HINT (Mobile: always visible since phones have no hover) */}
+      {onClick && (
+        <div className="absolute bottom-2 right-2 z-20 flex md:hidden items-center gap-1 bg-black/55 backdrop-blur-[2px] text-white text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full shadow-md pointer-events-none">
+          <Eye size={11} /> Quick View
+        </div>
+      )}
+
       {/* OUT OF STOCK OVERLAY */}
       {stock === 0 && (
         <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[2px] z-30">
@@ -285,9 +300,30 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick 
   );
 };
 
-// --- 🖼️ FULL PAGE PRODUCT VIEW ---
-const ProductFullPage = ({ product, promotions, getProductPrice, onClose, onAddToCart }) => {
+// --- 👁 QUICK VIEW MODAL (Popup) ---
+const QuickViewModal = ({ product, promotions, getProductPrice, onClose, onAddToCart }) => {
+  const [copied, setCopied] = useState(false);
+
+  // Close the popup when pressing Escape
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  // Stop the page behind from scrolling while the popup is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   if (!product) return null;
+
   const priceInfo = getProductPrice ? getProductPrice(product) : { final: product.price, original: product.originalPrice };
   const activePromos = promotions ? promotions.filter(pr =>
     pr.active !== false && pr.showTag !== false &&
@@ -296,108 +332,159 @@ const ProductFullPage = ({ product, promotions, getProductPrice, onClose, onAddT
       (pr.scope === "specific" && (pr.targetSelections?.includes(product.id) || pr.productIds?.includes(product.id))))
   ) : [];
   const isSoldOut = product.stock === 0;
-  return (
-    <div className="fixed inset-0 z-[90] bg-white overflow-y-auto">
-      {/* Sticky Top Bar */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft size={18} /> Back to Shop
-        </button>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">
-          Full Page View
-        </span>
-        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500">
-          <X size={20} />
-        </button>
-      </div>
+  const productCode = product.code || product.id || "";
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 items-start">
-        {/* Image */}
-        <div className="relative rounded-2xl overflow-hidden bg-gray-100 border border-gray-100">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-auto max-h-[80vh] object-contain"
-            onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/600x750?text=Shepherdess+K-Beauty"; }}
-          />
-          {isSoldOut && (
-            <div className="absolute top-3 right-3 bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">
-              Sold Out
-            </div>
-          )}
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(productCode);
+    } catch (err) {
+      // Fallback for older browsers / non-secure contexts
+      const textArea = document.createElement("textarea");
+      textArea.value = productCode;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+      document.body.removeChild(textArea);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 overflow-y-auto"
+      onClick={onClose}
+    >
+      {/* Popup Card (clicking inside won't close it) */}
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto animate-modal-pop"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Popup Top Bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white/90 backdrop-blur-md border-b border-gray-100 rounded-t-2xl">
+          <span className="flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold text-purple-600 uppercase tracking-widest">
+            <Eye size={14} /> Quick View
+          </span>
+          <button
+            onClick={onClose}
+            className="p-2 -mr-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+            aria-label="Close quick view"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Details */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-[11px] bg-purple-50 text-purple-600 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-              {product.category}
-            </span>
-            {product.subcategory && (
-              <span className="text-[11px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-medium">
-                {product.subcategory}
-              </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 p-4 md:p-8 items-start">
+          {/* Image */}
+          <div className="relative rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-auto max-h-[38vh] md:max-h-[62vh] object-contain"
+              onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/600x750?text=Shepherdess+K-Beauty"; }}
+            />
+            {isSoldOut && (
+              <div className="absolute top-3 right-3 bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">
+                Sold Out
+              </div>
             )}
           </div>
 
-          <h1 className="text-2xl md:text-4xl font-serif font-bold text-gray-900 leading-tight">
-            {product.name}
-          </h1>
-
-          {product.expiryDate && (
-            <p className="text-sm font-bold text-red-500 flex items-center gap-1.5">
-              <Clock size={15} /> Expiry: {product.expiryDate}
-            </p>
-          )}
-
-          {activePromos.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {activePromos.map((pr) => (
-                pr.tagImage ? (
-                  <img key={pr.id} src={pr.tagImage} alt={pr.title} className="w-12 h-12 object-contain" />
-                ) : (
-                  <span key={pr.id} className="bg-gray-900 text-white text-[10px] px-2.5 py-1 rounded font-bold uppercase">
-                    {pr.title}
-                  </span>
-                )
-              ))}
-            </div>
-          )}
-
-          <div className="border-t border-gray-100 pt-5">
-            <div className="flex items-end gap-3 flex-wrap">
-              <span className="text-3xl md:text-4xl font-black text-purple-600">
-                {(priceInfo.final ?? product.price).toFixed(3)} BHD
+          {/* Details */}
+          <div className="flex flex-col gap-3 md:gap-4">
+            <div className="flex flex-wrap gap-2">
+              <span className="text-[10px] md:text-[11px] bg-purple-50 text-purple-600 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                {product.category}
               </span>
-              {priceInfo.original && priceInfo.original > priceInfo.final && (
-                <>
-                  <span className="text-lg text-gray-400 line-through">{priceInfo.original.toFixed(3)} BHD</span>
-                  <span className="bg-red-50 text-red-600 text-xs font-bold px-2 py-1 rounded border border-red-100 uppercase">
-                    Save {Math.round(((priceInfo.original - priceInfo.final) / priceInfo.original) * 100)}%
-                  </span>
-                </>
+              {product.subcategory && (
+                <span className="text-[10px] md:text-[11px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-medium">
+                  {product.subcategory}
+                </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {isSoldOut ? "Out of stock" : `${product.stock} in stock`}
+
+            <h1 className="text-xl md:text-3xl font-serif font-bold text-gray-900 leading-tight">
+              {product.name}
+            </h1>
+
+            {product.expiryDate && (
+              <p className="text-xs md:text-sm font-bold text-red-500 flex items-center gap-1.5">
+                <Clock size={14} /> Expiry: {product.expiryDate}
+              </p>
+            )}
+
+            {activePromos.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {activePromos.map((pr) => (
+                  pr.tagImage ? (
+                    <img key={pr.id} src={pr.tagImage} alt={pr.title} className="w-10 h-10 md:w-12 md:h-12 object-contain" />
+                  ) : (
+                    <span key={pr.id} className="bg-gray-900 text-white text-[10px] px-2.5 py-1 rounded font-bold uppercase">
+                      {pr.title}
+                    </span>
+                  )
+                ))}
+              </div>
+            )}
+
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-end gap-3 flex-wrap">
+                <span className="text-2xl md:text-3xl font-black text-purple-600">
+                  {(priceInfo.final ?? product.price).toFixed(3)} BHD
+                </span>
+                {priceInfo.original && priceInfo.original > priceInfo.final && (
+                  <>
+                    <span className="text-base md:text-lg text-gray-400 line-through">{priceInfo.original.toFixed(3)} BHD</span>
+                    <span className="bg-red-50 text-red-600 text-xs font-bold px-2 py-1 rounded border border-red-100 uppercase">
+                      Save {Math.round(((priceInfo.original - priceInfo.final) / priceInfo.original) * 100)}%
+                    </span>
+                  </>
+                )}
+              </div>
+              <p className="text-xs md:text-sm text-gray-500 mt-1">
+                {isSoldOut ? "Out of stock" : `${product.stock} in stock`}
+              </p>
+            </div>
+
+            <p className="text-gray-600 text-sm md:text-base leading-relaxed whitespace-pre-line">
+              {product.description || "No description available."}
             </p>
-          </div>
 
-          <p className="text-gray-600 text-sm md:text-base leading-relaxed whitespace-pre-line">
-            {product.description || "No description available."}
-          </p>
+            {/* 🏷️ Product Code + Copy Button */}
+            <div className="flex items-center gap-2 flex-wrap bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Product Code</span>
+              <span
+                className="font-mono text-[11px] md:text-xs text-gray-700 truncate max-w-[130px] md:max-w-[200px]"
+                title={productCode}
+              >
+                {productCode}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className={`ml-auto flex items-center gap-1.5 text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                  copied
+                    ? "bg-green-50 text-green-600 border-green-200"
+                    : "bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
+                }`}
+              >
+                {copied ? (
+                  <><Check size={13} /> Copied!</>
+                ) : (
+                  <><Copy size={13} /> Copy Code</>
+                )}
+              </button>
+            </div>
 
-          <div className="flex gap-3 mt-2">
-            <button
-              disabled={isSoldOut}
-              onClick={() => { onAddToCart(product); onClose(); }}
-              className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-900 text-white hover:bg-purple-600 hover:shadow-lg"}`}
-            >
-              <ShoppingBag size={18} /> {isSoldOut ? "Sold Out" : "Add to Bag"}
-            </button>
+            <div className="flex gap-3 mt-1">
+              <button
+                disabled={isSoldOut}
+                onClick={() => { onAddToCart(product); onClose(); }}
+                className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-900 text-white hover:bg-purple-600 hover:shadow-lg"}`}
+              >
+                <ShoppingBag size={18} /> {isSoldOut ? "Sold Out" : "Add to Bag"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3409,7 +3496,7 @@ export default function App() {
 
   // --- 3. UI STATES ---
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [fullPageProduct, setFullPageProduct] = useState(null);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [shopContent, setShopContent] = useState(INITIAL_CONTENT);
@@ -4322,7 +4409,7 @@ export default function App() {
                           : 0
                       }
                       activePromos={activePromosForProduct}
-                      onClick={() => setFullPageProduct(p)}
+                      onClick={() => setQuickViewProduct(p)}
                     />
 
                     <div className="flex-1 flex flex-col items-start text-left w-full">
@@ -4393,12 +4480,12 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* View Full Page Button */}
+                        {/* Quick View Button */}
                         <button
-                          onClick={() => setFullPageProduct(p)}
+                          onClick={() => setQuickViewProduct(p)}
                           className="w-full mt-2 py-2 rounded-lg text-[10px] md:text-[11px] font-bold flex items-center justify-center gap-1.5 bg-gray-50 text-gray-500 hover:bg-purple-50 hover:text-purple-700 transition-all border border-gray-100"
                         >
-                          <ExternalLink size={12} /> View Full Page
+                          <Eye size={12} /> Quick View
                         </button>
                       </div>
                     </div>
@@ -4847,13 +4934,13 @@ export default function App() {
         </div>
       )}
 
-      {/* FULL PAGE PRODUCT VIEW */}
-      {fullPageProduct && (
-        <ProductFullPage
-          product={fullPageProduct}
+      {/* QUICK VIEW POPUP */}
+      {quickViewProduct && (
+        <QuickViewModal
+          product={quickViewProduct}
           promotions={promotions}
           getProductPrice={getProductPrice}
-          onClose={() => setFullPageProduct(null)}
+          onClose={() => setQuickViewProduct(null)}
           onAddToCart={addToCart}
         />
       )}
