@@ -18,7 +18,6 @@ import {
 } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { Routes, Route, useNavigate, useParams, useLocation, Link, Navigate } from "react-router-dom";
 import {
   ShoppingBag,
   X,
@@ -282,54 +281,7 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
   );
 };
 
-
-// --- QUICK VIEW MODAL + SHAREABLE LINKS ---
-const slugify = (s) => (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-const categorySlug = (name) => slugify(name);
-const productSlug = (p) => `${slugify(p.name)}-${p.id.slice(0,6)}`;
-
-const QuickViewModal = ({ product, promotions, getProductPrice, onClose, onAddToCart, onViewFull }) => {
-  if (!product) return null;
-  const priceInfo = getProductPrice ? getProductPrice(product) : { final: product.price, original: product.originalPrice };
-  const activePromos = promotions ? promotions.filter(pr => pr.active!==false && pr.showTag!==false && (pr.scope==="all" || (pr.scope==="category" && (pr.targetSelections?.includes(product.category)||pr.targetSelections?.includes(product.subcategory))) || (pr.scope==="specific" && (pr.targetSelections?.includes(product.id)||pr.productIds?.includes(product.id))))) : [];
-  const shareUrl = `${window.location.origin}/product/${product.id}`;
-  const copyLink = () => { navigator.clipboard.writeText(shareUrl); alert("Link copied! " + shareUrl); };
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-bounce-in flex flex-col md:flex-row">
-        <button onClick={onClose} className="absolute top-3 right-3 z-10 bg-white/90 rounded-full p-2 shadow hover:bg-gray-100"><X size={18}/></button>
-        <div className="md:w-1/2 bg-gray-50 p-4 flex items-center justify-center">
-          <img src={product.image} alt={product.name} className="w-full h-full max-h-[420px] object-contain rounded-xl" onError={e=>e.currentTarget.src="https://via.placeholder.com/400x500?text=No+Image"} />
-        </div>
-        <div className="md:w-1/2 p-6 flex flex-col">
-          <div className="flex gap-2 mb-2">
-            <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-1 rounded-full font-bold uppercase">{product.category}</span>
-            {product.subcategory && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">{product.subcategory}</span>}
-            {product.stock===0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold">SOLD OUT</span>}
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 leading-tight">{product.name}</h3>
-          {product.expiryDate && <p className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1"><Clock size={12}/> Expiry: {product.expiryDate}</p>}
-          <p className="text-sm text-gray-500 mt-3 leading-relaxed">{product.description || "No description."}</p>
-          {activePromos.length>0 && <div className="flex flex-wrap gap-1 mt-3">{activePromos.map(pr=><span key={pr.id} className="bg-gray-900 text-white text-[10px] px-2 py-1 rounded font-bold uppercase">{pr.title}</span>)}</div>}
-          <div className="mt-4">
-            {priceInfo.original && priceInfo.original > priceInfo.final && <p className="text-xs text-gray-400 line-through">{priceInfo.original.toFixed(3)} BHD</p>}
-            <p className="text-2xl font-black text-purple-600">{(priceInfo.final ?? product.price).toFixed(3)} BHD</p>
-            <p className="text-xs text-gray-400">{product.stock>0 ? `${product.stock} in stock` : "Out of stock"}</p>
-          </div>
-          <div className="mt-6 flex gap-2">
-            <button disabled={product.stock===0} onClick={()=>{onAddToCart(product); onClose();}} className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${product.stock===0?"bg-gray-100 text-gray-400":"bg-gray-900 text-white hover:bg-purple-600"}`}><ShoppingBag size={18}/> {product.stock===0?"Sold Out":"Add to Bag"}</button>
-            <button onClick={copyLink} className="px-4 py-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50"><Copy size={18}/></button>
-          </div>
-          <button onClick={onViewFull} className="mt-3 text-sm font-bold text-purple-600 hover:underline flex items-center justify-center gap-1">View full page <ExternalLink size={14}/></button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // --- ADMIN DASHBOARD ---
-
 // --- 🧾 FINAL PERFECT PRINT RECEIPT ---
 const OrderReceiptModal = ({ order, onClose }) => {
   if (!order) return null;
@@ -688,7 +640,7 @@ const AdminDashboard = ({
   generateReceipt,
 }) => {
   const [orders, setOrders] = useState([]);
-  const [tab, setTab] = useState(sessionStorage.getItem("admin_tab") || "orders");
+  const [tab, setTab] = useState("orders");
   const [editableContent, setEditableContent] = useState(content);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [whatsappOrder, setWhatsappOrder] = useState(null);
@@ -1296,7 +1248,7 @@ const AdminDashboard = ({
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => { setTab(t.id); navigate(`/admin/${t.id}`); }}
+            onClick={() => setTab(t.id)}
             className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${tab === t.id
               ? "border-purple-600 text-purple-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
@@ -3752,67 +3704,6 @@ export default function App() {
   // New state for the input box
   const [appliedCodeInput, setAppliedCodeInput] = useState("");
 
-
-  // --- ROUTING HELPERS (real URLs) ---
-  const navigate = useNavigate();
-  const location = useLocation();
-  const params = useParams();
-  const [quickViewId, setQuickViewId] = useState(null);
-  // sync /product/:id and /c/:slug and /admin/:tab via URL
-  useEffect(() => {
-    const path = location.pathname;
-    // product deep link -> open quick view
-    const prodMatch = path.match(/^\/product\/([^/]+)/);
-    if (prodMatch) { setQuickViewId(prodMatch[1]); }
-    // category deep link
-    const catMatch = path.match(/^\/(c\/)?([^/]+)$/);
-    const knownCats = ["", "admin"];
-    // handle /skincare style  e.g. /skincare, /make-up, /c/skincare
-    const slugToCat = Object.keys(categories).find(c=> categorySlug(c)===catMatch?.[2]?.toLowerCase());
-    const subSlug = Object.values(categories).flat().find(s=> categorySlug(s)===catMatch?.[2]?.toLowerCase());
-    const promoSlug = promotions.find(p=> categorySlug(p.title)===catMatch?.[2]?.toLowerCase());
-    if (path.startsWith("/admin")) {
-      if (isAdmin) setViewMode("dashboard");
-    } else if (prodMatch) {
-      setViewMode("shop");
-    } else if (slugToCat) { setSelectedCategory(slugToCat); setViewMode("shop"); }
-    else if (subSlug) { setSelectedCategory(subSlug); setViewMode("shop"); }
-    else if (promoSlug) { setSelectedCategory(promoSlug.title); setViewMode("shop"); }
-    else if (path==="/" ) { /* keep All or reset */ }
-  }, [location.pathname, categories, promotions, isAdmin]);
-
-  const openQuickView = (product) => {
-    setQuickViewId(product.id);
-    navigate(`/product/${product.id}`, { replace: false });
-  };
-  const closeQuickView = () => {
-    setQuickViewId(null);
-    if (location.pathname.startsWith("/product/")) navigate("/", { replace: false });
-  };
-  const navigateCategory = (cat) => {
-    if (cat==="All") { setSelectedCategory("All"); navigate("/"); }
-    else {
-      setSelectedCategory(cat);
-      const slug = categorySlug(cat);
-      navigate(`/${slug}`);
-    }
-    setVisibleCount(12);
-    window.scrollTo({top:0, behavior:"smooth"});
-  };
-
-  const quickViewProduct = quickViewId ? products.find(p=>p.id===quickViewId) : null;
-  // sync admin tab from URL e.g. /admin/inventory
-  useEffect(()=>{
-    if(location.pathname.startsWith("/admin/")){
-      const tabFromUrl = location.pathname.split("/")[2];
-      if(tabFromUrl) {
-        // AdminDashboard has its own tab state, but we can signal via query? For now set viewMode and let dashboard read
-        // Use sessionStorage to pass desired tab
-        sessionStorage.setItem("admin_tab", tabFromUrl);
-      }
-    }
-  }, [location.pathname]);
-
   const toggleAdmin = () => {
     if (adminPin === "742472") {
       setIsAdmin(true);
@@ -4066,7 +3957,7 @@ export default function App() {
           <div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => {
-              navigate("/"); setViewMode("shop");
+              setViewMode("shop");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           >
@@ -4088,11 +3979,6 @@ export default function App() {
               </p>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1 text-xs font-bold">
-            <Link to="/" className={`px-3 py-1.5 rounded-full ${location.pathname==="/"?"bg-purple-600 text-white":"text-gray-500 hover:bg-gray-100"}`}>Shop</Link>
-            {Object.keys(categories).slice(0,3).map(c=> <Link key={c} to={`/${categorySlug(c)}`} className={`px-3 py-1.5 rounded-full capitalize ${categorySlug(c)===location.pathname.slice(1) ? "bg-purple-100 text-purple-700":"text-gray-500 hover:bg-gray-100"}`}>{c}</Link>)}
-            <Link to="/admin" className={`px-3 py-1.5 rounded-full ${location.pathname.startsWith("/admin")?"bg-gray-900 text-white":"text-gray-500 hover:bg-gray-100"}`}>Admin</Link>
-          </nav>
           <div className="flex items-center gap-4">
             {isAdmin && (
               <button
@@ -4271,7 +4157,7 @@ export default function App() {
               {/* Main Category Buttons */}
               <div className="flex flex-wrap gap-1.5 md:gap-2 justify-center">
                 <button
-                  onClick={() => navigateCategory("All")}
+                  onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
                   All
@@ -4281,7 +4167,7 @@ export default function App() {
                 {promotions.filter(p => p.showInMenu !== false && p.active !== false && isPromoActive(p)).map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => navigateCategory(p.title)}
+                    onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                   >
                     <Tag size={10} /> {p.title}
@@ -4292,7 +4178,7 @@ export default function App() {
                 {availableCategories.map((c) => (
                   <button
                     key={c}
-                    onClick={() => navigateCategory(c)}
+                    onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
                   >
                     {c}
@@ -4309,7 +4195,7 @@ export default function App() {
                   {displaySubcategories.map((sub) => (
                     <button
                       key={sub}
-                      onClick={() => navigateCategory(sub)}
+                      onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
                       className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
                         ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
                         : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
@@ -4378,7 +4264,7 @@ export default function App() {
                     className="group bg-white rounded-xl md:rounded-2xl p-2.5 md:p-4 shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-purple-100 flex flex-col relative"
                   >
 
-                    <div onClick={()=>openQuickView(p)} className="cursor-zoom-in w-full"><ProductImage
+                    <ProductImage
                       src={p.image}
                       alt={p.name}
                       stock={p.stock}
@@ -4389,8 +4275,8 @@ export default function App() {
                           : 0
                       }
                       activePromos={activePromosForProduct}
-                    /></div>
-                    <button onClick={(e)=>{e.stopPropagation(); openQuickView(p);}} className="absolute top-2 right-2 bg-white/90 backdrop-blur p-1.5 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"><Eye size={14} className="text-gray-700"/></button>
+                    />
+
                     <div className="flex-1 flex flex-col items-start text-left w-full">
                       {/* Category & Subcategory Tags */}
                       <div className="flex flex-wrap justify-start gap-1 mb-1 w-full">
@@ -4905,8 +4791,6 @@ export default function App() {
         </div>
       )}
 
-      {quickViewProduct && <QuickViewModal product={quickViewProduct} promotions={promotions} getProductPrice={getProductPrice} onClose={closeQuickView} onAddToCart={addToCart} onViewFull={()=>{ closeQuickView(); navigate(`/product/${quickViewProduct.id}`); setTimeout(()=> setQuickViewId(quickViewProduct.id), 50); }} />}
-      {/* Dedicated route modals for /product/:id direct load handled via quickViewProduct */}
       {/* FOOTER */}
       <footer className="bg-white border-t border-gray-200 py-12 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
