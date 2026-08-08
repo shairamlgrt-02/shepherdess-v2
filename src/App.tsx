@@ -67,7 +67,8 @@ import {
   Printer,
   ChevronUp,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ArrowLeft
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -223,10 +224,13 @@ const ExpandableTextGroup = ({ name, expiryDate, text }) => {
 };
 
 // --- Updated ProductImage Component (Now supports Custom Tag Images) ---
-const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
+const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick }) => {
   const [loaded, setLoaded] = useState(false);
   return (
-    <div className="aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group">
+    <div
+      className={`aspect-[4/5] bg-gray-100 rounded-xl mb-4 overflow-hidden relative group ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+    >
       {!loaded && (
         <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
           <Sparkles className="text-gray-300 w-8 h-8 animate-spin-slow" />
@@ -277,6 +281,126 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos }) => {
           </span>
         </div>
       )}
+    </div>
+  );
+};
+
+// --- 🖼️ FULL PAGE PRODUCT VIEW ---
+const ProductFullPage = ({ product, promotions, getProductPrice, onClose, onAddToCart }) => {
+  if (!product) return null;
+  const priceInfo = getProductPrice ? getProductPrice(product) : { final: product.price, original: product.originalPrice };
+  const activePromos = promotions ? promotions.filter(pr =>
+    pr.active !== false && pr.showTag !== false &&
+    (pr.scope === "all" ||
+      (pr.scope === "category" && (pr.targetSelections?.includes(product.category) || pr.targetSelections?.includes(product.subcategory))) ||
+      (pr.scope === "specific" && (pr.targetSelections?.includes(product.id) || pr.productIds?.includes(product.id))))
+  ) : [];
+  const isSoldOut = product.stock === 0;
+  return (
+    <div className="fixed inset-0 z-[90] bg-white overflow-y-auto">
+      {/* Sticky Top Bar */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft size={18} /> Back to Shop
+        </button>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">
+          Full Page View
+        </span>
+        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500">
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 items-start">
+        {/* Image */}
+        <div className="relative rounded-2xl overflow-hidden bg-gray-100 border border-gray-100">
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-auto max-h-[80vh] object-contain"
+            onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/600x750?text=Shepherdess+K-Beauty"; }}
+          />
+          {isSoldOut && (
+            <div className="absolute top-3 right-3 bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">
+              Sold Out
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="text-[11px] bg-purple-50 text-purple-600 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+              {product.category}
+            </span>
+            {product.subcategory && (
+              <span className="text-[11px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-medium">
+                {product.subcategory}
+              </span>
+            )}
+          </div>
+
+          <h1 className="text-2xl md:text-4xl font-serif font-bold text-gray-900 leading-tight">
+            {product.name}
+          </h1>
+
+          {product.expiryDate && (
+            <p className="text-sm font-bold text-red-500 flex items-center gap-1.5">
+              <Clock size={15} /> Expiry: {product.expiryDate}
+            </p>
+          )}
+
+          {activePromos.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activePromos.map((pr) => (
+                pr.tagImage ? (
+                  <img key={pr.id} src={pr.tagImage} alt={pr.title} className="w-12 h-12 object-contain" />
+                ) : (
+                  <span key={pr.id} className="bg-gray-900 text-white text-[10px] px-2.5 py-1 rounded font-bold uppercase">
+                    {pr.title}
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+
+          <div className="border-t border-gray-100 pt-5">
+            <div className="flex items-end gap-3 flex-wrap">
+              <span className="text-3xl md:text-4xl font-black text-purple-600">
+                {(priceInfo.final ?? product.price).toFixed(3)} BHD
+              </span>
+              {priceInfo.original && priceInfo.original > priceInfo.final && (
+                <>
+                  <span className="text-lg text-gray-400 line-through">{priceInfo.original.toFixed(3)} BHD</span>
+                  <span className="bg-red-50 text-red-600 text-xs font-bold px-2 py-1 rounded border border-red-100 uppercase">
+                    Save {Math.round(((priceInfo.original - priceInfo.final) / priceInfo.original) * 100)}%
+                  </span>
+                </>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {isSoldOut ? "Out of stock" : `${product.stock} in stock`}
+            </p>
+          </div>
+
+          <p className="text-gray-600 text-sm md:text-base leading-relaxed whitespace-pre-line">
+            {product.description || "No description available."}
+          </p>
+
+          <div className="flex gap-3 mt-2">
+            <button
+              disabled={isSoldOut}
+              onClick={() => { onAddToCart(product); onClose(); }}
+              className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-900 text-white hover:bg-purple-600 hover:shadow-lg"}`}
+            >
+              <ShoppingBag size={18} /> {isSoldOut ? "Sold Out" : "Add to Bag"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -3285,6 +3409,7 @@ export default function App() {
 
   // --- 3. UI STATES ---
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [fullPageProduct, setFullPageProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [shopContent, setShopContent] = useState(INITIAL_CONTENT);
@@ -3716,33 +3841,6 @@ export default function App() {
     }
   };
 
-  const availableCategories = useMemo(
-    () =>
-      Object.keys(categories).filter((cat) =>
-        products.some((p) => p.active && p.category === cat)
-      ),
-    [categories, products]
-  );
-
-  // NEW: Calculate Current Main Category based on Selection
-  const currentMainCategory = useMemo(() => {
-    if (categories[selectedCategory]) return selectedCategory; // Is a Main Category
-    // Check if it's a subcategory
-    const mainParent = Object.keys(categories).find((main) =>
-      categories[main].includes(selectedCategory)
-    );
-    return mainParent || null;
-  }, [selectedCategory, categories]);
-
-  // NEW: Subcategories to display (only if they have active products)
-  const displaySubcategories = useMemo(() => {
-    if (!currentMainCategory) return [];
-    const subs = categories[currentMainCategory] || [];
-    return subs.filter((sub) =>
-      products.some((p) => p.active && p.subcategory === sub)
-    );
-  }, [currentMainCategory, categories, products]);
-
   // --- HELPER: CHECK IF NEW (14 DAYS) ---
   const isNewArrival = (createdAt) => {
     if (!createdAt) return false;
@@ -3762,7 +3860,9 @@ export default function App() {
     let result = products.filter((p) => {
       if (!p.active && !isAdmin) return false;
       if (hideOutOfStock && p.stock === 0) return false;
-      const matchesSearch = (p.name || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.subcategory || "").toLowerCase().includes(searchQuery.toLowerCase());
 
       let matchesCategory = false;
       if (selectedCategory === "All") matchesCategory = true;
@@ -4153,59 +4253,6 @@ export default function App() {
                 />
                 <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
               </div>
-
-              {/* Main Category Buttons */}
-              <div className="flex flex-wrap gap-1.5 md:gap-2 justify-center">
-                <button
-                  onClick={() => { setSelectedCategory("All"); setVisibleCount(12); }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === "All" ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-                >
-                  All
-                </button>
-
-                {/* Promotions/Sales Tabs */}
-                {promotions.filter(p => p.showInMenu !== false && p.active !== false && isPromoActive(p)).map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => { setSelectedCategory(p.title); setVisibleCount(12); }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-all ${selectedCategory === p.title ? "bg-red-500 text-white shadow-md" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
-                  >
-                    <Tag size={10} /> {p.title}
-                  </button>
-                ))}
-
-                {/* Dynamic Main Categories */}
-                {availableCategories.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => { setSelectedCategory(c); setVisibleCount(12); }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === c || currentMainCategory === c ? "bg-purple-600 text-white shadow-md transform scale-105" : "bg-gray-100 hover:bg-gray-200"}`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-
-              {/* NEW: Subcategory Filter Strip (Only shows when a Main Category is active) */}
-              {displaySubcategories.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center pt-3 border-t border-gray-50 animate-fade-in">
-                  <span className="w-full text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Filter {currentMainCategory}:
-                  </span>
-                  {displaySubcategories.map((sub) => (
-                    <button
-                      key={sub}
-                      onClick={() => { setSelectedCategory(sub); setVisibleCount(12); }}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${selectedCategory === sub
-                        ? "bg-purple-100 border-purple-300 text-purple-700 shadow-sm"
-                        : "bg-white border-gray-100 text-gray-500 hover:border-purple-200"
-                        }`}
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 2. THE STICKY CONTROL BAR */}
@@ -4275,6 +4322,7 @@ export default function App() {
                           : 0
                       }
                       activePromos={activePromosForProduct}
+                      onClick={() => setFullPageProduct(p)}
                     />
 
                     <div className="flex-1 flex flex-col items-start text-left w-full">
@@ -4344,6 +4392,14 @@ export default function App() {
                             )}
                           </div>
                         )}
+
+                        {/* View Full Page Button */}
+                        <button
+                          onClick={() => setFullPageProduct(p)}
+                          className="w-full mt-2 py-2 rounded-lg text-[10px] md:text-[11px] font-bold flex items-center justify-center gap-1.5 bg-gray-50 text-gray-500 hover:bg-purple-50 hover:text-purple-700 transition-all border border-gray-100"
+                        >
+                          <ExternalLink size={12} /> View Full Page
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -4789,6 +4845,17 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* FULL PAGE PRODUCT VIEW */}
+      {fullPageProduct && (
+        <ProductFullPage
+          product={fullPageProduct}
+          promotions={promotions}
+          getProductPrice={getProductPrice}
+          onClose={() => setFullPageProduct(null)}
+          onAddToCart={addToCart}
+        />
       )}
 
       {/* FOOTER */}
