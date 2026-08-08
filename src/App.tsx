@@ -38,6 +38,7 @@ import {
   Users,
   Calendar,
   Copy,
+  Share,
   Upload,
   ChevronDown,
   Trash2,
@@ -68,6 +69,7 @@ import {
   ArrowUp,
   ArrowDown
 } from "lucide-react";
+import { Routes, Route, useNavigate, useLocation, Link } from "react-router-dom";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -303,6 +305,7 @@ const ProductImage = ({ src, alt, stock, discount, isNew, activePromos, onClick 
 // --- 👁 QUICK VIEW MODAL (Popup) ---
 const QuickViewModal = ({ product, promotions, getProductPrice, onClose, onAddToCart }) => {
   const [copied, setCopied] = useState(false);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   // Close the popup when pressing Escape
   useEffect(() => {
@@ -334,20 +337,17 @@ const QuickViewModal = ({ product, promotions, getProductPrice, onClose, onAddTo
   const isSoldOut = product.stock === 0;
   const productCode = product.code || product.id || "";
 
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(productCode);
-    } catch (err) {
-      // Fallback for older browsers / non-secure contexts
-      const textArea = document.createElement("textarea");
-      textArea.value = productCode;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try { document.execCommand("copy"); } catch (e) { /* ignore */ }
-      document.body.removeChild(textArea);
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/product/${product.id}`;
+    try { await navigator.clipboard.writeText(url); }
+    catch (err) {
+      const ta = document.createElement("textarea"); ta.value = url;
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch(e) {}
+      document.body.removeChild(ta);
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setShowCopiedToast(true);
+    setTimeout(() => { setCopied(false); setShowCopiedToast(false); }, 2000);
   };
 
   return (
@@ -450,39 +450,27 @@ const QuickViewModal = ({ product, promotions, getProductPrice, onClose, onAddTo
               {product.description || "No description available."}
             </p>
 
-            {/* 🏷️ Product Code + Copy Button */}
-            <div className="flex items-center gap-2 flex-wrap bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
-              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Product Code</span>
-              <span
-                className="font-mono text-[11px] md:text-xs text-gray-700 truncate max-w-[130px] md:max-w-[200px]"
-                title={productCode}
-              >
-                {productCode}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className={`ml-auto flex items-center gap-1.5 text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
-                  copied
-                    ? "bg-green-50 text-green-600 border-green-200"
-                    : "bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
-                }`}
-              >
-                {copied ? (
-                  <><Check size={13} /> Copied!</>
-                ) : (
-                  <><Copy size={13} /> Copy Code</>
-                )}
-              </button>
-            </div>
-
-            <div className="flex gap-3 mt-1">
+            <div className="flex gap-3 mt-1 relative">
               <button
                 disabled={isSoldOut}
                 onClick={() => { onAddToCart(product); onClose(); }}
                 className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-900 text-white hover:bg-purple-600 hover:shadow-lg"}`}
               >
                 <ShoppingBag size={18} /> {isSoldOut ? "Sold Out" : "Add to Bag"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all border ${
+                  copied ? "bg-green-50 text-green-600 border-green-200" : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200"
+                }`}
+              >
+                {copied ? <Check size={18} /> : <Share size={18} />}
+                {showCopiedToast && (
+                  <span className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg whitespace-nowrap">
+                    Link copied!
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -851,7 +839,7 @@ const AdminDashboard = ({
   generateReceipt,
 }) => {
   const [orders, setOrders] = useState([]);
-  const [tab, setTab] = useState("orders");
+  const [tab, setTab] = useState(() => { const s = sessionStorage.getItem("shepherdess_admin_tab"); if(s) { sessionStorage.removeItem("shepherdess_admin_tab"); return s; } return "orders"; });
   const [editableContent, setEditableContent] = useState(content);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [whatsappOrder, setWhatsappOrder] = useState(null);
@@ -3185,6 +3173,23 @@ const AdminDashboard = ({
     </div>
   );
 };
+// --- URL HELPERS ---
+const slugify = (str) =>
+  (str || "").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+
+const buildSlugMap = (cats, proms) => {
+  const m = {};
+  Object.keys(cats||{}).forEach(cat => {
+    m[slugify(cat)] = { type: "category", value: cat };
+    (cats[cat]||[]).forEach(sub => { m[slugify(sub)] = { type: "subcategory", value: sub }; });
+  });
+  (proms||[]).forEach(pr => {
+    if(pr.title && pr.showInMenu !== false && pr.type === "collection")
+      m[slugify(pr.title)] = { type: "promo", value: pr.title };
+  });
+  return m;
+};
+
 // --- MAIN APP ---
 export default function App() {
   useEffect(() => {
@@ -3527,6 +3532,34 @@ export default function App() {
   // --- 5. MARKETING ENGINE (The New Logic) ---
   const [appliedCode, setAppliedCode] = useState(null); // Stores: { code, value, type, id }
   const [promoError, setPromoError] = useState("");
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const slugMap = useMemo(() => buildSlugMap(categories, promotions), [categories, promotions]);
+  useEffect(() => {
+    const p = location.pathname;
+    if(!p||p==="/"){setSelectedCategory("All");setViewMode("shop");setQuickViewProduct(null);return;}
+    if(p.startsWith("/admin")){setViewMode("dashboard");const t=p.replace("/admin","").replace(/^\//,"");if(t)sessionStorage.setItem("shepherdess_admin_tab",t);return;}
+    const pm=p.match(/^\/product\/(.+)$/);
+    if(pm){setViewMode("shop");const f=products.find(x=>x.id===pm[1]);if(f){setSelectedCategory("All");setQuickViewProduct(f);}return;}
+    const s=p.replace(/^\//,"").replace(/\/$/,"");const m=slugMap[s];
+    if(m){setViewMode("shop");setQuickViewProduct(null);if(m.type==="category"||m.type==="subcategory")setSelectedCategory(m.value);else if(m.type==="promo")setSelectedCategory(m.value);}
+  },[location.pathname,products,slugMap]);
+  const navigateCategory = (cat) => {
+    if(cat==="All"){navigate("/");return;}
+    const pr=promotions.find(x=>x.title===cat&&x.showInMenu!==false&&x.type==="collection");
+    if(pr){navigate(`/${slugify(pr.title)}`);return;}
+    navigate(`/${slugify(cat)}`);
+  };
+  const openQuickView = (product) => {
+    setQuickViewProduct(product);
+    if(product&&product.id)navigate(`/product/${product.id}`,{replace:true});
+  };
+  const closeQuickView = () => {
+    setQuickViewProduct(null);
+    if(selectedCategory&&selectedCategory!=="All")navigate(`/${slugify(selectedCategory)}`,{replace:true});
+    else navigate("/",{replace:true});
+  };
 
   // A. Helper: Check if a promo is active based on exact dates & times
   const isPromoActive = (promo) => {
@@ -4141,7 +4174,8 @@ export default function App() {
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-purple-100">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-20">
-          <div
+          <Link
+            to="/"
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => {
               setViewMode("shop");
@@ -4165,7 +4199,7 @@ export default function App() {
                 K-Beauty
               </p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
             {isAdmin && (
               <button
@@ -4207,8 +4241,9 @@ export default function App() {
       </header>
 
       {/* DASHBOARD OR SHOP */}
-      {viewMode === "dashboard" && isAdmin ? (
-        <AdminDashboard
+      <Routes>
+        <Route path="/admin/*" element={isAdmin ? (
+              <AdminDashboard
           db={db}
           products={products}
           content={shopContent}
@@ -4231,6 +4266,11 @@ export default function App() {
           generateReceipt={generateReceipt}
         />
       ) : (
+              <div className="min-h-[60vh] flex items-center justify-center"><div className="text-center"><Lock size={48} className="mx-auto text-gray-300 mb-4"/><p className="text-gray-500">Admin access required.</p><button onClick={()=>setShowAdminLogin(true)} className="mt-4 text-purple-600 font-bold hover:underline">Enter PIN</button></div></div>
+            )
+          }
+        />
+        <Route path="/*" element={
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="text-center mb-6 md:mb-8">
 
@@ -4328,8 +4368,6 @@ export default function App() {
 
             {/* 1. TOP FILTERS */}
             <div id="product-grid" className="flex flex-col gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-
-              {/* Search Bar */}
               <div className="relative w-full">
                 <input
                   type="text"
@@ -4340,6 +4378,24 @@ export default function App() {
                 />
                 <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
               </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button onClick={()=>navigateCategory("All")} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory==="All"?"bg-purple-600 text-white border-purple-600 shadow-sm":"bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"}`}>All</button>
+                {Object.entries(categories).map(([cat])=>{
+                  const hp=products.some(p=>p.category===cat&&(p.active||isAdmin));
+                  if(!hp)return null;
+                  return <button key={cat} onClick={()=>navigateCategory(cat)} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory===cat?"bg-purple-600 text-white border-purple-600 shadow-sm":"bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"}`}>{cat}</button>;
+                })}
+                {promotions.filter(pr=>pr.showInMenu!==false&&pr.type==="collection").map(promo=>(
+                  <button key={promo.id} onClick={()=>navigateCategory(promo.title)} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory===promo.title?"bg-red-500 text-white border-red-500 shadow-sm":"bg-white text-red-500 border-red-200 hover:border-red-300 hover:bg-red-50"}`}>{promo.title}</button>
+                ))}
+              </div>
+              {(()=>{
+                const ac=selectedCategory!=="All"&&categories[selectedCategory]?selectedCategory:null;
+                const subs=ac?(categories[ac]||[]):[];
+                const vs=subs.filter(sub=>products.some(p=>p.subcategory===sub&&(p.active||isAdmin)));
+                if(ac&&vs.length>0)return <div className="flex flex-wrap justify-center gap-1.5 pt-1 border-t border-gray-100">{vs.map(sub=><button key={sub} onClick={()=>navigateCategory(sub)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedCategory===sub?"bg-purple-100 text-purple-600 border-purple-200":"bg-gray-50 text-gray-500 border-gray-100 hover:border-purple-200 hover:text-purple-500"}`}>{sub}</button>)}</div>;
+                return null;
+              })()}
             </div>
 
             {/* 2. THE STICKY CONTROL BAR */}
@@ -4409,7 +4465,7 @@ export default function App() {
                           : 0
                       }
                       activePromos={activePromosForProduct}
-                      onClick={() => setQuickViewProduct(p)}
+                      onClick={() => openQuickView(p)}
                     />
 
                     <div className="flex-1 flex flex-col items-start text-left w-full">
@@ -4480,13 +4536,7 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Quick View Button */}
-                        <button
-                          onClick={() => setQuickViewProduct(p)}
-                          className="w-full mt-2 py-2 rounded-lg text-[10px] md:text-[11px] font-bold flex items-center justify-center gap-1.5 bg-gray-50 text-gray-500 hover:bg-purple-50 hover:text-purple-700 transition-all border border-gray-100"
-                        >
-                          <Eye size={12} /> Quick View
-                        </button>
+
                       </div>
                     </div>
                   </div>
@@ -4506,7 +4556,9 @@ export default function App() {
             )}
           </div>
         </main>
-      )}
+        }
+        />
+      </Routes>
 
       {/* CART */}
       {isCartOpen && (
@@ -4940,7 +4992,7 @@ export default function App() {
           product={quickViewProduct}
           promotions={promotions}
           getProductPrice={getProductPrice}
-          onClose={() => setQuickViewProduct(null)}
+          onClose={closeQuickView}
           onAddToCart={addToCart}
         />
       )}
