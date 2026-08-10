@@ -3180,10 +3180,33 @@ const AdminDashboard = ({
 // These price groups are deliberately fixed, so products move between them
 // automatically whenever their live selling price changes.
 const PRICE_FILTERS = [
-  { id: "below-1", slug: "below-1-bhd", label: "Below 1 BHD", min: 0, max: 1 },
-  { id: "1-bhd", slug: "1-to-1-99-bhd", label: "1–1.99 BHD", min: 1, max: 2 },
-  { id: "2-bhd", slug: "2-to-2-99-bhd", label: "2–2.99 BHD", min: 2, max: 3 },
-  { id: "3-bhd", slug: "3-to-3-99-bhd", label: "3–3.99 BHD", min: 3, max: 4 },
+  {
+    id: "1-bhd",
+    slug: "1-bhd",
+    aliases: ["below-1-bhd", "1-to-1-99-bhd"],
+    label: "1 BHD",
+    rangeLabel: "0–1.99 BHD",
+    min: 0,
+    max: 2,
+  },
+  {
+    id: "2-bhd",
+    slug: "2-bhd",
+    aliases: ["2-to-2-99-bhd"],
+    label: "2 BHD",
+    rangeLabel: "2–2.99 BHD",
+    min: 2,
+    max: 3,
+  },
+  {
+    id: "3-bhd",
+    slug: "3-bhd",
+    aliases: ["3-to-3-99-bhd"],
+    label: "3 BHD",
+    rangeLabel: "3–3.99 BHD",
+    min: 3,
+    max: 4,
+  },
 ];
 
 const getPriceFilterPath = (priceFilter) => `/price/${priceFilter.slug}`;
@@ -3588,7 +3611,10 @@ export default function App() {
 
     const pricePathMatch = path.match(/^\/price\/([^/]+)\/?$/);
     if (pricePathMatch) {
-      const priceFilter = PRICE_FILTERS.find((item) => item.slug === pricePathMatch[1]);
+      const requestedPriceSlug = pricePathMatch[1];
+      const priceFilter = PRICE_FILTERS.find((item) =>
+        item.slug === requestedPriceSlug || item.aliases?.includes(requestedPriceSlug)
+      );
       if (priceFilter) {
         setViewMode("shop");
         setQuickViewProduct(null);
@@ -4513,7 +4539,7 @@ export default function App() {
                       key={priceFilter.id}
                       to={getPriceFilterPath(priceFilter)}
                       aria-current={isSelected ? "page" : undefined}
-                      title={`Show products priced ${priceFilter.label}`}
+                      title={`Show products from ${priceFilter.rangeLabel}`}
                       className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${isSelected
                         ? "bg-red-500 text-white border-red-500 shadow-sm"
                         : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:border-red-300"
@@ -4587,7 +4613,7 @@ export default function App() {
                 <div className="col-span-2 lg:col-span-4 rounded-2xl border border-dashed border-red-200 bg-white px-6 py-12 text-center">
                   <Tag size={28} className="mx-auto mb-3 text-red-300" />
                   <h3 className="text-lg font-bold text-gray-900">
-                    {activePriceFilter ? `No items ${activePriceFilter.label} right now` : "No products found"}
+                    {activePriceFilter ? `No ${activePriceFilter.label} items right now` : "No products found"}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
                     {activePriceFilter
