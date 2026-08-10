@@ -3177,6 +3177,24 @@ const AdminDashboard = ({
   );
 };
 // --- URL HELPERS ---
+// These price groups are deliberately fixed, so products move between them
+// automatically whenever their live selling price changes.
+const PRICE_FILTERS = [
+  { id: "below-1", slug: "below-1-bhd", label: "Below 1 BHD", min: 0, max: 1 },
+  { id: "1-bhd", slug: "1-to-1-99-bhd", label: "1–1.99 BHD", min: 1, max: 2 },
+  { id: "2-bhd", slug: "2-to-2-99-bhd", label: "2–2.99 BHD", min: 2, max: 3 },
+  { id: "3-bhd", slug: "3-to-3-99-bhd", label: "3–3.99 BHD", min: 3, max: 4 },
+];
+
+const getPriceFilterPath = (priceFilter) => `/price/${priceFilter.slug}`;
+
+const isPriceInFilter = (price, priceFilter) => {
+  const numericPrice = Number(price);
+  return Number.isFinite(numericPrice) &&
+    numericPrice >= priceFilter.min &&
+    numericPrice < priceFilter.max;
+};
+
 const slugify = (str) =>
   (str || "").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
 
@@ -3506,6 +3524,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [shopContent, setShopContent] = useState(INITIAL_CONTENT);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -3539,29 +3558,99 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const slugMap = useMemo(() => buildSlugMap(categories, promotions), [categories, promotions]);
+  const activePriceFilter = PRICE_FILTERS.find((priceFilter) => priceFilter.id === selectedPriceFilter) || null;
+
   useEffect(() => {
-    const p = location.pathname;
-    if(!p||p==="/"){setSelectedCategory("All");setViewMode("shop");setQuickViewProduct(null);return;}
-    if(p.startsWith("/admin")){setViewMode("dashboard");const t=p.replace("/admin","").replace(/^\//,"");if(t)sessionStorage.setItem("shepherdess_admin_tab",t);return;}
-    const pm=p.match(/^\/product\/(.+)$/);
-    if(pm){setViewMode("shop");const f=products.find(x=>x.id===pm[1]);if(f){setSelectedCategory("All");setQuickViewProduct(f);}return;}
-    const s=p.replace(/^\//,"").replace(/\/$/,"");const m=slugMap[s];
-    if(m){setViewMode("shop");setQuickViewProduct(null);if(m.type==="category"||m.type==="subcategory")setSelectedCategory(m.value);else if(m.type==="promo")setSelectedCategory(m.value);}
-  },[location.pathname,products,slugMap]);
+    const path = location.pathname;
+
+    if (!path || path === "/") {
+      setSelectedCategory("All");
+      setSelectedPriceFilter(null);
+      setViewMode("shop");
+      setQuickViewProduct(null);
+      return;
+    }
+
+    if (path.startsWith("/admin")) {
+      setViewMode("dashboard");
+      const tab = path.replace("/admin", "").replace(/^\//, "");
+      if (tab) sessionStorage.setItem("shepherdess_admin_tab", tab);
+      return;
+    }
+
+    const productMatch = path.match(/^\/product\/(.+)$/);
+    if (productMatch) {
+      setViewMode("shop");
+      const product = products.find((item) => item.id === productMatch[1]);
+      if (product) setQuickViewProduct(product);
+      return;
+    }
+
+    const pricePathMatch = path.match(/^\/price\/([^/]+)\/?$/);
+    if (pricePathMatch) {
+      const priceFilter = PRICE_FILTERS.find((item) => item.slug === pricePathMatch[1]);
+      if (priceFilter) {
+        setViewMode("shop");
+        setQuickViewProduct(null);
+        setSelectedCategory("All");
+        setSelectedPriceFilter(priceFilter.id);
+        return;
+      }
+    }
+
+    const slug = path.replace(/^\//, "").replace(/\/$/, "");
+    const match = slugMap[slug];
+    if (match) {
+      setViewMode("shop");
+      setQuickViewProduct(null);
+      setSelectedPriceFilter(null);
+      if (match.type === "category" || match.type === "subcategory" || match.type === "promo") {
+        setSelectedCategory(match.value);
+      }
+      return;
+    }
+
+    // Do not leave a stale filter selected on an unrecognised storefront URL.
+    setViewMode("shop");
+    setQuickViewProduct(null);
+    setSelectedCategory("All");
+    setSelectedPriceFilter(null);
+  }, [location.pathname, products, slugMap]);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [selectedCategory, selectedPriceFilter, searchQuery]);
+
   const navigateCategory = (cat) => {
-    if(cat==="All"){navigate("/");return;}
-    const pr=promotions.find(x=>x.title===cat&&x.showInMenu!==false&&x.type==="collection");
-    if(pr){navigate(`/${slugify(pr.title)}`);return;}
+    setSelectedPriceFilter(null);
+    if (cat === "All") {
+      navigate("/");
+      return;
+    }
+    const promo = promotions.find((item) =>
+      item.title === cat && item.showInMenu !== false && item.type === "collection"
+    );
+    if (promo) {
+      navigate(`/${slugify(promo.title)}`);
+      return;
+    }
     navigate(`/${slugify(cat)}`);
   };
+
   const openQuickView = (product) => {
     setQuickViewProduct(product);
-    if(product&&product.id)navigate(`/product/${product.id}`,{replace:true});
+    if (product && product.id) navigate(`/product/${product.id}`, { replace: true });
   };
+
   const closeQuickView = () => {
     setQuickViewProduct(null);
-    if(selectedCategory&&selectedCategory!=="All")navigate(`/${slugify(selectedCategory)}`,{replace:true});
-    else navigate("/",{replace:true});
+    if (activePriceFilter) {
+      navigate(getPriceFilterPath(activePriceFilter), { replace: true });
+    } else if (selectedCategory && selectedCategory !== "All") {
+      navigate(`/${slugify(selectedCategory)}`, { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
   };
 
   // A. Helper: Check if a promo is active based on exact dates & times
@@ -3999,13 +4088,18 @@ export default function App() {
         }
       }
 
+      // Price collections always use the live customer-facing price, including
+      // any automatic sale that is currently active.
+      const matchesPrice = !activePriceFilter ||
+        isPriceInFilter(getProductPrice(p).final, activePriceFilter);
+
       // ✨ NEW: Strict "New Arrivals" Filter
       // If they selected "New Arrivals", strictly hide any product that doesn't have the "NEW" tag!
       if (sortOption === "newest" && !isNewArrival(p.createdAt)) {
         return false;
       }
 
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSearch && matchesPrice;
     });
     // 🌟 INJECT LIVE SALE PRICES GLOBALLY (SYNCED WITH MASTER HELPER)
     result = result.map(p => {
@@ -4044,6 +4138,7 @@ export default function App() {
   }, [
     products,
     selectedCategory,
+    selectedPriceFilter,
     searchQuery,
     isAdmin,
     categories,
@@ -4381,14 +4476,65 @@ export default function App() {
                 <Search size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                <button onClick={()=>navigateCategory("All")} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory==="All"?"bg-purple-600 text-white border-purple-600 shadow-sm":"bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"}`}>All</button>
-                {Object.entries(categories).map(([cat])=>{
-                  const hp=products.some(p=>p.category===cat&&(p.active||isAdmin));
-                  if(!hp)return null;
-                  return <button key={cat} onClick={()=>navigateCategory(cat)} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory===cat?"bg-purple-600 text-white border-purple-600 shadow-sm":"bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"}`}>{cat}</button>;
+                <button
+                  onClick={() => navigateCategory("All")}
+                  className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory === "All" && !activePriceFilter
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"
+                  }`}
+                >
+                  All
+                </button>
+
+                {Object.entries(categories).map(([cat]) => {
+                  const hasProducts = products.some((product) =>
+                    product.category === cat && (product.active || isAdmin)
+                  );
+                  if (!hasProducts) return null;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => navigateCategory(cat)}
+                      className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory === cat
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
                 })}
-                {promotions.filter(pr=>pr.showInMenu!==false&&pr.type==="collection").map(promo=>(
-                  <button key={promo.id} onClick={()=>navigateCategory(promo.title)} className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory===promo.title?"bg-red-500 text-white border-red-500 shadow-sm":"bg-white text-red-500 border-red-200 hover:border-red-300 hover:bg-red-50"}`}>{promo.title}</button>
+
+                {/* Automatic, shareable price collections */}
+                {PRICE_FILTERS.map((priceFilter) => {
+                  const isSelected = selectedPriceFilter === priceFilter.id;
+                  return (
+                    <Link
+                      key={priceFilter.id}
+                      to={getPriceFilterPath(priceFilter)}
+                      aria-current={isSelected ? "page" : undefined}
+                      title={`Show products priced ${priceFilter.label}`}
+                      className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${isSelected
+                        ? "bg-red-500 text-white border-red-500 shadow-sm"
+                        : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:border-red-300"
+                      }`}
+                    >
+                      {priceFilter.label}
+                    </Link>
+                  );
+                })}
+
+                {promotions.filter((promo) => promo.showInMenu !== false && promo.type === "collection").map((promo) => (
+                  <button
+                    key={promo.id}
+                    onClick={() => navigateCategory(promo.title)}
+                    className={`px-4 py-1.5 rounded-full text-[11px] md:text-xs font-bold transition-all border ${selectedCategory === promo.title
+                      ? "bg-red-500 text-white border-red-500 shadow-sm"
+                      : "bg-white text-red-500 border-red-200 hover:border-red-300 hover:bg-red-50"
+                    }`}
+                  >
+                    {promo.title}
+                  </button>
                 ))}
               </div>
               {(()=>{
@@ -4437,6 +4583,30 @@ export default function App() {
 
             {/* UPDATED: 2 Columns on Mobile, 4 on Desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
+              {displayedProducts.length === 0 && (
+                <div className="col-span-2 lg:col-span-4 rounded-2xl border border-dashed border-red-200 bg-white px-6 py-12 text-center">
+                  <Tag size={28} className="mx-auto mb-3 text-red-300" />
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {activePriceFilter ? `No items ${activePriceFilter.label} right now` : "No products found"}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {activePriceFilter
+                      ? "This collection updates automatically whenever product prices change."
+                      : "Try another search or filter."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      navigateCategory("All");
+                    }}
+                    className="mt-5 rounded-full bg-gray-900 px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-600"
+                  >
+                    View all products
+                  </button>
+                </div>
+              )}
+
               {displayedProducts.map((p) => {
 
                 const activePromosForProduct = promotions.filter(promo =>
