@@ -3533,7 +3533,9 @@ export default function App() {
   });
 
   // --- 5. MARKETING ENGINE (The New Logic) ---
-  const [appliedCode, setAppliedCode] = useState(null); // Stores: { code, value, type, id }
+  // 🧺 STACKING RULES: at most ONE discount code (percentage OR fixed) + ONE free-delivery code.
+  const [appliedDiscount, setAppliedDiscount] = useState(null); // { code, discount, id, type } — % or fixed
+  const [appliedDelivery, setAppliedDelivery] = useState(null); // { code, discount, id, type: 'free_delivery' }
   const [promoError, setPromoError] = useState("");
 
   const navigate = useNavigate();
@@ -3592,7 +3594,19 @@ export default function App() {
 
     if (!relevantPromo) return { final: product.price, original: product.originalPrice, isSale: false };
 
-    // 2. Calculate simple discount
+    // 2. ✨ CUSTOM PRICE OVERRIDE (per-product override set in the Promotions tab)
+    const customOverride = relevantPromo.customPrices?.[product.id];
+    if (customOverride !== undefined && customOverride !== null && customOverride !== '' && !isNaN(parseFloat(customOverride))) {
+      return {
+        final: parseFloat(customOverride),
+        original: product.price,
+        isSale: true,
+        label: relevantPromo.title,
+        isComingSoon: false
+      };
+    }
+
+    // 3. Calculate simple discount
     let discountedPrice = product.price;
     if (relevantPromo.discountType === 'percentage') {
       discountedPrice = product.price * (1 - (relevantPromo.value / 100));
@@ -3799,28 +3813,84 @@ export default function App() {
     return "#" + Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  // --- NEW: Handle Promo Code Application ---
+  // --- NEW: Handle Promo Code Application (supports stacking) ---
   const handleApplyCode = () => {
-    if (!appliedCodeInput.trim()) return;
+    const code = appliedCodeInput.trim();
+    if (!code) return;
+
     const cartItems = Object.values(cart);
-    const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const cartTotal = cartItems.reduce((sum, item) => sum + (getProductPrice(item).final * item.qty), 0);
 
     // Use the helper from Step 1
-    const result = validateCoupon(appliedCodeInput, cartTotal, cartItems);
+    const result = validateCoupon(code, cartTotal, cartItems);
 
-    if (result.valid) {
-      setAppliedCode({ code: appliedCodeInput, discount: result.discount, id: result.promoId, type: result.type });
-      setPromoError("");
-
-      const successMsg = result.type === 'free_delivery'
-        ? "Free Delivery code applied! 🚚"
-        : `Code applied! Saved ${result.discount.toFixed(3)} BHD`;
-      showNotification(successMsg);
-    } else {
-      setAppliedCode(null);
+    if (!result.valid) {
       setPromoError(result.error);
+      return;
+    }
+
+    if (result.type === 'free_delivery') {
+      if (appliedDelivery) {
+        setPromoError("You already have a free delivery code applied.");
+        return;
+      }
+      setAppliedDelivery({ code, discount: result.discount, id: result.promoId, type: result.type });
+      setPromoError("");
+      setAppliedCodeInput("");
+      showNotification(
+        deliveryMethod === 'delivery'
+          ? "Free Delivery code applied! 🚚"
+          : "Free Delivery code applied — select Delivery to use it."
+      );
+    } else {
+      if (appliedDiscount) {
+        setPromoError("You already have a discount code applied. Remove it to use a different one.");
+        return;
+      }
+      setAppliedDiscount({ code, discount: result.discount, id: result.promoId, type: result.type });
+      setPromoError("");
+      setAppliedCodeInput("");
+      showNotification(`Code applied! Saved ${result.discount.toFixed(3)} BHD`);
     }
   };
+
+  // 🛡️ Re-validate applied codes whenever the cart, delivery method, or
+  // promotions change, so the discount shown always matches what is charged.
+  useEffect(() => {
+    const cartItems = Object.values(cart);
+    const cartTotal = cartItems.reduce((sum, item) => sum + (getProductPrice(item).final * item.qty), 0);
+
+    // Re-validate the discount code (percentage / fixed)
+    if (appliedDiscount) {
+      const r = validateCoupon(appliedDiscount.code, cartTotal, cartItems);
+      if (r.valid && r.type !== 'free_delivery') {
+        setAppliedDiscount((prev) =>
+          prev && prev.discount === r.discount && prev.id === r.promoId
+            ? prev
+            : { ...prev, discount: r.discount, id: r.promoId, type: r.type }
+        );
+      } else {
+        setAppliedDiscount(null);
+        setPromoError("Your discount code is no longer valid and was removed.");
+      }
+    }
+
+    // Re-validate the free delivery code
+    if (appliedDelivery) {
+      const r = validateCoupon(appliedDelivery.code, cartTotal, cartItems);
+      if (r.valid && r.type === 'free_delivery') {
+        setAppliedDelivery((prev) =>
+          prev && prev.discount === r.discount && prev.id === r.promoId
+            ? prev
+            : { ...prev, discount: r.discount, id: r.promoId, type: r.type }
+        );
+      } else {
+        setAppliedDelivery(null);
+        setPromoError("Your free delivery code is no longer valid and was removed.");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, deliveryMethod, promotions]);
 
   // --- ✨ PHASE 4: FINAL SECURE CHECKOUT (ANTI-CHEAT + COGS + PROOF) ---
   const handleCheckout = async (e) => {
@@ -3877,37 +3947,70 @@ export default function App() {
           validatedItems.push({ ref: productRef, newStock: currentStock - item.qty });
         }
 
-        // --- STEP 2: PROMO VERIFICATION ---
-        let promoRef = null;
-        let promoSnap = null;
+        // --- STEP 2: PROMO VERIFICATION (stacking: one discount + one free delivery) ---
         let verifiedDiscount = 0;
+        let verifiedDeliveryDiscount = 0;
+        const appliedPromos = [appliedDiscount, appliedDelivery].filter(Boolean);
+        const promoUpdates = [];
 
-        if (appliedCode && appliedCode.id) {
-          promoRef = doc(db, "promotions", appliedCode.id);
-          promoSnap = await transaction.get(promoRef);
+        for (const applied of appliedPromos) {
+          const promoRef = doc(db, "promotions", applied.id);
+          const promoSnap = await transaction.get(promoRef);
 
-          if (promoSnap && promoSnap.exists()) {
-            const pData = promoSnap.data();
-            if (pData.type === 'free_delivery') {
-              verifiedDiscount = deliveryMethod === 'delivery' ? 1.000 : 0;
-            } else if (pData.discountType === 'percentage') {
-              verifiedDiscount = (verifiedSubtotal * (pData.value / 100));
-            } else {
-              verifiedDiscount = Number(pData.value) || 0;
-            }
+          if (!promoSnap.exists()) {
+            throw "A promo code is no longer valid. Please remove it and try again.";
           }
+
+          const pData = promoSnap.data();
+
+          // 🛡️ SERVER-SIDE RE-VALIDATION: code, dates, usage limit, min spend
+          const codeMatches = (pData.code || "").toUpperCase() === (applied.code || "").toUpperCase();
+          const promoIsActive = isPromoActive(pData);
+          const withinUsage = !pData.usageLimit || (pData.usedCount || 0) < pData.usageLimit;
+          const meetsMinSpend = !pData.minSpend || verifiedSubtotal >= pData.minSpend;
+
+          // Only the items that fall INSIDE the promo's scope count toward the discount
+          let eligibleSubtotal = 0;
+          Object.values(finalOrderItems).forEach(item => {
+            const inScope =
+              pData.scope === 'all' ||
+              (pData.scope === 'category' && (
+                (pData.targetSelections || []).includes(item.category) ||
+                (pData.targetSelections || []).includes(item.subcategory)
+              )) ||
+              (pData.scope === 'specific' && (
+                (pData.targetSelections || []).includes(item.id) ||
+                (pData.productIds || []).includes(item.id)
+              ));
+            if (inScope) eligibleSubtotal += (item.price * item.qty);
+          });
+
+          if (!codeMatches || !promoIsActive || !withinUsage || !meetsMinSpend || eligibleSubtotal <= 0) {
+            throw "A promo code is no longer valid. Please remove it and try again.";
+          }
+
+          if (pData.discountType === 'free_delivery') {
+            // 🚚 Free delivery only applies when Delivery is the selected method
+            verifiedDeliveryDiscount = deliveryMethod === 'delivery' ? 1.000 : 0;
+          } else if (pData.discountType === 'percentage') {
+            verifiedDiscount = eligibleSubtotal * (pData.value / 100);
+          } else {
+            verifiedDiscount = Math.min(Number(pData.value) || 0, eligibleSubtotal);
+          }
+
+          promoUpdates.push({ ref: promoRef, usedCount: (pData.usedCount || 0) + 1 });
         }
 
-        const finalTotal = Math.max(0, verifiedSubtotal + deliveryFee - verifiedDiscount);
+        const finalTotal = Math.max(0, verifiedSubtotal + deliveryFee - verifiedDiscount - verifiedDeliveryDiscount);
 
         // --- STEP 3: EXECUTE ALL "WRITES" ---
         validatedItems.forEach(update => {
           transaction.update(update.ref, { stock: update.newStock });
         });
 
-        if (promoSnap && promoSnap.exists()) {
-          transaction.update(promoRef, { usedCount: (promoSnap.data().usedCount || 0) + 1 });
-        }
+        promoUpdates.forEach(u => {
+          transaction.update(u.ref, { usedCount: u.usedCount });
+        });
 
         const newOrderRef = doc(collection(db, "orders"));
         const orderData = {
@@ -3924,8 +4027,8 @@ export default function App() {
           totalCOGS: totalOrderCOGS,
           subtotal: verifiedSubtotal,
           deliveryFee: deliveryFee,
-          discount: verifiedDiscount,
-          promoCode: appliedCode ? appliedCode.code : null,
+          discount: verifiedDiscount + verifiedDeliveryDiscount,
+          promoCode: appliedPromos.map(p => p.code).join(" + ") || null,
           total: finalTotal,
           journeyStatus: "pending",
           date: new Date().toISOString(),
@@ -3937,7 +4040,9 @@ export default function App() {
       setCheckoutStep("success");
       setCart({});
       setProofFile(null);
-      setAppliedCode(null);
+      setAppliedDiscount(null);
+      setAppliedDelivery(null);
+      setAppliedCodeInput("");
       showNotification("Order placed successfully! ✧", "success");
 
     } catch (error) {
@@ -4815,36 +4920,67 @@ export default function App() {
                         <span>Delivery Fee:</span>
                         <span>{(deliveryMethod === 'delivery' ? 1.000 : 0).toFixed(3)} BHD</span>
                       </div>
-                      {appliedCode && (
-                        <div className="flex justify-between text-xs text-green-600 font-bold animate-pulse">
-                          <span>Discount ({appliedCode.code}):</span>
-                          <span>
-                            {appliedCode.type === 'free_delivery'
-                              ? (deliveryMethod === 'delivery' ? '- 1.000 BHD (Free Delivery)' : '0.000 BHD (Delivery Not Selected)')
-                              : `- ${appliedCode.discount.toFixed(3)} BHD`}
-                          </span>
+                      {appliedDiscount && (
+                        <div className="flex justify-between text-xs text-green-600 font-bold">
+                          <span>Discount ({appliedDiscount.code}):</span>
+                          <span>- {appliedDiscount.discount.toFixed(3)} BHD</span>
+                        </div>
+                      )}
+                      {appliedDelivery && (
+                        <div className="flex justify-between text-xs text-blue-600 font-bold">
+                          <span>Free Delivery ({appliedDelivery.code}):</span>
+                          <span>{deliveryMethod === 'delivery' ? '- 1.000 BHD' : '0.000 BHD (Delivery not selected)'}</span>
                         </div>
                       )}
                     </div>
 
-                    {/* PROMO CODE INPUT */}
+                    {/* PROMO CODE INPUT (stacking: 1 discount + 1 free delivery) */}
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="Promo Code?"
-                        className="flex-1 p-2 text-xs border border-purple-200 rounded-lg uppercase placeholder:normal-case focus:outline-none focus:border-purple-500"
+                        placeholder={
+                          appliedDiscount && appliedDelivery
+                            ? "Max codes applied"
+                            : appliedDiscount
+                              ? "Add a free delivery code?"
+                              : "Promo Code?"
+                        }
+                        className="flex-1 p-2 text-xs border border-purple-200 rounded-lg uppercase placeholder:normal-case focus:outline-none focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-400"
                         value={appliedCodeInput}
                         onChange={(e) => setAppliedCodeInput(e.target.value.toUpperCase())}
+                        disabled={!!appliedDiscount && !!appliedDelivery}
                       />
                       <button
                         onClick={handleApplyCode}
-                        disabled={!!appliedCode}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${appliedCode ? 'bg-green-500 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+                        disabled={!!appliedDiscount && !!appliedDelivery}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${appliedDiscount && appliedDelivery ? 'bg-green-500 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}
                       >
-                        {appliedCode ? <Check size={14} /> : "Apply"}
+                        {appliedDiscount && appliedDelivery ? <Check size={14} /> : "Apply"}
                       </button>
                     </div>
                     {promoError && <p className="text-[10px] text-red-500 font-bold">{promoError}</p>}
+
+                    {/* Applied code chips (removable) */}
+                    {(appliedDiscount || appliedDelivery) && (
+                      <div className="flex flex-col gap-1.5">
+                        {appliedDiscount && (
+                          <div className="flex items-center justify-between bg-white/80 border border-green-200 rounded-lg px-2.5 py-1.5">
+                            <span className="text-[10px] font-bold text-green-700 uppercase">
+                              {appliedDiscount.code} — {appliedDiscount.discount.toFixed(3)} BHD off
+                            </span>
+                            <button onClick={() => { setAppliedDiscount(null); setPromoError(""); }} className="text-gray-400 hover:text-red-500" title="Remove"><X size={12} /></button>
+                          </div>
+                        )}
+                        {appliedDelivery && (
+                          <div className="flex items-center justify-between bg-white/80 border border-blue-200 rounded-lg px-2.5 py-1.5">
+                            <span className="text-[10px] font-bold text-blue-700 uppercase">
+                              {appliedDelivery.code} — {deliveryMethod === 'delivery' ? 'Free Delivery' : 'Select Delivery to use'}
+                            </span>
+                            <button onClick={() => { setAppliedDelivery(null); setPromoError(""); }} className="text-gray-400 hover:text-red-500" title="Remove"><X size={12} /></button>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
 
                     {/* FINAL TOTAL */}
@@ -4852,16 +4988,11 @@ export default function App() {
                       <span className="text-purple-700 font-bold text-lg">Total:</span>
                       <span className="font-mono text-2xl font-bold text-gray-900">
                         {(() => {
-                          const cartSub = Object.values(cart).reduce((s, i) => s + (getProductPrice(i).final * i.qty), 0); const fee = deliveryMethod === 'delivery' ? 1.000 : 0;
-                          let codeDeduct = 0;
-                          if (appliedCode) {
-                            if (appliedCode.type === 'free_delivery') {
-                              codeDeduct = deliveryMethod === 'delivery' ? 1.000 : 0;
-                            } else {
-                              codeDeduct = appliedCode.discount;
-                            }
-                          }
-                          return Math.max(0, cartSub + fee - codeDeduct).toFixed(3);
+                          const cartSub = Object.values(cart).reduce((s, i) => s + (getProductPrice(i).final * i.qty), 0);
+                          const fee = deliveryMethod === 'delivery' ? 1.000 : 0;
+                          const discountDeduct = appliedDiscount ? appliedDiscount.discount : 0;
+                          const deliveryDeduct = (appliedDelivery && deliveryMethod === 'delivery') ? 1.000 : 0;
+                          return Math.max(0, cartSub + fee - discountDeduct - deliveryDeduct).toFixed(3);
                         })()} BHD
                       </span>
                     </div>
